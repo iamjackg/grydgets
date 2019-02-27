@@ -6,7 +6,7 @@ import logging
 import time
 import threading
 
-from dash import widgets, config
+from grydgets import widgets, config
 
 
 logging.basicConfig(level=logging.DEBUG)

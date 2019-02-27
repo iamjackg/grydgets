@@ -11,7 +11,7 @@ import time
 import pygame
 import requests
 
-from dash.fonts import FontCache
+from grydgets.fonts import FontCache
 
 font_cache = FontCache()
 
