@@ -1,4 +1,3 @@
-import json
 import os
 
 import pygame
@@ -11,19 +10,25 @@ from grydgets import widgets, config
 
 logging.basicConfig(level=logging.DEBUG)
 
-conf = config.parse_conf('widgets.yaml')
+widget_tree = config.load_yaml('widgets.yaml')
+conf = config.load_config('conf.yaml')
 
-MAX_FPS = 60
-
-flags = 0
-flags |= pygame.DOUBLEBUF
-if os.uname()[1] == 'raspberrypi':
+if 'fb-device' in conf['graphics']:
     os.environ["SDL_FBDEV"] = '/dev/fb1'
+
+if 'x-display' in conf['graphics']:
     os.environ["DISPLAY"] = ':0'
-    MAX_FPS = 10
-    flags |= pygame.FULLSCREEN
-    flags |= pygame.HWSURFACE
-    logging.getLogger().setLevel(logging.INFO)
+
+fps_limit = conf['graphics']['fps-limit']
+
+pygame_flags = 0
+pygame_flags |= pygame.DOUBLEBUF
+
+if conf['graphics']['fullscreen']:
+    pygame_flags |= pygame.FULLSCREEN
+    pygame_flags |= pygame.HWSURFACE
+
+logging.getLogger().setLevel(logging.getLevelName(conf['logging']['level'].upper()))
 
 stop_everything = threading.Event()
 
@@ -32,13 +37,14 @@ pygame.mixer.quit()
 
 pygame.mouse.set_visible(0)
 
-screen_size = (480, 320)
-screen = pygame.display.set_mode(screen_size, flags)
+screen_size = tuple(conf['graphics']['resolution'])
+screen = pygame.display.set_mode(screen_size, pygame_flags)
 
 screen_widget = widgets.ScreenWidget(screen_size)
 
-screen_widget.add_widget(widgets.create_widget_tree(conf['widgets'][0]))
+screen_widget.add_widget(widgets.create_widget_tree(widget_tree['widgets'][0]))
 
+fps_limit = 60
 fps_time = time.time()
 frame_data = list()
 while not stop_everything.is_set():
@@ -52,7 +58,7 @@ while not stop_everything.is_set():
         screen.blit(screen_widget.render(screen_size), (0, 0))
 
         pygame.display.flip()
-        sleep_time = max((1/MAX_FPS) - (time.time()-frame_start), 0)
+        sleep_time = max((1 / fps_limit) - (time.time() - frame_start), 0)
         # if sleep_time == 0:
         #     logging.debug('Losing frames {}'.format(sleep_time))
         time.sleep(sleep_time)
