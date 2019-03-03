@@ -39,6 +39,7 @@ pygame.mouse.set_visible(0)
 
 screen_size = tuple(conf['graphics']['resolution'])
 screen = pygame.display.set_mode(screen_size, pygame_flags)
+pygame.display.set_caption('Grydgets dashboard', 'Grydgets')
 
 screen_widget = widgets.ScreenWidget(screen_size)
 
