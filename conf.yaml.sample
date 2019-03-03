@@ -1,0 +1,8 @@
+graphics:
+  fps-limit: 60
+  fullscreen: False
+  resolution: [480, 320]
+  fb-device: '/dev/fb1'
+  x-display: ':0'
+logging:
+  level: info

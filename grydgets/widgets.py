@@ -197,7 +197,7 @@ class GridWidget(ContainerWidget):
 
 
 class TextWidget(Widget):
-    def __init__(self, font_path, text='', text_size=None, color=(0, 0, 0), padding=0, align='left', vertical_align='top'):
+    def __init__(self, font_path=None, text='', text_size=None, color=(0, 0, 0), padding=0, align='left', vertical_align='top'):
         super().__init__()
         self.color = color
         self.align = align
@@ -256,11 +256,11 @@ class TextWidget(Widget):
 
 
 class DateClockWidget(Widget):
-    def __init__(self):
+    def __init__(self, time_font_path=None, date_font_path=None):
         super().__init__()
         self.grid_widget = GridWidget(rows=2, columns=1, row_ratios=[7, 3])
-        self.hour_widget = TextWidget('OpenSans-ExtraBold.ttf', color=(255, 255, 255), padding=2, align='center', vertical_align='center')
-        self.date_widget = TextWidget('OpenSans-Regular.ttf', color=(255, 255, 255), padding=2, align='center')
+        self.hour_widget = TextWidget(font_path=time_font_path, color=(255, 255, 255), padding=2, align='center', vertical_align='center')
+        self.date_widget = TextWidget(font_path=date_font_path, color=(255, 255, 255), padding=2, align='center')
         self.grid_widget.add_widget(self.hour_widget)
         self.grid_widget.add_widget(self.date_widget)
         self.surface = None
@@ -328,13 +328,13 @@ class UpdaterWidget(Widget):
 
 
 class RESTWidget(UpdaterWidget):
-    def __init__(self, url, json_path, format_string, text_size=None, auth=None):
+    def __init__(self, url, json_path=None, format_string=None, font_path=None, text_size=None, auth=None):
         self.url = url
         self.json_path = json_path
-        self.format_string = format_string
+        self.format_string = format_string or '{}'
         self.update_frequency = 30
         self.value = ''
-        self.text_widget = TextWidget('OpenSans-ExtraBold.ttf', color=(255, 255, 255), padding=6, text_size=text_size, align='center', vertical_align='center')
+        self.text_widget = TextWidget(font_path=font_path, color=(255, 255, 255), padding=6, text_size=text_size, align='center', vertical_align='center')
 
         self.requests_kwargs = {
             'headers': {}
@@ -350,12 +350,16 @@ class RESTWidget(UpdaterWidget):
 
     def update(self):
         response = requests.get(self.url, **self.requests_kwargs)
-        response_json = response.json()
-        json_path_list = self.json_path.split('.')
-        while json_path_list:
-            response_json = response_json[json_path_list.pop(0)]
+        if self.json_path is not None:
+            response_json = response.json()
+            json_path_list = self.json_path.split('.')
+            while json_path_list:
+                response_json = response_json[json_path_list.pop(0)]
+            text = response_json
+        else:
+            text = response.text
 
-        self.value = self.format_string.format(response_json)
+        self.value = self.format_string.format(text)
         logging.debug('Updated {} to {}'.format(self, self.value))
 
     def render(self, size):
@@ -367,7 +371,7 @@ class RESTWidget(UpdaterWidget):
 
 
 class ImageWidget(Widget):
-    def __init__(self, image_data):
+    def __init__(self, image_data=None):
         super().__init__()
         self.image_data = image_data
         self.old_surface = None
@@ -411,12 +415,11 @@ class ImageWidget(Widget):
 
 
 class RESTImageWidget(UpdaterWidget):
-    def __init__(self, url, json_path, auth=None):
+    def __init__(self, url, json_path=None, auth=None):
         self.url = url
         self.json_path = json_path
         self.update_frequency = 30
-        self.image_widget = ImageWidget(image_data=None)
-        self.image_data = None
+        self.image_widget = ImageWidget()
 
         self.requests_kwargs = {
             'headers': {}
@@ -432,20 +435,24 @@ class RESTImageWidget(UpdaterWidget):
 
     def update(self):
         response = requests.get(self.url, **self.requests_kwargs)
-        response_json = response.json()
-        json_path_list = self.json_path.split('.')
-        while json_path_list:
-            response_json = response_json[json_path_list.pop(0)]
+        if self.json_path is not None:
+            response_json = response.json()
+            json_path_list = self.json_path.split('.')
+            while json_path_list:
+                response_json = response_json[json_path_list.pop(0)]
 
-        image_url = response_json
-        image_response = requests.get(image_url)
-        self.image_data = image_response.content
+            image_url = response_json
+            image_response = requests.get(image_url)
+            image_data = image_response.content
+        else:
+            image_data = response.content
+
         logging.debug('Updated {}'.format(self))
 
-        self.dirty = True
+        self.image_widget.set_image(image_data)
 
     def render(self, size):
-        self.image_widget.set_image(self.image_data)
+        #self.image_widget.set_image(self.image_data)
 
         return self.image_widget.render(size)
 
@@ -478,9 +485,9 @@ class HTTPImageWidget(UpdaterWidget):
 
 
 class LabelWidget(ContainerWidget):
-    def __init__(self, text, position='above', text_size=None):
+    def __init__(self, text, font_path=None, position='above', text_size=None):
         super().__init__()
-        self.text_widget = TextWidget(font_path='OpenSans-Regular.ttf', text=text, text_size=text_size, color=(255, 255, 255), align='center', vertical_align='top')
+        self.text_widget = TextWidget(font_path=font_path, text=text, text_size=text_size, color=(255, 255, 255), align='center', vertical_align='top')
         self.position = position
 
         grid_proportions = [1, 2]

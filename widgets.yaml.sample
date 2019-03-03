@@ -1,0 +1,32 @@
+widgets:
+  - widget: grid
+    rows: 2
+    columns: 1
+    children:
+      - widget: dateclock
+      - widget: grid
+        rows: 1
+        columns: 1
+        padding: 4
+        color: [50, 50, 50]
+        children:
+          - widget: label
+            text: 'Random person'
+            position: below
+            text_size: 30
+            children:
+              - widget: flip
+                interval: 5
+                transition: 1
+                ease: 3
+                children:
+                  - widget: rest
+                    url: 'https://jsonplaceholder.typicode.com/users/1'
+                    json_path: 'name'
+                    format_string: '{}'
+                    text_size: 70
+                  - widget: rest
+                    url: 'https://jsonplaceholder.typicode.com/users/1'
+                    json_path: 'address.city'
+                    format_string: 'lives in {}'
+                    text_size: 70
