@@ -1,7 +1,7 @@
 # Grydgets
 
-Grydgets is an easy tool to create widget-based animated dashboards.
-It runs on anything that supports Python, PyGame, and SDL: from the oldest Raspberry Pi to a full-blown modern PC.
+Grydgets allows you to easily create widget-based animated dashboards.
+It runs on anything that supports Python, PyGame, and SDL, from the oldest Raspberry Pi to a full-blown modern PC.
 
 ![](images/grydgets-window.png)
 
@@ -19,7 +19,8 @@ pip install pygame requests voluptuous
 
 ### General options
 
-Grydgets' configuration is stored in `conf.yaml` in its main folder. A sample file is provided in the repo.
+Configuration for Grydgets must be stored in a `conf.yaml` file in its main folder. A sample file is provided in the
+repo.
 
 These are the currently available options:
 
@@ -35,25 +36,27 @@ logging:
 ```
 
 `fb-device` is only needed if you're using a non-standard display device, like an SPI screen on the Raspberry Pi.
+
 Similarly, `x-display` is necessary if you're trying to start Grydgets via ssh, and the `DISPLAY` environment variable
 is not properly set.
 
 ## Widgets
 
 Grydgets, as the name suggests, draws dashboards based on a series of _widgets_. Widgets are generally of two types:
-normal widgets, and container widgets.
+Normal and Container.
 
-Normal widgets usually draw something specific on the screen: a clock, the result of a REST call, a picture, etc.
+**Normal widgets** draw something specific on the screen: a clock, the result of a REST call, an image, etc.
 
-Container widgets determine where and how other widgets appear, for example laying them out in a grid. They can also
-affect their appearance, for example by adding a label underneath another widget.
+**Container widgets** determine where and how other widgets appear. For example, a Grid widget allows you to lay other
+widgets out in a grid. They can also affect their appearance, for example by adding a label below or above another
+widget.
 
 The tree of widgets that composes your dashboard must be specified in a file called `widgets.yaml` in the main folder. A
 sample file is included in the repository.
 
 ### Container widgets
 
-All container widgets take a `children` parameter, specifying a list of widgets they're supposed to contain.
+All Container widgets take a `children` parameter, specifying the list of widgets they're going to contain.
 
 #### grid
 
