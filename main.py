@@ -6,7 +6,8 @@ import time
 import threading
 
 from grydgets import widgets, config
-
+from grydgets.widgets.containers import ScreenWidget
+from grydgets.widgets.widgets import create_widget_tree, stop_all_widgets
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -41,9 +42,9 @@ screen_size = tuple(conf['graphics']['resolution'])
 screen = pygame.display.set_mode(screen_size, pygame_flags)
 pygame.display.set_caption('Grydgets dashboard', 'Grydgets')
 
-screen_widget = widgets.ScreenWidget(screen_size)
+screen_widget = ScreenWidget(screen_size)
 
-screen_widget.add_widget(widgets.create_widget_tree(widget_tree['widgets'][0]))
+screen_widget.add_widget(create_widget_tree(widget_tree['widgets'][0]))
 
 fps_limit = 60
 fps_time = time.time()
@@ -73,5 +74,5 @@ while not stop_everything.is_set():
         fps_time = time.time()
         frame_data = list()
 
-widgets.stop_all_widgets(screen_widget)
+stop_all_widgets(screen_widget)
 pygame.quit()
