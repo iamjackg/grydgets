@@ -119,15 +119,21 @@ class RESTWidget(UpdaterWidget):
         return self.text_widget.is_dirty()
 
     def update(self):
-        response = requests.get(self.url, **self.requests_kwargs)
-        if self.json_path is not None:
-            response_json = response.json()
-            json_path_list = self.json_path.split('.')
-            while json_path_list:
-                response_json = response_json[json_path_list.pop(0)]
-            text = response_json
-        else:
-            text = response.text
+        try:
+            response = requests.get(self.url, **self.requests_kwargs)
+            if response.status_code != 200:
+                text = "Error {}".format(response.status_code)
+            elif self.json_path is not None:
+                response_json = response.json()
+                json_path_list = self.json_path.split('.')
+                while json_path_list:
+                    response_json = response_json[json_path_list.pop(0)]
+                text = response_json
+            else:
+                text = response.text
+        except requests.ConnectionError as e:
+            logging.warning('Could not update {}: {}'.format(self, e))
+            text = "Unavailable"
 
         self.value = self.format_string.format(text)
         logging.debug('Updated {} to {}'.format(self, self.value))

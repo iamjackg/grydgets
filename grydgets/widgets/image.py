@@ -71,18 +71,22 @@ class RESTImageWidget(UpdaterWidget):
         return self.image_widget.is_dirty()
 
     def update(self):
-        response = requests.get(self.url, **self.requests_kwargs)
-        if self.json_path is not None:
-            response_json = response.json()
-            json_path_list = self.json_path.split('.')
-            while json_path_list:
-                response_json = response_json[json_path_list.pop(0)]
+        try:
+            response = requests.get(self.url, **self.requests_kwargs)
+            if self.json_path is not None:
+                response_json = response.json()
+                json_path_list = self.json_path.split('.')
+                while json_path_list:
+                    response_json = response_json[json_path_list.pop(0)]
 
-            image_url = response_json
-            image_response = requests.get(image_url)
-            image_data = image_response.content
-        else:
-            image_data = response.content
+                image_url = response_json
+                image_response = requests.get(image_url)
+                image_data = image_response.content
+            else:
+                image_data = response.content
+        except requests.ConnectionError as e:
+            logging.warning('Could not update {}: {}'.format(self, e))
+            return
 
         logging.debug('Updated {}'.format(self))
 
