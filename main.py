@@ -15,10 +15,10 @@ widget_tree = config.load_yaml('widgets.yaml')
 conf = config.load_config('conf.yaml')
 
 if 'fb-device' in conf['graphics']:
-    os.environ["SDL_FBDEV"] = '/dev/fb1'
+    os.environ["SDL_FBDEV"] = conf['graphics']['fb-device']
 
 if 'x-display' in conf['graphics']:
-    os.environ["DISPLAY"] = ':0'
+    os.environ["DISPLAY"] = conf['graphics']['x-display']
 
 fps_limit = conf['graphics']['fps-limit']
 
