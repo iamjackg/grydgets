@@ -96,30 +96,3 @@ class RESTImageWidget(UpdaterWidget):
         #self.image_widget.set_image(self.image_data)
 
         return self.image_widget.render(size)
-
-
-class HTTPImageWidget(UpdaterWidget):
-    def __init__(self, url, auth=None):
-        self.url = url
-        self.update_frequency = 30
-        self.image_widget = ImageWidget(image_data=None)
-        self.image_data = None
-
-        self.requests_kwargs = {
-            'headers': {}
-        }
-        if auth is not None:
-            if 'bearer' in auth:
-                self.requests_kwargs['headers']['Authorization'] = 'Bearer {}'.format(auth['bearer'])
-        # This needs to happen at the end because it actually starts the update thread
-        super().__init__()
-
-    def update(self):
-        response = requests.get(self.url, **self.requests_kwargs)
-        self.image_data = response.content
-        logging.debug('Updated {}'.format(self))
-
-    def render(self, size):
-        self.image_widget.set_image(self.image_data)
-
-        return self.image_widget.render(size)
