@@ -11,25 +11,25 @@ from grydgets.widgets.widgets import create_widget_tree, stop_all_widgets
 
 logging.basicConfig(level=logging.DEBUG)
 
-widget_tree = config.load_yaml('widgets.yaml')
-conf = config.load_config('conf.yaml')
+widget_tree = config.load_yaml("widgets.yaml")
+conf = config.load_config("conf.yaml")
 
-if 'fb-device' in conf['graphics']:
-    os.environ["SDL_FBDEV"] = conf['graphics']['fb-device']
+if "fb-device" in conf["graphics"]:
+    os.environ["SDL_FBDEV"] = conf["graphics"]["fb-device"]
 
-if 'x-display' in conf['graphics']:
-    os.environ["DISPLAY"] = conf['graphics']['x-display']
+if "x-display" in conf["graphics"]:
+    os.environ["DISPLAY"] = conf["graphics"]["x-display"]
 
-fps_limit = conf['graphics']['fps-limit']
+fps_limit = conf["graphics"]["fps-limit"]
 
 pygame_flags = 0
 pygame_flags |= pygame.DOUBLEBUF
 
-if conf['graphics']['fullscreen']:
+if conf["graphics"]["fullscreen"]:
     pygame_flags |= pygame.FULLSCREEN
     pygame_flags |= pygame.HWSURFACE
 
-logging.getLogger().setLevel(logging.getLevelName(conf['logging']['level'].upper()))
+logging.getLogger().setLevel(logging.getLevelName(conf["logging"]["level"].upper()))
 
 stop_everything = threading.Event()
 
@@ -38,13 +38,13 @@ pygame.mixer.quit()
 
 pygame.mouse.set_visible(0)
 
-screen_size = tuple(conf['graphics']['resolution'])
+screen_size = tuple(conf["graphics"]["resolution"])
 screen = pygame.display.set_mode(screen_size, pygame_flags)
-pygame.display.set_caption('Grydgets dashboard', 'Grydgets')
+pygame.display.set_caption("Grydgets dashboard", "Grydgets")
 
 screen_widget = ScreenWidget(screen_size)
 
-screen_widget.add_widget(create_widget_tree(widget_tree['widgets'][0]))
+screen_widget.add_widget(create_widget_tree(widget_tree["widgets"][0]))
 
 fps_limit = 60
 fps_time = time.time()
@@ -70,7 +70,7 @@ while not stop_everything.is_set():
     frame_end = time.time()
     frame_data.append(frame_end - frame_start)
     if time.time() - fps_time > 0.5:
-        logging.debug('FPS: {}'.format(1 / (sum(frame_data) / len(frame_data))))
+        # logging.debug("FPS: {}".format(1 / (sum(frame_data) / len(frame_data))))
         fps_time = time.time()
         frame_data = list()
 

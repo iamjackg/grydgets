@@ -1,5 +1,6 @@
 import io
 import logging
+import threading
 
 import pygame
 import requests
@@ -32,16 +33,29 @@ class ImageWidget(Widget):
             for picture_axis, container_axis in zip(original_size, self.size):
                 if picture_axis != container_axis:
                     ratio = picture_axis / container_axis
-                    adjusted_sizes.append(tuple(int(original_axis / ratio) for original_axis in original_size))
+                    adjusted_sizes.append(
+                        tuple(
+                            int(original_axis / ratio)
+                            for original_axis in original_size
+                        )
+                    )
 
             final_size = self.size
             for adjusted_size in adjusted_sizes:
-                if adjusted_size[0] <= self.size[0] and adjusted_size[1] <= self.size[1]:
+                if (
+                    adjusted_size[0] <= self.size[0]
+                    and adjusted_size[1] <= self.size[1]
+                ):
                     final_size = adjusted_size
                     break
 
-            resized_picture = pygame.transform.smoothscale(loaded_image_surface, final_size)
-            picture_position = ((self.size[0] - final_size[0]) / 2, (self.size[1] - final_size[1]) / 2)
+            resized_picture = pygame.transform.smoothscale(
+                loaded_image_surface, final_size
+            )
+            picture_position = (
+                (self.size[0] - final_size[0]) / 2,
+                (self.size[1] - final_size[1]) / 2,
+            )
 
             final_surface = pygame.Surface(self.size, pygame.SRCALPHA, 32)
             final_surface.blit(resized_picture, picture_position)
@@ -58,12 +72,12 @@ class RESTImageWidget(UpdaterWidget):
         self.update_frequency = 30
         self.image_widget = ImageWidget()
 
-        self.requests_kwargs = {
-            'headers': {}
-        }
+        self.requests_kwargs = {"headers": {}}
         if auth is not None:
-            if 'bearer' in auth:
-                self.requests_kwargs['headers']['Authorization'] = 'Bearer {}'.format(auth['bearer'])
+            if "bearer" in auth:
+                self.requests_kwargs["headers"]["Authorization"] = "Bearer {}".format(
+                    auth["bearer"]
+                )
         # This needs to happen at the end because it actually starts the update thread
         super().__init__()
 
@@ -75,7 +89,7 @@ class RESTImageWidget(UpdaterWidget):
             response = requests.get(self.url, **self.requests_kwargs)
             if self.json_path is not None:
                 response_json = response.json()
-                json_path_list = self.json_path.split('.')
+                json_path_list = self.json_path.split(".")
                 while json_path_list:
                     response_json = response_json[json_path_list.pop(0)]
 
@@ -85,14 +99,14 @@ class RESTImageWidget(UpdaterWidget):
             else:
                 image_data = response.content
         except requests.ConnectionError as e:
-            logging.warning('Could not update {}: {}'.format(self, e))
+            logging.warning("Could not update {}: {}".format(self, e))
             return
 
-        logging.debug('Updated {}'.format(self))
+        logging.debug("Updated {}".format(self))
 
         self.image_widget.set_image(image_data)
 
     def render(self, size):
-        #self.image_widget.set_image(self.image_data)
+        # self.image_widget.set_image(self.image_data)
 
         return self.image_widget.render(size)

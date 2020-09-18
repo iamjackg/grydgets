@@ -47,9 +47,9 @@ class UpdaterWidget(Widget):
 
     def stop(self):
         self.update_thread.stop()
-        logging.debug('{} waiting for thread to terminate'.format(self))
+        logging.debug("{} waiting for thread to terminate".format(self))
         self.update_thread.join()
-        logging.debug('{} joined'.format(self))
+        logging.debug("{} joined".format(self))
 
     def update(self):
         pass
@@ -63,7 +63,7 @@ class WidgetUpdaterThread(threading.Thread):
         self.frequency = frequency
         self.last_update = int(time.time())
 
-        logging.debug('Initialized {}'.format(self))
+        logging.debug("Initialized {}".format(self))
 
     def stop(self):
         self._stop_event.set()
@@ -73,7 +73,7 @@ class WidgetUpdaterThread(threading.Thread):
             while not self._stop_event.is_set():
                 now = int(time.time())
                 if now - self.last_update >= self.frequency:
-                    logging.debug('Updating {}'.format(self.widget))
+                    logging.debug("Updating {}".format(self.widget))
                     self.widget.update()
                     self.last_update = now
                 time.sleep(0.1)
