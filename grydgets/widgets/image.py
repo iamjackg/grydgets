@@ -11,13 +11,15 @@ from grydgets.widgets.base import Widget, UpdaterWidget
 class ImageWidget(Widget):
     def __init__(self, image_data=None):
         super().__init__()
+        self.image_update_lock = threading.Lock()
         self.image_data = image_data
         self.old_surface = None
         self.dirty = True
 
     def set_image(self, image_data):
         if image_data != self.image_data:
-            self.image_data = image_data
+            with self.image_update_lock:
+                self.image_data = image_data
             self.dirty = True
 
     def render(self, size):
@@ -26,7 +28,16 @@ class ImageWidget(Widget):
         if self.image_data is None:
             self.old_surface = pygame.Surface(self.size, pygame.SRCALPHA, 32)
         elif self.dirty:
-            loaded_image_surface = pygame.image.load(io.BytesIO(self.image_data))
+            try:
+                with self.image_update_lock:
+                    loaded_image_surface = pygame.image.load(
+                        io.BytesIO(self.image_data)
+                    )
+            except pygame.error:
+                with self.image_update_lock:
+                    self.image_data = None
+                return self.old_surface
+
             original_size = loaded_image_surface.get_size()
             adjusted_sizes = list()
 
