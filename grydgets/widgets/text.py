@@ -117,6 +117,70 @@ class DateClockWidget(Widget):
         return self.surface
 
 
+import requests
+import xml.etree.ElementTree as ET
+class NextbusWidget(UpdaterWidget):
+
+    def __init__(self, agency, stop_id, route=None, number=1, font_path=None, text_size=None):
+        self.agency = agency
+        self.stop_id = stop_id
+        self.number = number
+        self.prediction_url = f"http://webservices.nextbus.com/service/publicXMLFeed?a={self.agency}&command=predictions&stopId={self.stop_id}"
+        if route:
+            self.prediction_url += f"&r={route}"
+        self.value = ""
+
+        self.text_widget = TextWidget(
+            font_path=font_path,
+            color=(255, 255, 255),
+            padding=6,
+            text_size=text_size,
+            align="center",
+            vertical_align="center",
+        )
+
+        super().__init__() # starts the update thread
+
+    def is_dirty(self):
+        return self.text_widget.is_dirty()
+
+    def get_next_time(self):
+        try:
+            response = requests.get(self.prediction_url)
+            if response.status_code != 200:
+                text = "Error {}".format(response.status_code)
+            else:
+                root = ET.fromstring(response.text)
+                upcoming = []
+                for route in root:
+                    routeNumber = route.attrib['routeTag']
+                    for direction in route:
+                        for prediction in direction:
+                            upcoming.append((routeNumber, int(prediction.attrib['minutes'])))
+
+                upcoming.sort(key=lambda x: x[1])
+                print(", ".join([b[1].__str__() + "m" for b in upcoming]))
+                #text = f"{upcoming[0][1]} min"
+                limit = min(self.number, len(upcoming))
+                text = " ".join([f"{b[1]}min" for b in upcoming[0:limit]])
+        except requests.ConnectionError as e:
+            logging.warning("Could not update {}: {}".format(self, e))
+            text = "Unavailable"
+        return text
+
+    def update(self):
+        new_value = self.get_next_time()
+        if new_value != self.value:
+            self.value = new_value
+            self.text_widget.set_text(self.value)
+        logging.debug("Updated {} to {}".format(self, self.value))
+
+    def render(self, size):
+        self.size = size
+        self.text_widget.set_text(self.get_next_time())
+        return self.text_widget.render(self.size)
+
+
 class RESTWidget(UpdaterWidget):
     def __init__(
         self,
