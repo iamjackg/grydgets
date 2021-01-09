@@ -169,7 +169,7 @@ class NextbusWidget(UpdaterWidget):
                 print(", ".join([b[1].__str__() + "m" for b in upcoming]))
                 # text = f"{upcoming[0][1]} min"
                 limit = min(self.number, len(upcoming))
-                text = " ".join([f"{b[1]}min" for b in upcoming[0:limit]])
+                text = " ".join(["{}min".format(b[1]) for b in upcoming[0:limit]])
         except requests.ConnectionError as e:
             logging.warning("Could not update {}: {}".format(self, e))
             text = "Unavailable"
