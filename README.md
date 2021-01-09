@@ -12,7 +12,7 @@ all the dependencies by yourself.
 
 ```
 git clone https://github.com/iamjackg/grydgets
-pip install pygame requests voluptuous
+pip install pygame requests voluptuous pyyaml
 ```
 
 ## Configuration
@@ -194,3 +194,21 @@ A widget that displays an image. Currently only accepts binary image data.
 It supports the following parameters:
 
 * `image_data` _(optional)_: binary contents of the image to display.
+
+#### nextbus
+
+A widget that displays the time for the next vehicle to arrive at a public transit stop, using the NextBus public API. It supports the following parameters:
+
+* `agency`: the agency code, e.g. `ttc` for the Toronto Transit Commission.
+* `stop_id`: the stop id to report on
+* `route` _(optional)_: limit results to a specific route
+* `number` _(optional)_: the number of vehicles to report the arrival time for
+
+For example, to show the next two arrival times of all TTC streetcars eastbound at Young & King:
+
+```yaml
+  - widget: nextbus
+    agency: ttc
+    stop_id: 15638
+    number: 2
+```
