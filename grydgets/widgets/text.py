@@ -227,9 +227,12 @@ class RESTWidget(UpdaterWidget):
             elif self.json_path is not None:
                 response_json = response.json()
                 json_path_list = self.json_path.split(".")
-                while json_path_list:
-                    response_json = response_json[json_path_list.pop(0)]
-                text = response_json
+                try:
+                    while json_path_list:
+                        response_json = response_json[json_path_list.pop(0)]
+                    text = response_json
+                except (KeyError, IndexError, TypeError):
+                    text = "--"
             else:
                 text = response.text
         except requests.ConnectionError as e:
