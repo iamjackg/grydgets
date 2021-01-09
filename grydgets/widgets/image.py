@@ -5,6 +5,7 @@ import threading
 import pygame
 import requests
 
+from grydgets.json_utils import extract_json_path
 from grydgets.widgets.base import Widget, UpdaterWidget
 
 
@@ -100,11 +101,8 @@ class RESTImageWidget(UpdaterWidget):
             response = requests.get(self.url, **self.requests_kwargs)
             if self.json_path is not None:
                 response_json = response.json()
-                json_path_list = self.json_path.split(".")
-                while json_path_list:
-                    response_json = response_json[json_path_list.pop(0)]
+                image_url = extract_json_path(response_json, self.json_path)
 
-                image_url = response_json
                 image_response = requests.get(image_url)
                 image_data = image_response.content
             else:

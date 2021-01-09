@@ -2,11 +2,11 @@ import datetime
 import logging
 
 import pygame
-import requests
 
 from grydgets.widgets.base import Widget, UpdaterWidget, ContainerWidget
 from grydgets.widgets.containers import GridWidget
 from grydgets.fonts import FontCache
+from grydgets.json_utils import extract_json_path
 
 font_cache = FontCache()
 
@@ -119,9 +119,12 @@ class DateClockWidget(Widget):
 
 import requests
 import xml.etree.ElementTree as ET
-class NextbusWidget(UpdaterWidget):
 
-    def __init__(self, agency, stop_id, route=None, number=1, font_path=None, text_size=None):
+
+class NextbusWidget(UpdaterWidget):
+    def __init__(
+        self, agency, stop_id, route=None, number=1, font_path=None, text_size=None
+    ):
         self.agency = agency
         self.stop_id = stop_id
         self.number = number
@@ -139,7 +142,7 @@ class NextbusWidget(UpdaterWidget):
             vertical_align="center",
         )
 
-        super().__init__() # starts the update thread
+        super().__init__()  # starts the update thread
 
     def is_dirty(self):
         return self.text_widget.is_dirty()
@@ -153,14 +156,16 @@ class NextbusWidget(UpdaterWidget):
                 root = ET.fromstring(response.text)
                 upcoming = []
                 for route in root:
-                    routeNumber = route.attrib['routeTag']
+                    routeNumber = route.attrib["routeTag"]
                     for direction in route:
                         for prediction in direction:
-                            upcoming.append((routeNumber, int(prediction.attrib['minutes'])))
+                            upcoming.append(
+                                (routeNumber, int(prediction.attrib["minutes"]))
+                            )
 
                 upcoming.sort(key=lambda x: x[1])
                 print(", ".join([b[1].__str__() + "m" for b in upcoming]))
-                #text = f"{upcoming[0][1]} min"
+                # text = f"{upcoming[0][1]} min"
                 limit = min(self.number, len(upcoming))
                 text = " ".join([f"{b[1]}min" for b in upcoming[0:limit]])
         except requests.ConnectionError as e:
@@ -226,12 +231,9 @@ class RESTWidget(UpdaterWidget):
                 text = "Error {}".format(response.status_code)
             elif self.json_path is not None:
                 response_json = response.json()
-                json_path_list = self.json_path.split(".")
                 try:
-                    while json_path_list:
-                        response_json = response_json[json_path_list.pop(0)]
-                    text = response_json
-                except (KeyError, IndexError, TypeError):
+                    text = extract_json_path(response_json, self.json_path)
+                except Exception as e:
                     text = "--"
             else:
                 text = response.text

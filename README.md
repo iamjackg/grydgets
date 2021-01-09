@@ -159,7 +159,7 @@ It supports the following parameters:
 
 * `url`: the URL to retrieve.
 * `auth` _(optional)_: a dictionary of auth options. Currently only supports a `bearer` key to supply a Bearer token.
-* `json_path` _(optional)_: the path to the json item to extract. Currently only supports objects, not arrays.
+* `json_path` _(optional)_: the path to the json item to extract. Supports arrays and objects.
 * `format_string` _(optional)_: a python format string to be used to format the final text.
 * `font_path` _(optional)_: the path to a ttf file to use as font. Defaults to a standard font
 * `text_size` _(optional)_: the size of the text in pixels. Defaults to automatic
@@ -184,7 +184,6 @@ It supports the following parameters:
 * `url`: the URL to retrieve.
 * `auth` _(optional)_: a dictionary of auth options. Currently only supports a `bearer` key to supply a Bearer token.
 * `json_path` _(optional)_: the path to the json item that contains an image URL to retrieve.
-Currently only supports objects, not arrays.
 
 
 #### image
