@@ -128,9 +128,11 @@ class NextbusWidget(UpdaterWidget):
         self.agency = agency
         self.stop_id = stop_id
         self.number = number
-        self.prediction_url = f"http://webservices.nextbus.com/service/publicXMLFeed?a={self.agency}&command=predictions&stopId={self.stop_id}"
+        self.prediction_url = "http://webservices.nextbus.com/service/publicXMLFeed?a={}&command=predictions&stopId={}".format(
+            self.agency, self.stop_id
+        )
         if route:
-            self.prediction_url += f"&r={route}"
+            self.prediction_url += "&r={}".format(route)
         self.value = ""
 
         self.text_widget = TextWidget(
