@@ -109,7 +109,7 @@ class RESTImageWidget(UpdaterWidget):
                 image_data = image_response.content
             else:
                 image_data = response.content
-        except requests.ConnectionError as e:
+        except Exception as e:
             logging.warning("Could not update {}: {}".format(self, e))
             return
 
