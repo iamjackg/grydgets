@@ -17,7 +17,7 @@ class TextWidget(Widget):
         font_path=None,
         text="",
         text_size=None,
-        color=(0, 0, 0),
+        color=(255, 255, 255),
         padding=0,
         align="left",
         vertical_align="top",
@@ -197,6 +197,8 @@ class RESTWidget(UpdaterWidget):
         font_path=None,
         text_size=None,
         auth=None,
+        method=None,
+        payload=None,
         vertical_align="center",
     ):
         self.url = url
@@ -205,6 +207,8 @@ class RESTWidget(UpdaterWidget):
         self.update_frequency = 30
         self.value = ""
         self.vertical_align = vertical_align
+        self.method = method or "GET"
+        self.payload = payload
         self.text_widget = TextWidget(
             font_path=font_path,
             color=(255, 255, 255),
@@ -220,6 +224,8 @@ class RESTWidget(UpdaterWidget):
                 self.requests_kwargs["headers"]["Authorization"] = "Bearer {}".format(
                     auth["bearer"]
                 )
+        if self.method == "POST" and self.payload:
+            self.requests_kwargs["json"] = self.payload
         # This needs to happen at the end because it actually starts the update thread
         super().__init__()
 
@@ -228,7 +234,9 @@ class RESTWidget(UpdaterWidget):
 
     def update(self):
         try:
-            response = requests.get(self.url, **self.requests_kwargs)
+            response = requests.request(
+                method=self.method, url=self.url, **self.requests_kwargs
+            )
             if response.status_code != 200:
                 text = "Error {}".format(response.status_code)
             elif self.json_path is not None:
@@ -236,6 +244,7 @@ class RESTWidget(UpdaterWidget):
                 try:
                     text = extract_json_path(response_json, self.json_path)
                 except Exception as e:
+                    logging.error(e)
                     text = "--"
             else:
                 text = response.text
@@ -258,7 +267,14 @@ class RESTWidget(UpdaterWidget):
 
 
 class LabelWidget(ContainerWidget):
-    def __init__(self, text, font_path=None, position="above", text_size=None, color=(255, 255, 255)):
+    def __init__(
+        self,
+        text,
+        font_path=None,
+        position="above",
+        text_size=None,
+        color=(255, 255, 255),
+    ):
         super().__init__()
         self.text_widget = TextWidget(
             font_path=font_path,
@@ -266,7 +282,7 @@ class LabelWidget(ContainerWidget):
             text_size=text_size,
             color=color,
             align="center",
-            vertical_align="top",
+            vertical_align="top" if position == "below" else "center",
         )
         self.position = position
 
