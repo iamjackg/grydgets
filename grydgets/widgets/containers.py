@@ -111,7 +111,10 @@ class GridWidget(ContainerWidget):
             else:
                 self.surface.fill((0, 0, 0, 0), pygame.Rect(coords, widget_size))
 
-            self.surface.blit(widget.render(size=widget_size), coords)
+            try:
+                self.surface.blit(widget.render(size=widget_size), coords)
+            except TypeError:
+                pass
 
         self.dirty = False
 
