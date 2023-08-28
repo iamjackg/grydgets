@@ -83,18 +83,18 @@ class TextWidget(Widget):
 
 
 class DateClockWidget(Widget):
-    def __init__(self, time_font_path=None, date_font_path=None):
+    def __init__(self, time_font_path=None, date_font_path=None, color=(255, 255, 255)):
         super().__init__()
         self.grid_widget = GridWidget(rows=2, columns=1, row_ratios=[7, 3])
         self.hour_widget = TextWidget(
             font_path=time_font_path,
-            color=(255, 255, 255),
+            color=color,
             padding=2,
             align="center",
             vertical_align="center",
         )
         self.date_widget = TextWidget(
-            font_path=date_font_path, color=(255, 255, 255), padding=2, align="center"
+            font_path=date_font_path, color=color, padding=2, align="center"
         )
         self.grid_widget.add_widget(self.hour_widget)
         self.grid_widget.add_widget(self.date_widget)
@@ -258,13 +258,13 @@ class RESTWidget(UpdaterWidget):
 
 
 class LabelWidget(ContainerWidget):
-    def __init__(self, text, font_path=None, position="above", text_size=None):
+    def __init__(self, text, font_path=None, position="above", text_size=None, color=(255, 255, 255)):
         super().__init__()
         self.text_widget = TextWidget(
             font_path=font_path,
             text=text,
             text_size=text_size,
-            color=(255, 255, 255),
+            color=color,
             align="center",
             vertical_align="top",
         )
