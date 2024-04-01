@@ -4,5 +4,6 @@ graphics:
   resolution: [480, 320]
   fb-device: '/dev/fb1'
   x-display: ':0'
+  flip: false
 logging:
   level: info

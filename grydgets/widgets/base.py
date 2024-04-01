@@ -4,9 +4,12 @@ import time
 
 
 class Widget(object):
-    def __init__(self, size=None):
+    def __init__(self, size=None, **kwargs):
         self.size = size
         self.dirty = True
+        self.logger = logging.getLogger(
+            kwargs.get("unique_name") or type(self).__name__
+        )
 
     def is_dirty(self):
         return self.dirty
@@ -21,8 +24,8 @@ class Widget(object):
 
 
 class ContainerWidget(Widget):
-    def __init__(self, size=None):
-        super().__init__(size)
+    def __init__(self, size=None, **kwargs):
+        super().__init__(size, **kwargs)
         self.widget_list = list()
 
     def is_dirty(self):
@@ -37,33 +40,36 @@ class ContainerWidget(Widget):
 
 
 class UpdaterWidget(Widget):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
         self.update_frequency = 30
-        self.update_thread = WidgetUpdaterThread(self, self.update_frequency)
+        self.update_thread = WidgetUpdaterThread(self, self.update_frequency, **kwargs)
 
         self.update()
         self.update_thread.start()
 
     def stop(self):
         self.update_thread.stop()
-        logging.debug("{} waiting for thread to terminate".format(self))
+        self.logger.debug("waiting for thread to terminate")
         self.update_thread.join()
-        logging.debug("{} joined".format(self))
+        self.logger.debug("thread joined")
 
     def update(self):
         pass
 
 
 class WidgetUpdaterThread(threading.Thread):
-    def __init__(self, widget, frequency):
+    def __init__(self, widget, frequency, **kwargs):
         super(WidgetUpdaterThread, self).__init__()
         self._stop_event = threading.Event()
         self.widget = widget
         self.frequency = frequency
         self.last_update = int(time.time())
+        self.logger = logging.getLogger(
+            (kwargs.get("unique_name") or type(self).__name__) + "WidgetUpdaterThread"
+        )
 
-        logging.debug("Initialized {}".format(self))
+        self.logger.debug("Initialized")
 
     def stop(self):
         self._stop_event.set()
@@ -73,9 +79,9 @@ class WidgetUpdaterThread(threading.Thread):
             while not self._stop_event.is_set():
                 now = int(time.time())
                 if now - self.last_update >= self.frequency:
-                    logging.debug("Updating {}".format(self.widget))
+                    self.logger.debug("Updating")
                     self.widget.update()
                     self.last_update = now
                 time.sleep(0.1)
         except Exception as e:
-            logging.warning(str(e))
+            self.logger.warning(str(e))

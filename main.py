@@ -1,6 +1,7 @@
 import os
 
 import pygame
+from pygame.transform import rotate
 import logging
 import time
 import threading
@@ -46,7 +47,6 @@ screen_widget = ScreenWidget(screen_size)
 
 screen_widget.add_widget(create_widget_tree(widget_tree["widgets"][0]))
 
-fps_limit = 60
 fps_time = time.time()
 frame_data = list()
 while not stop_everything.is_set():
@@ -57,7 +57,12 @@ while not stop_everything.is_set():
                 stop_everything.set()
 
         screen_widget.tick()
-        screen.blit(screen_widget.render(screen_size), (0, 0))
+        if conf["graphics"].get("flip", False):
+            blit_image = rotate(screen_widget.render(screen_size), 180)
+        else:
+            blit_image = screen_widget.render(screen_size)
+
+        screen.blit(blit_image, (0, 0))
 
         pygame.display.flip()
         sleep_time = max((1 / fps_limit) - (time.time() - frame_start), 0)

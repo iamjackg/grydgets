@@ -10,8 +10,8 @@ from grydgets.widgets.base import Widget, UpdaterWidget
 
 
 class ImageWidget(Widget):
-    def __init__(self, image_data=None):
-        super().__init__()
+    def __init__(self, image_data=None, **kwargs):
+        super().__init__(**kwargs)
         self.image_update_lock = threading.Lock()
         self.image_data = image_data
         self.old_surface = None
@@ -78,7 +78,7 @@ class ImageWidget(Widget):
 
 
 class RESTImageWidget(UpdaterWidget):
-    def __init__(self, url, json_path=None, auth=None):
+    def __init__(self, url, json_path=None, auth=None, **kwargs):
         self.url = url
         self.json_path = json_path
         self.update_frequency = 30
@@ -91,7 +91,7 @@ class RESTImageWidget(UpdaterWidget):
                     auth["bearer"]
                 )
         # This needs to happen at the end because it actually starts the update thread
-        super().__init__()
+        super().__init__(**kwargs)
 
     def is_dirty(self):
         return self.image_widget.is_dirty()
@@ -108,10 +108,10 @@ class RESTImageWidget(UpdaterWidget):
             else:
                 image_data = response.content
         except Exception as e:
-            logging.warning("Could not update {}: {}".format(self, e))
+            self.logger.warning("Could not update: {}".format(e))
             return
 
-        logging.debug("Updated {}".format(self))
+        self.logger.debug("Updated")
 
         self.image_widget.set_image(image_data)
 

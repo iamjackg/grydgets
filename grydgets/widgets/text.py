@@ -21,8 +21,9 @@ class TextWidget(Widget):
         padding=0,
         align="left",
         vertical_align="top",
+        **kwargs
     ):
-        super().__init__()
+        super().__init__(**kwargs)
         self.color = color
         self.align = align
         self.vertical_align = vertical_align
@@ -41,7 +42,7 @@ class TextWidget(Widget):
     def render(self, size):
         super().render(size)
         if self.dirty:
-            # logging.debug('{} I am dirty'.format(self))
+            # self.logger.debug('I am dirty')
             self.surface = pygame.Surface(self.size, pygame.SRCALPHA, 32)
 
             real_size = (
@@ -83,18 +84,21 @@ class TextWidget(Widget):
 
 
 class DateClockWidget(Widget):
-    def __init__(self, time_font_path=None, date_font_path=None, color=(255, 255, 255)):
-        super().__init__()
-        self.grid_widget = GridWidget(rows=2, columns=1, row_ratios=[7, 3])
+    def __init__(
+        self, time_font_path=None, date_font_path=None, color=(255, 255, 255), **kwargs
+    ):
+        super().__init__(**kwargs)
+        self.grid_widget = GridWidget(rows=2, columns=1, row_ratios=[7, 3], **kwargs)
         self.hour_widget = TextWidget(
             font_path=time_font_path,
             color=color,
             padding=2,
             align="center",
             vertical_align="center",
+            **kwargs
         )
         self.date_widget = TextWidget(
-            font_path=date_font_path, color=color, padding=2, align="center"
+            font_path=date_font_path, color=color, padding=2, align="center", **kwargs
         )
         self.grid_widget.add_widget(self.hour_widget)
         self.grid_widget.add_widget(self.date_widget)
@@ -123,7 +127,14 @@ import xml.etree.ElementTree as ET
 
 class NextbusWidget(UpdaterWidget):
     def __init__(
-        self, agency, stop_id, route=None, number=1, font_path=None, text_size=None
+        self,
+        agency,
+        stop_id,
+        route=None,
+        number=1,
+        font_path=None,
+        text_size=None,
+        **kwargs
     ):
         self.agency = agency
         self.stop_id = stop_id
@@ -142,9 +153,10 @@ class NextbusWidget(UpdaterWidget):
             text_size=text_size,
             align="center",
             vertical_align="center",
+            **kwargs
         )
 
-        super().__init__()  # starts the update thread
+        super().__init__(**kwargs)  # starts the update thread
 
     def is_dirty(self):
         return self.text_widget.is_dirty()
@@ -171,7 +183,7 @@ class NextbusWidget(UpdaterWidget):
                 limit = min(self.number, len(upcoming))
                 text = " ".join(["{}min".format(b[1]) for b in upcoming[0:limit]])
         except requests.ConnectionError as e:
-            logging.warning("Could not update {}: {}".format(self, e))
+            self.logger.warning("Could not update: {}".format(e))
             text = "Unavailable"
         return text
 
@@ -180,7 +192,7 @@ class NextbusWidget(UpdaterWidget):
         if new_value != self.value:
             self.value = new_value
             self.text_widget.set_text(self.value)
-        logging.debug("Updated {} to {}".format(self, self.value))
+        self.logger.debug("Updated to {}".format(self.value))
 
     def render(self, size):
         self.size = size
@@ -200,6 +212,7 @@ class RESTWidget(UpdaterWidget):
         method=None,
         payload=None,
         vertical_align="center",
+        **kwargs
     ):
         self.url = url
         self.json_path = json_path
@@ -216,6 +229,7 @@ class RESTWidget(UpdaterWidget):
             text_size=text_size,
             align="center",
             vertical_align=vertical_align,
+            **kwargs
         )
 
         self.requests_kwargs = {"headers": {}}
@@ -227,7 +241,7 @@ class RESTWidget(UpdaterWidget):
         if self.method == "POST" and self.payload:
             self.requests_kwargs["json"] = self.payload
         # This needs to happen at the end because it actually starts the update thread
-        super().__init__()
+        super().__init__(**kwargs)
 
     def is_dirty(self):
         return self.text_widget.is_dirty()
@@ -244,19 +258,19 @@ class RESTWidget(UpdaterWidget):
                 try:
                     text = extract_json_path(response_json, self.json_path)
                 except Exception as e:
-                    logging.error(e)
+                    self.logger.error(e)
                     text = "--"
             else:
                 text = response.text
         except requests.ConnectionError as e:
-            logging.warning("Could not update {}: {}".format(self, e))
+            self.logger.warning("Could not update: {}".format(e))
             text = "Unavailable"
 
         if self.format_string.format(text) != self.value:
             self.value = self.format_string.format(text)
             self.text_widget.set_text(self.value)
 
-        logging.debug("Updated {} to {}".format(self, self.value))
+        self.logger.debug("Updated to {}".format(self.value))
 
     def render(self, size):
         self.size = size
@@ -274,8 +288,9 @@ class LabelWidget(ContainerWidget):
         position="above",
         text_size=None,
         color=(255, 255, 255),
+        **kwargs
     ):
-        super().__init__()
+        super().__init__(**kwargs)
         self.text_widget = TextWidget(
             font_path=font_path,
             text=text,
@@ -283,6 +298,7 @@ class LabelWidget(ContainerWidget):
             color=color,
             align="center",
             vertical_align="top" if position == "below" else "center",
+            **kwargs
         )
         self.position = position
 

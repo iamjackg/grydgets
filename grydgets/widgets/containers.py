@@ -7,8 +7,8 @@ from grydgets.widgets.base import ContainerWidget
 
 
 class ScreenWidget(ContainerWidget):
-    def __init__(self, size, color=(0, 0, 0)):
-        super().__init__(size)
+    def __init__(self, size, color=(0, 0, 0), **kwargs):
+        super().__init__(size, **kwargs)
         self.color = color
 
     def add_widget(self, widget):
@@ -36,9 +36,16 @@ class ScreenWidget(ContainerWidget):
 
 class GridWidget(ContainerWidget):
     def __init__(
-        self, rows, columns, row_ratios=None, column_ratios=None, padding=0, color=None
+        self,
+        rows,
+        columns,
+        row_ratios=None,
+        column_ratios=None,
+        padding=0,
+        color=None,
+        **kwargs
     ):
-        super().__init__()
+        super().__init__(**kwargs)
         self.rows = rows
         self.columns = columns
         self.padding = padding
@@ -92,7 +99,6 @@ class GridWidget(ContainerWidget):
             itertools.product(horizontal_positions, vertical_positions),
             itertools.product(horizontal_sizes, vertical_sizes),
         ):
-
             if not widget.is_dirty() and not self.dirty:
                 continue
 
@@ -122,8 +128,8 @@ class GridWidget(ContainerWidget):
 
 
 class FlipWidget(ContainerWidget):
-    def __init__(self, interval=5, transition=1, ease=2):
-        super().__init__()
+    def __init__(self, interval=5, transition=1, ease=2, **kwargs):
+        super().__init__(**kwargs)
         self.last_update = int(time.time())
         self.moving = False
         self.current_widget = 0
@@ -136,7 +142,7 @@ class FlipWidget(ContainerWidget):
         return self.moving or self.widget_list[self.current_widget].is_dirty()
 
     def ease_in_out(self, value, ease):
-        return (value ** ease) / ((value ** ease) + ((1 - value) ** ease))
+        return (value**ease) / ((value**ease) + ((1 - value) ** ease))
 
     def tick(self):
         if time.time() - self.last_update >= self.interval:
