@@ -7,7 +7,7 @@ __SECRETS = {"main_secrets": {}}
 def secret_loader(_, node):
     if not __SECRETS["main_secrets"]:
         with open("secrets.yaml") as secrets_f:
-            secret_data = yaml.load(secrets_f)
+            secret_data = yaml.load(secrets_f, Loader=yaml.SafeLoader)
             __SECRETS["main_secrets"] = secret_data
 
     return __SECRETS["main_secrets"][node.value]
@@ -18,7 +18,7 @@ yaml.add_constructor("!secret", secret_loader)
 
 def load_yaml(filename):
     with open(filename) as conf_f:
-        parsed_yaml = yaml.load(conf_f)
+        parsed_yaml = yaml.load(conf_f, Loader=yaml.FullLoader)
     return parsed_yaml
 
 
