@@ -57,7 +57,7 @@ while not stop_everything.is_set():
                 stop_everything.set()
 
         screen_widget.tick()
-        if conf["graphics"].get("flip", False):
+        if conf["graphics"]["flip"]:
             blit_image = rotate(screen_widget.render(screen_size), 180)
         else:
             blit_image = screen_widget.render(screen_size)
