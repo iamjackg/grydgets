@@ -151,6 +151,12 @@ class FlipWidget(ContainerWidget):
                 self.ticker = time.time()
                 self.last_update = int(time.time())
 
+        if self.moving:
+            for widget in self.widget_list:
+                widget.tick()
+        else:
+            self.widget_list[self.current_widget].tick()
+
     def render(self, size):
         if self.moving:
             surface = pygame.Surface(size, pygame.SRCALPHA, 32)

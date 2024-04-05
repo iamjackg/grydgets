@@ -39,6 +39,11 @@ class TextWidget(Widget):
             self.text = text
             self.dirty = True
 
+    def set_color(self, color):
+        if color != self.color:
+            self.color = color
+            self.dirty = True
+
     def render(self, size):
         super().render(size)
         if self.dirty:

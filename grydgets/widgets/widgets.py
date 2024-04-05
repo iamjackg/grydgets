@@ -7,6 +7,8 @@ import sys
 from grydgets.widgets.base import Widget, ContainerWidget, UpdaterWidget
 import grydgets.widgets.image
 import grydgets.widgets.text
+import grydgets.widgets.containers
+import grydgets.widgets.notifiable
 
 _name_to_widget_map = {}
 
@@ -26,7 +28,7 @@ def window(seq, n=2):
 
 def map_all_the_widgets_in_here():
     all_widget_members = []
-    for module in ["containers", "image", "text"]:
+    for module in ["containers", "image", "notifiable", "text"]:
         module_name = f"grydgets.widgets.{module}"
         all_widget_members.extend(inspect.getmembers(sys.modules[module_name]))
     for name, obj in all_widget_members:
@@ -40,13 +42,19 @@ def map_all_the_widgets_in_here():
                 _name_to_widget_map[class_name] = obj
 
 
+name_to_instance = {}
+
+
 def create_widget_tree(widget_dictionary, path=None, counter=None):
+    global name_to_instance
+
     if path is None:
         path = []
     if counter is None:
         counter = {}
 
-    widget_name = widget_dictionary["widget"]
+    widget_type_name = widget_dictionary["widget"]
+    widget_name = widget_dictionary.get("name") or widget_type_name
     # Increment or initialize the widget counter
     counter[widget_name] = counter.get(widget_name, 0) + 1
 
@@ -60,7 +68,21 @@ def create_widget_tree(widget_dictionary, path=None, counter=None):
     logging.debug(f"Adding to widget tree: {unique_name}")
     # Pass the unique name as an extra parameter
     widget_parameters["unique_name"] = unique_name
-    widget = _name_to_widget_map[widget_name](**widget_parameters)
+    widget = _name_to_widget_map[widget_type_name](**widget_parameters)
+    if hasattr(widget, "notify"):
+        if callable(widget.notify):
+            if widget_name not in name_to_instance:
+                name_to_instance[widget_name] = widget
+            else:
+                logging.warning(
+                    f"Warning: Duplicate widget name '{widget_name}'. "
+                    "Not adding to list of notifiable widgets."
+                )
+        else:
+            logging.warning(
+                f"Warning: 'notify' attribute of widget '{widget_name}' "
+                f"is not callable. Skipping."
+            )
 
     if "children" in widget_dictionary:
         child_counter = {}  # Reset counter for children

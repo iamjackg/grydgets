@@ -34,11 +34,16 @@ config_schema = voluptuous.Schema(
             ),
             voluptuous.Optional("fb-device"): str,
             voluptuous.Optional("x-display"): str,
-            voluptuous.Required("flip", default=False): bool,
+            voluptuous.Optional("flip", default=False): bool,
         },
         voluptuous.Required("logging"): {
             voluptuous.Required("level", default="info"): voluptuous.In(
                 ["debug", "info", "warning"]
+            )
+        },
+        voluptuous.Required("server"): {
+            voluptuous.Optional("port", default=5000): voluptuous.All(
+                int, voluptuous.Range(1, 655355)
             )
         },
     }

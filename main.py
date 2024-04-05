@@ -5,10 +5,15 @@ from pygame.transform import rotate
 import logging
 import time
 import threading
+from flask import Flask, request, jsonify
 
-from grydgets import widgets, config
+from grydgets import config
 from grydgets.widgets.containers import ScreenWidget
-from grydgets.widgets.widgets import create_widget_tree, stop_all_widgets
+from grydgets.widgets.widgets import (
+    create_widget_tree,
+    stop_all_widgets,
+    name_to_instance,
+)
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -47,6 +52,28 @@ screen_widget = ScreenWidget(screen_size)
 
 screen_widget.add_widget(create_widget_tree(widget_tree["widgets"][0]))
 
+app = Flask(__name__)
+
+
+@app.route("/notify", methods=["POST"])
+def widget():
+    payload = request.get_json()
+    requested_widget = payload["widget"]
+    if requested_widget not in name_to_instance:
+        return jsonify({"success": False, "error": "Widget not found"}), 400
+
+    name_to_instance[requested_widget].notify(payload)
+    return jsonify({"success": True})
+
+
+def run_server():
+    app.run(port=conf["server"]["port"])
+
+
+server_thread = threading.Thread(target=run_server)
+server_thread.daemon = True
+server_thread.start()
+
 fps_time = time.time()
 frame_data = list()
 while not stop_everything.is_set():
@@ -57,7 +84,7 @@ while not stop_everything.is_set():
                 stop_everything.set()
 
         screen_widget.tick()
-        if conf["graphics"]["flip"]:
+        if conf["graphics"].get("flip", False):
             blit_image = rotate(screen_widget.render(screen_size), 180)
         else:
             blit_image = screen_widget.render(screen_size)
