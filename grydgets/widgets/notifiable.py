@@ -6,7 +6,9 @@ from grydgets.widgets.text import TextWidget
 
 
 class NotifiableTextWidget(ContainerWidget):
-    def __init__(self, font_path=None, padding=0, color=(255, 255, 255), **kwargs):
+    def __init__(
+        self, font_path=None, text_size=None, padding=0, color=(255, 255, 255), **kwargs
+    ):
         super().__init__(**kwargs)
         self.showing_text = False
         self.last_update = None
@@ -15,6 +17,7 @@ class NotifiableTextWidget(ContainerWidget):
 
         self.text_widget = TextWidget(
             font_path=font_path,
+            text_size=text_size,
             text="",
             color=color,
             align="center",
