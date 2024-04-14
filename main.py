@@ -15,7 +15,9 @@ from grydgets.widgets.widgets import (
     name_to_instance,
 )
 
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(
+    format="[%(asctime)s] %(levelname)s:%(name)s:%(message)s", level=logging.DEBUG
+)
 
 widget_tree = config.load_yaml("widgets.yaml")
 conf = config.load_config("conf.yaml")
