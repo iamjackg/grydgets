@@ -12,8 +12,10 @@ class NotifiableTextWidget(ContainerWidget):
         super().__init__(**kwargs)
         self.showing_text = False
         self.last_update = None
+        self.rendering_start = None
         self.newly_created_text = False
         self.notification_queue = queue.Queue()
+        self.notification_duration = 5
 
         self.text_widget = TextWidget(
             font_path=font_path,
@@ -44,8 +46,13 @@ class NotifiableTextWidget(ContainerWidget):
             return self.widget_list[0].is_dirty()
 
     def tick(self):
-        if self.showing_text and time.time() - self.last_update > 5:
+        if (
+            self.showing_text
+            and self.rendering_start is not None
+            and time.time() - self.rendering_start >= self.notification_duration
+        ):
             self.showing_text = False
+            self.rendering_start = None
             self.dirty = True
         else:
             self.widget_list[0].tick()
@@ -62,10 +69,13 @@ class NotifiableTextWidget(ContainerWidget):
                     self.text_widget.set_text(data["text"])
                     if "color" in data:
                         self.text_widget.set_color(data["color"])
+                    self.notification_duration = data.get("duration", 5)
                     self.dirty = True
 
     def render(self, size):
         if self.showing_text:
+            if self.rendering_start is None:
+                self.rendering_start = time.time()
             return self.text_widget.render(size)
         else:
             return self.widget_list[0].render(size)
