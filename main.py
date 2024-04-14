@@ -48,7 +48,11 @@ screen_size = tuple(conf["graphics"]["resolution"])
 screen = pygame.display.set_mode(screen_size, pygame_flags)
 pygame.display.set_caption("Grydgets dashboard", "Grydgets")
 
-screen_widget = ScreenWidget(screen_size)
+screen_widget = ScreenWidget(
+    screen_size,
+    image_path=widget_tree.get("background_image", None),
+    color=widget_tree.get("background_color", (0, 0, 0)),
+)
 
 screen_widget.add_widget(create_widget_tree(widget_tree["widgets"][0]))
 
@@ -67,7 +71,7 @@ def widget():
 
 
 def run_server():
-    app.run(port=conf["server"]["port"])
+    app.run(host="0.0.0.0", port=conf["server"]["port"])
 
 
 server_thread = threading.Thread(target=run_server)

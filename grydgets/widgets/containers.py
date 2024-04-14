@@ -6,10 +6,34 @@ import pygame
 from grydgets.widgets.base import ContainerWidget
 
 
+def load_and_scale_image(image_path, size):
+    # Load the image
+    image = pygame.image.load(image_path)
+
+    # Get image dimensions
+    image_width, image_height = image.get_size()
+
+    # Determine scale factor to fit the image to the longest side of the surface
+    scale_factor = max(size[0] / image_width, size[1] / image_height)
+
+    # Calculate new image dimensions
+    new_dimensions = (int(image_width * scale_factor), int(image_height * scale_factor))
+
+    # Resize the image
+    scaled_image = pygame.transform.scale(image, new_dimensions)
+
+    return scaled_image
+
+
 class ScreenWidget(ContainerWidget):
-    def __init__(self, size, color=(0, 0, 0), **kwargs):
+    def __init__(self, size, color=(0, 0, 0), image_path=None, **kwargs):
         super().__init__(size, **kwargs)
         self.color = color
+        self.size = size
+        self.image_path = image_path
+        self.image = None
+        if image_path is not None:
+            self.image = load_and_scale_image(image_path, size)
 
     def add_widget(self, widget):
         if self.widget_list:
@@ -20,8 +44,14 @@ class ScreenWidget(ContainerWidget):
     def render(self, size):
         super().render(size)
 
+        if self.size != size and self.image_path is not None:
+            self.image = load_and_scale_image(self.image_path, size)
+
         surface = pygame.Surface(self.size, 0, 32)
-        surface.fill(self.color)
+        if self.image is not None:
+            surface.blit(self.image, (0, 0))
+        else:
+            surface.fill(self.color)
 
         # self.size = (self.size[0] - 1, self.size[1])
 
@@ -43,6 +73,9 @@ class GridWidget(ContainerWidget):
         column_ratios=None,
         padding=0,
         color=None,
+        widget_color=None,
+        corner_radius=0,
+        widget_corner_radius=0,
         **kwargs
     ):
         super().__init__(**kwargs)
@@ -50,6 +83,9 @@ class GridWidget(ContainerWidget):
         self.columns = columns
         self.padding = padding
         self.color = color
+        self.widget_color = widget_color
+        self.corner_radius = corner_radius
+        self.widget_corner_radius = widget_corner_radius
         if row_ratios is not None:
             self.row_ratios = row_ratios
         else:
@@ -112,17 +148,44 @@ class GridWidget(ContainerWidget):
             coords[0] += self.padding
             coords[1] += self.padding
 
-            if self.color is not None:
-                self.surface.fill(self.color, pygame.Rect(coords, widget_size))
+            if self.widget_color is not None:
+                if self.widget_corner_radius != 0:
+                    pygame.draw.rect(
+                        self.surface,
+                        self.widget_color,
+                        pygame.Rect(coords, widget_size),
+                        border_radius=self.widget_corner_radius,
+                        # border_radius=widget_size[1] // 4,
+                    )
+                    # print(widget_size)
+                else:
+                    self.surface.fill(
+                        self.widget_color, pygame.Rect(coords, widget_size)
+                    )
             else:
                 self.surface.fill((0, 0, 0, 0), pygame.Rect(coords, widget_size))
 
             try:
-                self.surface.blit(widget.render(size=widget_size), coords)
+                self.surface.blit(
+                    widget.render(size=widget_size),
+                    coords,
+                )
             except TypeError:
                 pass
 
         self.dirty = False
+
+        if self.corner_radius:
+            mask_surface = pygame.Surface(self.size, pygame.SRCALPHA)
+            mask_surface.fill((0, 0, 0, 0))
+            pygame.draw.rect(
+                mask_surface,
+                (255, 255, 255, 255),
+                pygame.Rect((0, 0), self.size),
+                border_radius=self.corner_radius,
+                # border_radius=self.size[1] // 4,
+            )
+            self.surface.blit(mask_surface, (0, 0), special_flags=pygame.BLEND_RGBA_MIN)
 
         return self.surface
 

@@ -57,10 +57,19 @@ class TextWidget(Widget):
 
             text_size = self.text_size or real_size[1]
             text_surface = None
+            font = None
             while text_surface is None or text_surface.get_width() > real_size[0]:
                 font = font_cache.get_font(self.font_path, text_size)
                 text_surface = font.render(self.text, 1, self.color)
                 text_size -= 1
+
+            shadow_text = font.render(self.text, 1, (0, 0, 0))
+            shadow_surface = pygame.Surface(
+                (shadow_text.get_width() + 20, shadow_text.get_height() + 20),
+                pygame.SRCALPHA,
+                32,
+            )
+            shadow_surface.blit(shadow_text, (10, 10))
 
             blit_coordinates = [self.padding, self.padding]
             if self.align == "center":
@@ -81,6 +90,10 @@ class TextWidget(Widget):
             elif self.vertical_align == "bottom":
                 blit_coordinates[1] += real_size[1] - real_text_height
 
+            self.surface.blit(
+                pygame.transform.gaussian_blur(shadow_surface, radius=10),
+                (blit_coordinates[0] - 10, blit_coordinates[1] - 10),
+            )
             self.surface.blit(text_surface, blit_coordinates)
 
             self.dirty = False
@@ -292,7 +305,7 @@ class LabelWidget(ContainerWidget):
         font_path=None,
         position="above",
         text_size=None,
-        color=(255, 255, 255),
+        text_color=(255, 255, 255),
         **kwargs
     ):
         super().__init__(**kwargs)
@@ -300,7 +313,7 @@ class LabelWidget(ContainerWidget):
             font_path=font_path,
             text=text,
             text_size=text_size,
-            color=color,
+            color=text_color,
             align="center",
             vertical_align="top" if position == "below" else "center",
             **kwargs
@@ -312,7 +325,10 @@ class LabelWidget(ContainerWidget):
             grid_proportions = [2, 1]
 
         self.grid_widget = GridWidget(
-            columns=1, rows=2, row_ratios=grid_proportions, padding=4
+            columns=1,
+            rows=2,
+            row_ratios=grid_proportions,
+            padding=0,
         )
 
     def is_dirty(self):
