@@ -60,16 +60,21 @@ class TextWidget(Widget):
             font = None
             while text_surface is None or text_surface.get_width() > real_size[0]:
                 font = font_cache.get_font(self.font_path, text_size)
-                text_surface = font.render(self.text, 1, self.color)
+                text_surface = font.render(self.text, True, self.color)
                 text_size -= 1
+            clone_text_surface = pygame.Surface(
+                text_surface.get_size(), pygame.SRCALPHA, 32
+            )
+            clone_text_surface.blit(text_surface, (0, 0))
 
-            shadow_text = font.render(self.text, 1, (0, 0, 0))
+            shadow_text = font.render(self.text, True, (0, 0, 0, 255))
             shadow_surface = pygame.Surface(
                 (shadow_text.get_width() + 20, shadow_text.get_height() + 20),
                 pygame.SRCALPHA,
                 32,
             )
             shadow_surface.blit(shadow_text, (10, 10))
+            shadow_surface.set_alpha(150)
 
             blit_coordinates = [self.padding, self.padding]
             if self.align == "center":
@@ -91,10 +96,12 @@ class TextWidget(Widget):
                 blit_coordinates[1] += real_size[1] - real_text_height
 
             self.surface.blit(
-                pygame.transform.gaussian_blur(shadow_surface, radius=10),
+                pygame.transform.gaussian_blur(shadow_surface, radius=5),
                 (blit_coordinates[0] - 10, blit_coordinates[1] - 10),
+                # special_flags=pygame.BLEND_PREMULTIPLIED,
             )
-            self.surface.blit(text_surface, blit_coordinates)
+
+            self.surface.blit(clone_text_surface, blit_coordinates)
 
             self.dirty = False
 
@@ -116,7 +123,12 @@ class DateClockWidget(Widget):
             **kwargs
         )
         self.date_widget = TextWidget(
-            font_path=date_font_path, color=color, padding=2, align="center", **kwargs
+            font_path=date_font_path,
+            color=color,
+            padding=2,
+            align="center",
+            vertical_align="top",
+            **kwargs
         )
         self.grid_widget.add_widget(self.hour_widget)
         self.grid_widget.add_widget(self.date_widget)

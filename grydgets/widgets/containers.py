@@ -47,7 +47,7 @@ class ScreenWidget(ContainerWidget):
         if self.size != size and self.image_path is not None:
             self.image = load_and_scale_image(self.image_path, size)
 
-        surface = pygame.Surface(self.size, 0, 32)
+        surface = pygame.Surface(self.size, pygame.SRCALPHA, 32)
         if self.image is not None:
             surface.blit(self.image, (0, 0))
         else:
@@ -148,30 +148,49 @@ class GridWidget(ContainerWidget):
             coords[0] += self.padding
             coords[1] += self.padding
 
+            final_widget_surface = pygame.Surface(widget_size, pygame.SRCALPHA, 32)
+            # final_widget_surface.fill((0, 0, 0, 0))
             if self.widget_color is not None:
                 if self.widget_corner_radius != 0:
                     pygame.draw.rect(
-                        self.surface,
+                        final_widget_surface,
                         self.widget_color,
-                        pygame.Rect(coords, widget_size),
+                        pygame.Rect((0, 0), widget_size),
                         border_radius=self.widget_corner_radius,
                         # border_radius=widget_size[1] // 4,
                     )
                     # print(widget_size)
                 else:
-                    self.surface.fill(
-                        self.widget_color, pygame.Rect(coords, widget_size)
+                    final_widget_surface.fill(
+                        self.widget_color, pygame.Rect((0, 0), widget_size)
                     )
-            else:
-                self.surface.fill((0, 0, 0, 0), pygame.Rect(coords, widget_size))
+
+                final_widget_surface = (
+                    final_widget_surface.convert_alpha().premul_alpha()
+                )
 
             try:
+                widget_surf = widget.render(size=widget_size)
+                final_widget_surface.blit(
+                    widget_surf,
+                    (0, 0),
+                    # special_flags=pygame.BLEND_PREMULTIPLIED,
+                )
+                self.surface.fill((0, 0, 0, 0), pygame.Rect(coords, widget_size))
+                # self.surface = self.surface.premul_alpha()
                 self.surface.blit(
-                    widget.render(size=widget_size),
+                    final_widget_surface,
                     coords,
+                    # special_flags=pygame.BLEND_PREMULTIPLIED,
                 )
             except TypeError:
                 pass
+            # self.surface.fill((0, 0, 0, 0), pygame.Rect(coords, widget_size))
+            # self.surface.blit(
+            #     widget.render(widget_size).premul_alpha(),
+            #     coords,
+            #     special_flags=pygame.BLEND_PREMULTIPLIED,
+            # )
 
         self.dirty = False
 
