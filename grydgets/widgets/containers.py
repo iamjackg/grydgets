@@ -57,6 +57,19 @@ class ScreenWidget(ContainerWidget):
 
         child_surface = self.widget_list[0].render(self.size)
 
+        mask = pygame.mask.from_surface(child_surface, threshold=200)
+        mask_surface = mask.to_surface(setcolor=(0, 0, 0, 255), unsetcolor=(0, 0, 0, 0))
+        white_mask_surface = mask.to_surface(
+            setcolor=(255, 255, 255, 255), unsetcolor=(0, 0, 0, 0)
+        )
+        blurred_mask_surface = pygame.transform.gaussian_blur(mask_surface, radius=5)
+        blurred_mask_surface.blit(
+            white_mask_surface,
+            (0, 0),
+            special_flags=pygame.BLEND_RGBA_SUB,
+        )
+
+        surface.blit(blurred_mask_surface, (0, 0))
         surface.blit(child_surface, (0, 0))
 
         self.dirty = False

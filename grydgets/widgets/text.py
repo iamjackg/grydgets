@@ -67,14 +67,14 @@ class TextWidget(Widget):
             )
             clone_text_surface.blit(text_surface, (0, 0))
 
-            shadow_text = font.render(self.text, True, (0, 0, 0, 255))
-            shadow_surface = pygame.Surface(
-                (shadow_text.get_width() + 20, shadow_text.get_height() + 20),
-                pygame.SRCALPHA,
-                32,
-            )
-            shadow_surface.blit(shadow_text, (10, 10))
-            shadow_surface.set_alpha(150)
+            # shadow_text = font.render(self.text, True, (0, 0, 0, 255))
+            # shadow_surface = pygame.Surface(
+            #     (shadow_text.get_width() + 20, shadow_text.get_height() + 20),
+            #     pygame.SRCALPHA,
+            #     32,
+            # )
+            # shadow_surface.blit(shadow_text, (10, 10))
+            # shadow_surface.set_alpha(150)
 
             blit_coordinates = [self.padding, self.padding]
             if self.align == "center":
@@ -95,11 +95,11 @@ class TextWidget(Widget):
             elif self.vertical_align == "bottom":
                 blit_coordinates[1] += real_size[1] - real_text_height
 
-            self.surface.blit(
-                pygame.transform.gaussian_blur(shadow_surface, radius=5),
-                (blit_coordinates[0] - 10, blit_coordinates[1] - 10),
-                # special_flags=pygame.BLEND_PREMULTIPLIED,
-            )
+            # self.surface.blit(
+            #     pygame.transform.gaussian_blur(shadow_surface, radius=5),
+            #     (blit_coordinates[0] - 10, blit_coordinates[1] - 10),
+            #     # special_flags=pygame.BLEND_PREMULTIPLIED,
+            # )
 
             self.surface.blit(clone_text_surface, blit_coordinates)
 
