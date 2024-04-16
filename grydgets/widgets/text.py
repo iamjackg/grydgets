@@ -110,10 +110,23 @@ class TextWidget(Widget):
 
 class DateClockWidget(Widget):
     def __init__(
-        self, time_font_path=None, date_font_path=None, color=(255, 255, 255), **kwargs
+        self,
+        time_font_path=None,
+        date_font_path=None,
+        color=(255, 255, 255),
+        background_color=None,
+        corner_radius=0,
+        **kwargs
     ):
         super().__init__(**kwargs)
-        self.grid_widget = GridWidget(rows=2, columns=1, row_ratios=[7, 3], **kwargs)
+        self.grid_widget = GridWidget(
+            rows=2,
+            columns=1,
+            row_ratios=[7, 3],
+            widget_color=background_color,
+            corner_radius=corner_radius,
+            **kwargs
+        )
         self.hour_widget = TextWidget(
             font_path=time_font_path,
             color=color,
