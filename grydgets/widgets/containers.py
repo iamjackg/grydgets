@@ -3,6 +3,7 @@ import time
 
 import pygame
 
+from grydgets.benchmark import benchmark
 from grydgets.widgets.base import ContainerWidget
 
 
@@ -41,6 +42,7 @@ class ScreenWidget(ContainerWidget):
         else:
             super().add_widget(widget)
 
+    @benchmark
     def render(self, size):
         super().render(size)
 
@@ -62,7 +64,7 @@ class ScreenWidget(ContainerWidget):
         white_mask_surface = mask.to_surface(
             setcolor=(255, 255, 255, 255), unsetcolor=(0, 0, 0, 0)
         )
-        blurred_mask_surface = pygame.transform.gaussian_blur(mask_surface, radius=5)
+        blurred_mask_surface = pygame.transform.box_blur(mask_surface, radius=5)
         blurred_mask_surface.blit(
             white_mask_surface,
             (0, 0),
@@ -129,6 +131,7 @@ class GridWidget(ContainerWidget):
 
         return absolute_start_coordinates
 
+    @benchmark
     def render(self, size):
         if size != self.size:
             self.size = size

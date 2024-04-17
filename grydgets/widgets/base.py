@@ -43,7 +43,7 @@ class ContainerWidget(Widget):
 class UpdaterWidget(Widget):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.update_frequency = 30
+        self.update_frequency = kwargs.get("update_frequency", 30)
         self.update_thread = WidgetUpdaterThread(self, self.update_frequency, **kwargs)
 
         self.update()
@@ -80,7 +80,7 @@ class WidgetUpdaterThread(threading.Thread):
             while not self._stop_event.is_set():
                 now = int(time.time())
                 if now - self.last_update >= self.frequency:
-                    jitter = random.randint(0, self.frequency // 2)
+                    jitter = random.randint(0, min(self.frequency // 2, 15))
                     time.sleep(jitter)
                     self.logger.debug("Updating")
                     self.widget.update()
