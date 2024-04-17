@@ -16,6 +16,8 @@ class NotifiableTextWidget(ContainerWidget):
         self.newly_created_text = False
         self.notification_queue = queue.Queue()
         self.notification_duration = 5
+        self.text_widget_surface = None
+        self.other_widget_surface = None
 
         self.text_widget = TextWidget(
             font_path=font_path,
@@ -77,6 +79,10 @@ class NotifiableTextWidget(ContainerWidget):
         if self.showing_text:
             if self.rendering_start is None:
                 self.rendering_start = time.time()
-            return self.text_widget.render(size)
+            if self.text_widget_surface is None or self.text_widget.is_dirty():
+                self.text_widget_surface = self.text_widget.render(size)
+            return self.text_widget_surface
         else:
-            return self.widget_list[0].render(size)
+            if self.other_widget_surface is None or self.widget_list[0].is_dirty():
+                self.other_widget_surface = self.widget_list[0].render(size)
+            return self.other_widget_surface

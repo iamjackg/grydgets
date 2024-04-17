@@ -86,6 +86,6 @@ class WidgetUpdaterThread(threading.Thread):
                         break
                     self.logger.debug("Updating")
                     self.widget.update()
-                time.sleep(1)
+                self._stop_event.wait(1)
         except Exception as e:
             self.logger.warning(str(e))
