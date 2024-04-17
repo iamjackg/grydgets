@@ -1,4 +1,5 @@
 import itertools
+import logging
 import time
 
 import pygame
@@ -27,7 +28,9 @@ def load_and_scale_image(image_path, size):
 
 
 class ScreenWidget(ContainerWidget):
-    def __init__(self, size, color=(0, 0, 0), image_path=None, drop_shadow=False, **kwargs):
+    def __init__(
+        self, size, color=(0, 0, 0), image_path=None, drop_shadow=False, **kwargs
+    ):
         super().__init__(size, **kwargs)
         self.color = color
         self.size = size
@@ -62,7 +65,9 @@ class ScreenWidget(ContainerWidget):
 
         if self.drop_shadow:
             mask = pygame.mask.from_surface(child_surface, threshold=200)
-            mask_surface = mask.to_surface(setcolor=(0, 0, 0, 255), unsetcolor=(0, 0, 0, 0))
+            mask_surface = mask.to_surface(
+                setcolor=(0, 0, 0, 255), unsetcolor=(0, 0, 0, 0)
+            )
             white_mask_surface = mask.to_surface(
                 setcolor=(255, 255, 255, 255), unsetcolor=(0, 0, 0, 0)
             )
@@ -93,7 +98,7 @@ class GridWidget(ContainerWidget):
         widget_color=None,
         corner_radius=0,
         widget_corner_radius=0,
-        **kwargs
+        **kwargs,
     ):
         super().__init__(**kwargs)
         self.rows = rows
@@ -191,7 +196,16 @@ class GridWidget(ContainerWidget):
                 )
 
             try:
-                widget_surf = widget.render(size=widget_size)
+                if self.logger.getEffectiveLevel() == logging.DEBUG:
+                    start_time = time.time()
+                    widget_surf = widget.render(size=widget_size)
+                    end_time = time.time()
+                    execution_time = end_time - start_time
+                    widget.logger.debug(
+                        f"Execution time of rendering myself: {execution_time:.5f} seconds"
+                    )
+                else:
+                    widget_surf = widget.render(size=widget_size)
                 final_widget_surface.blit(
                     widget_surf,
                     (0, 0),
