@@ -138,6 +138,9 @@ class GridWidget(ContainerWidget):
             self.dirty = True
             self.surface = pygame.Surface(self.size, pygame.SRCALPHA, 32)
 
+        if not (self.is_dirty() or self.dirty):
+            return self.surface
+
         horizontal_sizes = self.calculate_percentage_sizes(
             self.size[0], self.column_ratios
         )

@@ -82,6 +82,7 @@ server_thread.start()
 
 fps_time = time.time()
 frame_data = list()
+last_screen_surface = None
 while not stop_everything.is_set():
     frame_start = time.time()
     try:
@@ -90,14 +91,16 @@ while not stop_everything.is_set():
                 stop_everything.set()
 
         screen_widget.tick()
-        if conf["graphics"].get("flip", False):
-            blit_image = rotate(screen_widget.render(screen_size), 180)
-        else:
-            blit_image = screen_widget.render(screen_size)
+        if not last_screen_surface or screen_widget.is_dirty():
+            if conf["graphics"].get("flip", False):
+                last_screen_surface = rotate(screen_widget.render(screen_size), 180)
+            else:
+                last_screen_surface = screen_widget.render(screen_size)
 
-        screen.blit(blit_image, (0, 0))
+            screen.blit(last_screen_surface, (0, 0))
 
-        pygame.display.flip()
+            pygame.display.flip()
+
         sleep_time = max((1 / fps_limit) - (time.time() - frame_start), 0)
         # if sleep_time == 0:
         #     logging.debug('Losing frames {}'.format(sleep_time))
@@ -108,7 +111,7 @@ while not stop_everything.is_set():
     frame_end = time.time()
     frame_data.append(frame_end - frame_start)
     if time.time() - fps_time > 0.5:
-        # logging.debug("FPS: {}".format(1 / (sum(frame_data) / len(frame_data))))
+        logging.debug("FPS: {}".format(1 / (sum(frame_data) / len(frame_data))))
         fps_time = time.time()
         frame_data = list()
 

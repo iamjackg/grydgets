@@ -81,10 +81,11 @@ class WidgetUpdaterThread(threading.Thread):
                 now = int(time.time())
                 if now - self.last_update >= self.frequency:
                     jitter = random.randint(0, min(self.frequency // 2, 15))
-                    time.sleep(jitter)
+                    self.last_update = now
+                    if self._stop_event.wait(timeout=jitter):
+                        break
                     self.logger.debug("Updating")
                     self.widget.update()
-                    self.last_update = now
                 time.sleep(1)
         except Exception as e:
             self.logger.warning(str(e))

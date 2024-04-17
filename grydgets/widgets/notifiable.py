@@ -42,7 +42,6 @@ class NotifiableTextWidget(ContainerWidget):
         if self.showing_text:
             return self.dirty
         else:
-            self.logger.debug("Calling child is_dirty")
             return self.widget_list[0].is_dirty()
 
     def tick(self):
