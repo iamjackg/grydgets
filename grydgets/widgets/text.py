@@ -235,7 +235,7 @@ class NextbusWidget(UpdaterWidget):
         if new_value != self.value:
             self.value = new_value
             self.text_widget.set_text(self.value)
-        self.logger.debug("Updated to {}".format(self.value))
+            self.logger.debug("Updated to {}".format(self.value))
 
     def render(self, size):
         self.size = size
@@ -309,11 +309,12 @@ class RESTWidget(UpdaterWidget):
             self.logger.warning("Could not update: {}".format(e))
             text = "Unavailable"
 
-        if self.format_string.format(text) != self.value:
-            self.value = self.format_string.format(text)
+        formatted_value = self.format_string.format(text)
+        if formatted_value != self.value:
+            self.value = formatted_value
             self.text_widget.set_text(self.value)
 
-        self.logger.debug("Updated to {}".format(self.value))
+            self.logger.debug("Updated to {}".format(self.value))
 
     def render(self, size):
         self.size = size

@@ -36,6 +36,7 @@ class NotifiableTextWidget(ContainerWidget):
             super().add_widget(widget)
 
     def notify(self, data):
+        self.logger.debug("Received notification")
         self.notification_queue.put(data)
 
     def is_dirty(self):
@@ -59,6 +60,7 @@ class NotifiableTextWidget(ContainerWidget):
         if not self.showing_text:
             try:
                 data = self.notification_queue.get(block=False)
+                self.logger.debug("Processing notification queue")
             except queue.Empty:
                 pass
             else:
