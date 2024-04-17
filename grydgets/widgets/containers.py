@@ -27,12 +27,13 @@ def load_and_scale_image(image_path, size):
 
 
 class ScreenWidget(ContainerWidget):
-    def __init__(self, size, color=(0, 0, 0), image_path=None, **kwargs):
+    def __init__(self, size, color=(0, 0, 0), image_path=None, drop_shadow=False, **kwargs):
         super().__init__(size, **kwargs)
         self.color = color
         self.size = size
         self.image_path = image_path
         self.image = None
+        self.drop_shadow = drop_shadow
         if image_path is not None:
             self.image = load_and_scale_image(image_path, size)
 
@@ -59,19 +60,20 @@ class ScreenWidget(ContainerWidget):
 
         child_surface = self.widget_list[0].render(self.size)
 
-        mask = pygame.mask.from_surface(child_surface, threshold=200)
-        mask_surface = mask.to_surface(setcolor=(0, 0, 0, 255), unsetcolor=(0, 0, 0, 0))
-        white_mask_surface = mask.to_surface(
-            setcolor=(255, 255, 255, 255), unsetcolor=(0, 0, 0, 0)
-        )
-        blurred_mask_surface = pygame.transform.box_blur(mask_surface, radius=5)
-        blurred_mask_surface.blit(
-            white_mask_surface,
-            (0, 0),
-            special_flags=pygame.BLEND_RGBA_SUB,
-        )
+        if self.drop_shadow:
+            mask = pygame.mask.from_surface(child_surface, threshold=200)
+            mask_surface = mask.to_surface(setcolor=(0, 0, 0, 255), unsetcolor=(0, 0, 0, 0))
+            white_mask_surface = mask.to_surface(
+                setcolor=(255, 255, 255, 255), unsetcolor=(0, 0, 0, 0)
+            )
+            blurred_mask_surface = pygame.transform.box_blur(mask_surface, radius=5)
+            blurred_mask_surface.blit(
+                white_mask_surface,
+                (0, 0),
+                special_flags=pygame.BLEND_RGBA_SUB,
+            )
 
-        surface.blit(blurred_mask_surface, (0, 0))
+            surface.blit(blurred_mask_surface, (0, 0))
         surface.blit(child_surface, (0, 0))
 
         self.dirty = False

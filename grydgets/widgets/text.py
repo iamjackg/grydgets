@@ -62,10 +62,10 @@ class TextWidget(Widget):
                 font = font_cache.get_font(self.font_path, text_size)
                 text_surface = font.render(self.text, True, self.color)
                 text_size -= 1
-            clone_text_surface = pygame.Surface(
-                text_surface.get_size(), pygame.SRCALPHA, 32
-            )
-            clone_text_surface.blit(text_surface, (0, 0))
+            # clone_text_surface = pygame.Surface(
+            #     text_surface.get_size(), pygame.SRCALPHA, 32
+            # )
+            # clone_text_surface.blit(text_surface, (0, 0))
 
             # shadow_text = font.render(self.text, True, (0, 0, 0, 255))
             # shadow_surface = pygame.Surface(
@@ -101,7 +101,7 @@ class TextWidget(Widget):
             #     # special_flags=pygame.BLEND_PREMULTIPLIED,
             # )
 
-            self.surface.blit(clone_text_surface, blit_coordinates)
+            self.surface.blit(text_surface, blit_coordinates)
 
             self.dirty = False
 
