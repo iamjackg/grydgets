@@ -11,8 +11,7 @@ class NotifiableTextWidget(ContainerWidget):
     ):
         super().__init__(**kwargs)
         self.showing_text = False
-        self.last_update = None
-        self.rendering_start = None
+        self.rendering_start_time = None
         self.newly_created_text = False
         self.notification_queue = queue.Queue()
         self.notification_duration = 5
@@ -44,17 +43,23 @@ class NotifiableTextWidget(ContainerWidget):
     def is_dirty(self):
         if self.showing_text:
             return self.dirty
+        elif not self.showing_text and self.rendering_start_time is None and self.dirty:
+            return True
         else:
             return self.widget_list[0].is_dirty()
 
     def tick(self):
         if (
             self.showing_text
-            and self.rendering_start is not None
-            and time.time() - self.rendering_start >= self.notification_duration
+            and self.rendering_start_time is not None
+            and time.time() - self.rendering_start_time >= self.notification_duration
         ):
+            self.logger.debug(
+                "Will stop showing text after %d seconds",
+                time.time() - self.rendering_start_time,
+            )
             self.showing_text = False
-            self.rendering_start = None
+            self.rendering_start_time = None
             self.dirty = True
         else:
             self.widget_list[0].tick()
@@ -67,7 +72,6 @@ class NotifiableTextWidget(ContainerWidget):
                 pass
             else:
                 if "text" in data:
-                    self.last_update = int(time.time())
                     self.showing_text = True
                     self.text_widget.set_text(data["text"])
                     if "color" in data:
@@ -77,12 +81,15 @@ class NotifiableTextWidget(ContainerWidget):
 
     def render(self, size):
         if self.showing_text:
-            if self.rendering_start is None:
-                self.rendering_start = time.time()
+            if self.rendering_start_time is None:
+                self.logger.debug("Started showing text")
+                self.rendering_start_time = time.time()
             if self.text_widget_surface is None or self.text_widget.is_dirty():
                 self.text_widget_surface = self.text_widget.render(size)
+            self.dirty = False
             return self.text_widget_surface
         else:
             if self.other_widget_surface is None or self.widget_list[0].is_dirty():
                 self.other_widget_surface = self.widget_list[0].render(size)
+            self.dirty = False
             return self.other_widget_surface
