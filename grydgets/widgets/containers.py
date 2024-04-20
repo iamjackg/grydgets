@@ -98,6 +98,8 @@ class GridWidget(ContainerWidget):
         widget_color=None,
         corner_radius=0,
         widget_corner_radius=0,
+        image_path=None,
+        drop_shadow=False,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -108,6 +110,7 @@ class GridWidget(ContainerWidget):
         self.widget_color = widget_color
         self.corner_radius = corner_radius
         self.widget_corner_radius = widget_corner_radius
+        self.drop_shadow = drop_shadow
         if row_ratios is not None:
             self.row_ratios = row_ratios
         else:
@@ -117,7 +120,12 @@ class GridWidget(ContainerWidget):
             self.column_ratios = column_ratios
         else:
             self.column_ratios = [1] * self.columns
+
+        self.image = None
+        self.image_path = image_path
+
         self.surface = None
+        self.widget_surface = None
 
     def calculate_percentage_sizes(self, length, ratios):
         percentage_ratios = [ratio / sum(ratios) for ratio in ratios]
@@ -144,9 +152,15 @@ class GridWidget(ContainerWidget):
             self.size = size
             self.dirty = True
             self.surface = pygame.Surface(self.size, pygame.SRCALPHA, 32)
+            self.widget_surface = pygame.Surface(self.size, pygame.SRCALPHA, 32)
+            if self.image is not None:
+                self.image = load_and_scale_image(self.image_path, size)
 
         if not (self.is_dirty() or self.dirty):
             return self.surface
+
+        if self.image is None and self.image_path is not None:
+            self.image = load_and_scale_image(self.image_path, size)
 
         horizontal_sizes = self.calculate_percentage_sizes(
             self.size[0], self.column_ratios
@@ -211,9 +225,9 @@ class GridWidget(ContainerWidget):
                     (0, 0),
                     # special_flags=pygame.BLEND_PREMULTIPLIED,
                 )
-                self.surface.fill((0, 0, 0, 0), pygame.Rect(coords, widget_size))
+                self.widget_surface.fill((0, 0, 0, 0), pygame.Rect(coords, widget_size))
                 # self.surface = self.surface.premul_alpha()
-                self.surface.blit(
+                self.widget_surface.blit(
                     final_widget_surface,
                     coords,
                     # special_flags=pygame.BLEND_PREMULTIPLIED,
@@ -228,6 +242,30 @@ class GridWidget(ContainerWidget):
             # )
 
         self.dirty = False
+
+        if self.image is not None:
+            self.surface.blit(self.image, (0, 0))
+        else:
+            self.surface.fill((0, 0, 0, 0))
+
+        if self.drop_shadow:
+            mask = pygame.mask.from_surface(self.widget_surface, threshold=200)
+            mask_surface = mask.to_surface(
+                setcolor=(0, 0, 0, 255), unsetcolor=(0, 0, 0, 0)
+            )
+            white_mask_surface = mask.to_surface(
+                setcolor=(255, 255, 255, 255), unsetcolor=(0, 0, 0, 0)
+            )
+            blurred_mask_surface = pygame.transform.box_blur(mask_surface, radius=5)
+            blurred_mask_surface.blit(
+                white_mask_surface,
+                (0, 0),
+                special_flags=pygame.BLEND_RGBA_SUB,
+            )
+
+            self.surface.blit(blurred_mask_surface, (0, 0))
+
+        self.surface.blit(self.widget_surface, (0, 0))
 
         if self.corner_radius:
             mask_surface = pygame.Surface(self.size, pygame.SRCALPHA)

@@ -54,6 +54,7 @@ screen_widget = ScreenWidget(
     screen_size,
     image_path=widget_tree.get("background_image", None),
     color=widget_tree.get("background_color", (0, 0, 0)),
+    drop_shadow=widget_tree.get("drop_shadow", False),
 )
 
 screen_widget.add_widget(create_widget_tree(widget_tree["widgets"][0]))
