@@ -256,13 +256,17 @@ class GridWidget(ContainerWidget):
             white_mask_surface = mask.to_surface(
                 setcolor=(255, 255, 255, 255), unsetcolor=(0, 0, 0, 0)
             )
-            blurred_mask_surface = pygame.transform.box_blur(mask_surface, radius=5)
+            blurred_mask_surface = pygame.transform.gaussian_blur(
+                mask_surface, radius=5
+            )
             blurred_mask_surface.blit(
                 white_mask_surface,
                 (0, 0),
                 special_flags=pygame.BLEND_RGBA_SUB,
             )
 
+            self.surface.blit(blurred_mask_surface, (0, 0))
+            self.surface.blit(blurred_mask_surface, (0, 0))
             self.surface.blit(blurred_mask_surface, (0, 0))
 
         self.surface.blit(self.widget_surface, (0, 0))
