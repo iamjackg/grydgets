@@ -205,9 +205,9 @@ class GridWidget(ContainerWidget):
                         self.widget_color, pygame.Rect((0, 0), widget_size)
                     )
 
-                final_widget_surface = (
-                    final_widget_surface.convert_alpha().premul_alpha()
-                )
+                # final_widget_surface = (
+                #     final_widget_surface.convert_alpha().premul_alpha()
+                # )
 
             try:
                 if self.logger.getEffectiveLevel() == logging.DEBUG:
@@ -246,7 +246,7 @@ class GridWidget(ContainerWidget):
         if self.image is not None:
             self.surface.blit(self.image, (0, 0))
         else:
-            self.surface.fill((0, 0, 0, 0))
+            self.surface.fill(self.color or (0, 0, 0, 0))
 
         if self.drop_shadow:
             mask = pygame.mask.from_surface(self.widget_surface, threshold=200)
