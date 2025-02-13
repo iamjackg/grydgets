@@ -1,0 +1,193 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "background_image": { "type": "string" },
+    "drop_shadow": { "type": "boolean" },
+    "background_color": {
+      "type": "array",
+      "items": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 255
+      },
+      "minItems": 3,
+      "maxItems": 4
+    },
+    "widgets": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/widget" }
+    }
+  },
+  "definitions": {
+    "color": {
+      "type": "array",
+      "items": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 255
+      },
+      "minItems": 3,
+      "maxItems": 4
+    },
+    "widget": {
+      "type": "object",
+      "required": ["widget"],
+      "properties": {
+        "widget": {
+          "type": "string",
+          "enum": ["notifiabletext", "grid", "dateclock", "restimage", "rest", "label"]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "widget": { "const": "notifiabletext" } }
+          },
+          "then": {
+            "required": ["font_path"],
+            "properties": {
+              "widget": { "type": "string" },
+              "name": { "type": "string" },
+              "font_path": { "type": "string" },
+              "padding": { "type": "integer", "minimum": 0 },
+              "text_size": { "type": "integer", "minimum": 1 },
+              "children": {
+                "type": "array",
+                "maxItems": 1,
+                "items": { "$ref": "#/definitions/widget" }
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        {
+          "if": {
+            "properties": { "widget": { "const": "grid" } }
+          },
+          "then": {
+            "required": ["rows", "columns"],
+            "properties": {
+              "widget": { "type": "string" },
+              "name": { "type": "string" },
+              "rows": { "type": "integer", "minimum": 1 },
+              "columns": { "type": "integer", "minimum": 1 },
+              "row_ratios": {
+                "type": "array",
+                "items": { "type": "number", "minimum": 0 }
+              },
+              "column_ratios": {
+                "type": "array",
+                "items": { "type": "number", "minimum": 0 }
+              },
+              "padding": { "type": "integer", "minimum": 0 },
+              "widget_color": { "$ref": "#/definitions/color" },
+              "color": { "$ref": "#/definitions/color" },
+              "corner_radius": { "type": "integer", "minimum": 0 },
+              "widget_corner_radius": { "type": "integer", "minimum": 0 },
+              "children": {
+                "type": "array",
+                "items": { "$ref": "#/definitions/widget" }
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        {
+          "if": {
+            "properties": { "widget": { "const": "dateclock" } }
+          },
+          "then": {
+            "required": ["date_font_path", "time_font_path"],
+            "properties": {
+              "widget": { "type": "string" },
+              "name": { "type": "string" },
+              "date_font_path": { "type": "string" },
+              "time_font_path": { "type": "string" },
+              "background_color": { "$ref": "#/definitions/color" },
+              "corner_radius": { "type": "integer", "minimum": 0 }
+            },
+            "additionalProperties": false
+          }
+        },
+        {
+          "if": {
+            "properties": { "widget": { "const": "restimage" } }
+          },
+          "then": {
+            "required": ["url"],
+            "properties": {
+              "widget": { "type": "string" },
+              "name": { "type": "string" },
+              "url": { "type": "string", "format": "uri" },
+              "update_frequency": { "type": "integer", "minimum": 1 },
+              "auth": {
+                "type": "object",
+                "properties": {
+                  "bearer": { "type": "string" }
+                }
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        {
+          "if": {
+            "properties": { "widget": { "const": "rest" } }
+          },
+          "then": {
+            "required": ["url"],
+            "properties": {
+              "widget": { "type": "string" },
+              "name": { "type": "string" },
+              "url": { "type": "string", "format": "uri" },
+              "method": {
+                "type": "string",
+                "enum": ["GET", "POST"]
+              },
+              "update_frequency": { "type": "integer", "minimum": 1 },
+              "payload": { "type": "object" },
+              "auth": {
+                "type": "object",
+                "properties": {
+                  "bearer": { "type": "string" }
+                }
+              },
+              "json_path": { "type": "string" },
+              "format_string": { "type": "string" },
+              "font_path": { "type": "string" },
+              "text_size": { "type": "integer", "minimum": 1 }
+            },
+            "additionalProperties": false
+          }
+        },
+        {
+          "if": {
+            "properties": { "widget": { "const": "label" } }
+          },
+          "then": {
+            "required": ["text", "font_path"],
+            "properties": {
+              "widget": { "type": "string" },
+              "name": { "type": "string" },
+              "text": { "type": "string" },
+              "font_path": { "type": "string" },
+              "position": {
+                "type": "string",
+                "enum": ["above", "below"]
+              },
+              "text_size": { "type": "integer", "minimum": 1 },
+              "text_color": { "$ref": "#/definitions/color" },
+              "children": {
+                "type": "array",
+                "maxItems": 1,
+                "items": { "$ref": "#/definitions/widget" }
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      ]
+    }
+  }
+}

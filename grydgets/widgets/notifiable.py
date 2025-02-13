@@ -102,6 +102,7 @@ class NotifiableTextWidget(ContainerWidget):
 class NotifiableImageWidget(ContainerWidget):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+        self._lock = threading.Lock()
         self.showing_image = False
         self.rendering_start_time = None
         self.notification_queue = queue.Queue()
@@ -143,8 +144,8 @@ class NotifiableImageWidget(ContainerWidget):
             self.showing_image = False
             self.rendering_start_time = None
             self.dirty = True
-        else:
-            self.widget_list[0].tick()
+
+        self.widget_list[0].tick()
 
         if not self.showing_image:
             try:
@@ -175,12 +176,20 @@ class NotifiableImageWidget(ContainerWidget):
     def _fetch_and_set_image(self, url):
         def fetch_image():
             try:
-                response = requests.get(url)
+                response = requests.get(url, timeout=10)  # Add timeout
+                response.raise_for_status()  # Raise for bad status codes
                 image_data = response.content
-                self.image_widget.set_image(image_data)
-                self.showing_image = True
-                self.dirty = True
-            except Exception as e:
-                self.logger.warning(f"Could not fetch image: {e}")
 
-        threading.Thread(target=fetch_image).start()
+                # Use a lock for thread safety
+                with self._lock:  # Add this lock as instance variable
+                    self.image_widget.set_image(image_data)
+                    self.showing_image = True
+                    self.dirty = True
+
+            except requests.RequestException as e:
+                self.logger.error(f"Failed to fetch image: {e}")
+            except Exception as e:
+                self.logger.error(f"Unexpected error processing image: {e}")
+
+        thread = threading.Thread(target=fetch_image, daemon=True)
+        thread.start()
