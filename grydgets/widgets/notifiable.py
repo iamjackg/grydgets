@@ -124,33 +124,35 @@ class NotifiableImageWidget(ContainerWidget):
         self.notification_queue.put(data)
 
     def is_dirty(self):
-        if self.showing_image:
-            return self.dirty
-        elif not self.showing_image and self.rendering_start_time is None and self.dirty:
-            return True
-        else:
-            return self.widget_list[0].is_dirty()
+        with self._lock:
+            if self.showing_image:
+                return self.dirty
+            elif not self.showing_image and self.rendering_start_time is None and self.dirty:
+                return True
+            else:
+                return self.widget_list[0].is_dirty()
 
     def tick(self):
-        if (
-                self.showing_image
-                and self.rendering_start_time is not None
-                and time.time() - self.rendering_start_time >= self.notification_duration
-        ):
-            self.logger.debug(
-                "Will stop showing image after %d seconds",
-                time.time() - self.rendering_start_time,
-                )
-            self.showing_image = False
-            self.rendering_start_time = None
-            self.dirty = True
+        with self._lock:
+            if (
+                    self.showing_image
+                    and self.rendering_start_time is not None
+                    and time.time() - self.rendering_start_time >= self.notification_duration
+            ):
+                self.logger.info(
+                    "Will stop showing image after %d seconds",
+                    time.time() - self.rendering_start_time,
+                    )
+                self.showing_image = False
+                self.rendering_start_time = None
+                self.dirty = True
 
         self.widget_list[0].tick()
 
         if not self.showing_image:
             try:
                 data = self.notification_queue.get(block=False)
-                self.logger.debug("Processing image notification queue")
+                self.logger.info("Processing image notification queue")
             except queue.Empty:
                 pass
             else:
@@ -159,19 +161,21 @@ class NotifiableImageWidget(ContainerWidget):
                     self.notification_duration = data.get("duration", 5)
 
     def render(self, size):
-        if self.showing_image:
-            if self.rendering_start_time is None:
-                self.logger.debug("Started showing image")
-                self.rendering_start_time = time.time()
-            if self.image_widget_surface is None or self.image_widget.is_dirty():
-                self.image_widget_surface = self.image_widget.render(size)
-            self.dirty = False
-            return self.image_widget_surface
-        else:
-            if self.other_widget_surface is None or self.widget_list[0].is_dirty():
-                self.other_widget_surface = self.widget_list[0].render(size)
-            self.dirty = False
-            return self.other_widget_surface
+        with self._lock:
+            if self.showing_image:
+                if self.rendering_start_time is None:
+                    self.logger.info("Started showing image")
+                    self.rendering_start_time = time.time()
+                if self.image_widget_surface is None or self.image_widget.is_dirty():
+                    self.image_widget_surface = self.image_widget.render(size)
+                self.dirty = False
+                return self.image_widget_surface
+            else:
+                if self.other_widget_surface is None or self.widget_list[0].is_dirty():
+                    self.other_widget_surface = self.widget_list[0].render(size)
+                self.dirty = False
+                return self.other_widget_surface
+
 
     def _fetch_and_set_image(self, url):
         def fetch_image():
