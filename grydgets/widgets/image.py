@@ -1,3 +1,4 @@
+import base64
 import io
 import logging
 import threading
@@ -90,6 +91,12 @@ class RESTImageWidget(UpdaterWidget):
                 self.requests_kwargs["headers"]["Authorization"] = "Bearer {}".format(
                     auth["bearer"]
                 )
+            elif "basic" in auth:
+                username = auth["basic"].get("username", "")
+                password = auth["basic"].get("password", "")
+                auth_string = f"{username}:{password}"
+                encoded_auth = base64.b64encode(auth_string.encode()).decode()
+                self.requests_kwargs["headers"]["Authorization"] = f"Basic {encoded_auth}"
         # This needs to happen at the end because it actually starts the update thread
         super().__init__(**kwargs)
 

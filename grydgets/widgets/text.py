@@ -1,3 +1,4 @@
+import base64
 import datetime
 import logging
 
@@ -281,6 +282,12 @@ class RESTWidget(UpdaterWidget):
                 self.requests_kwargs["headers"]["Authorization"] = "Bearer {}".format(
                     auth["bearer"]
                 )
+            elif "basic" in auth:
+                username = auth["basic"].get("username", "")
+                password = auth["basic"].get("password", "")
+                auth_string = f"{username}:{password}"
+                encoded_auth = base64.b64encode(auth_string.encode()).decode()
+                self.requests_kwargs["headers"]["Authorization"] = f"Basic {encoded_auth}"
         if self.method == "POST" and self.payload:
             self.requests_kwargs["json"] = self.payload
         # This needs to happen at the end because it actually starts the update thread
