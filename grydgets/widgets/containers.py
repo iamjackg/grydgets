@@ -1,11 +1,16 @@
+import base64
 import itertools
 import logging
 import time
+from datetime import datetime, time as datetime_time
+from functools import lru_cache
 
 import pygame
+import requests
 
 from grydgets.benchmark import benchmark
-from grydgets.widgets.base import ContainerWidget
+from grydgets.json_utils import extract_json_path
+from grydgets.widgets.base import ContainerWidget, WidgetUpdaterThread, UpdaterWidget
 
 
 def load_and_scale_image(image_path, size):
@@ -344,6 +349,240 @@ class FlipWidget(ContainerWidget):
             if time.time() - self.ticker >= self.transition:
                 self.moving = False
                 self.current_widget = (self.current_widget + 1) % len(self.widget_list)
+
+            return surface
+        else:
+            return self.widget_list[self.current_widget].render(size)
+
+
+class ScheduleFlipWidget(FlipWidget):
+    def __init__(self, schedule=None, **kwargs):
+        super().__init__(**kwargs)
+        self.current_widget = None
+        self.schedule = schedule or {}
+        self.destination_widget = None
+
+    @lru_cache
+    def get_current_widget(self, current_time):
+        # Convert schedule to sorted list of (time, widget) tuples
+        time_widgets = []
+        for time_str, widget in self.schedule.items():
+            hour, minute = map(int, time_str.split(":"))
+            time_widgets.append((datetime_time(hour, minute), widget))
+
+        # Sort by time
+        time_widgets.sort(key=lambda x: x[0])
+
+        # Find the active widget
+        for i, (sched_time, widget) in enumerate(time_widgets):
+            next_time = time_widgets[(i + 1) % len(time_widgets)][0]
+
+            # Handle overnight periods (when next_time < sched_time)
+            if next_time <= sched_time:
+                # This period spans midnight
+                if current_time >= sched_time or current_time < next_time:
+                    return list(map(lambda x: x.name, self.widget_list)).index(widget)
+            else:
+                # Normal period within same day
+                if sched_time <= current_time < next_time:
+                    return list(map(lambda x: x.name, self.widget_list)).index(widget)
+
+        return None
+
+    def tick(self):
+        if self.current_widget is None:
+            self.current_widget = self.get_current_widget(datetime.now().time())
+        current_widget = self.get_current_widget(datetime.now().time())
+        if current_widget != self.current_widget:
+            if not self.moving:  # This allows for the current animation to complete
+                self.moving = True
+                self.destination_widget = current_widget
+                self.ticker = time.time()
+                self.last_update = int(time.time())
+
+        if self.moving:
+            for widget in (
+                self.widget_list[self.current_widget],
+                self.widget_list[self.destination_widget],
+            ):
+                widget.tick()
+        else:
+            self.widget_list[self.current_widget].tick()
+
+    def render(self, size):
+        if self.moving:
+            surface = pygame.Surface(size, pygame.SRCALPHA, 32)
+            if self.transition != 0:
+                transition_percentage = min(
+                    self.ease_in_out(
+                        (time.time() - self.ticker) / self.transition, self.ease
+                    ),
+                    1,
+                )
+            else:
+                transition_percentage = 1
+
+            current_widget = self.widget_list[self.current_widget]
+            next_widget = self.widget_list[self.destination_widget]
+
+            surface.blit(
+                current_widget.render(size), (-(size[0] * transition_percentage), 0)
+            )
+            surface.blit(
+                next_widget.render(size), (size[0] * (1 - transition_percentage), 0)
+            )
+
+            if time.time() - self.ticker >= self.transition:
+                self.moving = False
+                self.current_widget = self.destination_widget
+
+            return surface
+        else:
+            return self.widget_list[self.current_widget].render(size)
+
+
+class HTTPFlipWidget(FlipWidget, UpdaterWidget):
+    def __init__(
+        self,
+        url,
+        mapping,
+        default_widget,
+        json_path=None,
+        auth=None,
+        method=None,
+        payload=None,
+        **kwargs,
+    ):
+        self.destination_widget = None
+        self.mapping = mapping
+        self.default_widget = 0
+        self.default_widget_name = default_widget
+
+        self.url = url
+        self.json_path = json_path
+        self.update_frequency = 5
+        self.value = ""
+        self.method = method or "GET"
+        self.payload = payload
+
+        self.requests_kwargs = {"headers": {}}
+        if auth is not None:
+            if "bearer" in auth:
+                self.requests_kwargs["headers"]["Authorization"] = "Bearer {}".format(
+                    auth["bearer"]
+                )
+            elif "basic" in auth:
+                username = auth["basic"].get("username", "")
+                password = auth["basic"].get("password", "")
+                auth_string = f"{username}:{password}"
+                encoded_auth = base64.b64encode(auth_string.encode()).decode()
+                self.requests_kwargs["headers"][
+                    "Authorization"
+                ] = f"Basic {encoded_auth}"
+        if self.method == "POST" and self.payload:
+            self.requests_kwargs["json"] = self.payload
+        # This needs to happen at the end because it actually starts the update thread
+        super().__init__(**kwargs)
+        self.current_widget = None
+
+    def add_widget(self, widget):
+        super().add_widget(widget)
+        if widget.name == self.default_widget_name:
+            self.default_widget = len(self.widget_list) - 1
+
+    @lru_cache
+    def get_current_widget(self, response_value):
+        if response_value in self.mapping:
+            self.logger.debug(
+                f"Mapped {response_value} to {self.mapping[response_value]}, or {list(map(lambda x: x.name, self.widget_list)).index(self.mapping[response_value])}"
+            )
+            return list(map(lambda x: x.name, self.widget_list)).index(
+                self.mapping[response_value]
+            )
+        else:
+            self.logger.error(f"No mapping for {response_value}")
+            return None
+
+    def tick(self):
+        if self.current_widget is None:
+            self.current_widget = self.get_current_widget(self.value)
+            if self.current_widget is None:
+                self.current_widget = self.default_widget
+        current_widget = self.get_current_widget(self.value)
+        if current_widget is None:
+            current_widget = self.current_widget
+
+        if current_widget != self.current_widget:
+            if not self.moving:  # This allows for the current animation to complete
+                self.moving = True
+                self.destination_widget = current_widget
+                self.ticker = time.time()
+                self.last_update = int(time.time())
+
+        if self.moving:
+            for widget in (
+                self.widget_list[self.current_widget],
+                self.widget_list[self.destination_widget],
+            ):
+                widget.tick()
+        else:
+            self.widget_list[self.current_widget].tick()
+
+    def update(self):
+        """Perform HTTP request and determine target widget"""
+        try:
+            response = requests.request(
+                method=self.method, url=self.url, **self.requests_kwargs
+            )
+
+            if response.status_code != 200:
+                self.logger.warning(f"HTTP error: {response.status_code}")
+                return
+
+            # Extract the value from response
+            if self.json_path is not None:
+                try:
+                    response_json = response.json()
+                    self.value = str(extract_json_path(response_json, self.json_path))
+                except Exception as e:
+                    self.logger.error(f"JSON extraction error: {e}")
+                    return
+            else:
+                self.value = response.text.strip()
+
+            self.logger.debug(f"Response '{self.value}'")
+
+        except requests.ConnectionError as e:
+            self.logger.warning(f"Connection error: {e}")
+        except Exception as e:
+            self.logger.error(f"Unexpected error: {e}")
+
+    def render(self, size):
+        if self.moving:
+            surface = pygame.Surface(size, pygame.SRCALPHA, 32)
+            if self.transition != 0:
+                transition_percentage = min(
+                    self.ease_in_out(
+                        (time.time() - self.ticker) / self.transition, self.ease
+                    ),
+                    1,
+                )
+            else:
+                transition_percentage = 1
+
+            current_widget = self.widget_list[self.current_widget]
+            next_widget = self.widget_list[self.destination_widget]
+
+            surface.blit(
+                current_widget.render(size), (-(size[0] * transition_percentage), 0)
+            )
+            surface.blit(
+                next_widget.render(size), (size[0] * (1 - transition_percentage), 0)
+            )
+
+            if time.time() - self.ticker >= self.transition:
+                self.moving = False
+                self.current_widget = self.destination_widget
 
             return surface
         else:

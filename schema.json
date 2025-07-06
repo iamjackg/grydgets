@@ -30,13 +30,31 @@
       "minItems": 3,
       "maxItems": 4
     },
+    "auth_scheme": {
+      "type": "object",
+      "minProperties": 1,
+      "maxProperties": 1,
+      "properties": {
+        "bearer": { "type": "string" },
+        "basic": {
+          "type": "object",
+          "required": ["username", "password"],
+          "properties": {
+            "username": { "type": "string" },
+            "password": { "type": "string" }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
     "widget": {
       "type": "object",
       "required": ["widget"],
       "properties": {
         "widget": {
           "type": "string",
-          "enum": ["notifiabletext", "notifiableimage", "grid", "dateclock", "restimage", "rest", "label"]
+          "enum": ["notifiabletext", "notifiableimage", "grid", "dateclock", "restimage", "rest", "label", "httpflip", "scheduleflip"]
         }
       },
       "allOf": [
@@ -52,6 +70,24 @@
               "font_path": { "type": "string" },
               "padding": { "type": "integer", "minimum": 0 },
               "text_size": { "type": "integer", "minimum": 1 },
+              "color": { "$ref": "#/definitions/color" },
+              "children": {
+                "type": "array",
+                "maxItems": 1,
+                "items": { "$ref": "#/definitions/widget" }
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        {
+          "if": {
+            "properties": { "widget": { "const": "notifiableimage" } }
+          },
+          "then": {
+            "properties": {
+              "widget": { "type": "string" },
+              "name": { "type": "string" },
               "children": {
                 "type": "array",
                 "maxItems": 1,
@@ -85,6 +121,8 @@
               "color": { "$ref": "#/definitions/color" },
               "corner_radius": { "type": "integer", "minimum": 0 },
               "widget_corner_radius": { "type": "integer", "minimum": 0 },
+              "image_path": { "type": "string" },
+              "drop_shadow": { "type": "boolean" },
               "children": {
                 "type": "array",
                 "items": { "$ref": "#/definitions/widget" }
@@ -105,7 +143,8 @@
               "date_font_path": { "type": "string" },
               "time_font_path": { "type": "string" },
               "background_color": { "$ref": "#/definitions/color" },
-              "corner_radius": { "type": "integer", "minimum": 0 }
+              "corner_radius": { "type": "integer", "minimum": 0 },
+              "color": { "$ref": "#/definitions/color" }
             },
             "additionalProperties": false
           }
@@ -121,12 +160,8 @@
               "name": { "type": "string" },
               "url": { "type": "string", "format": "uri" },
               "update_frequency": { "type": "integer", "minimum": 1 },
-              "auth": {
-                "type": "object",
-                "properties": {
-                  "bearer": { "type": "string" }
-                }
-              }
+              "json_path": { "type": "string" },
+              "auth": { "$ref": "#/definitions/auth_scheme" }
             },
             "additionalProperties": false
           }
@@ -147,16 +182,15 @@
               },
               "update_frequency": { "type": "integer", "minimum": 1 },
               "payload": { "type": "object" },
-              "auth": {
-                "type": "object",
-                "properties": {
-                  "bearer": { "type": "string" }
-                }
-              },
+              "auth": { "$ref": "#/definitions/auth_scheme" },
               "json_path": { "type": "string" },
               "format_string": { "type": "string" },
               "font_path": { "type": "string" },
-              "text_size": { "type": "integer", "minimum": 1 }
+              "text_size": { "type": "integer", "minimum": 1 },
+              "color": { "$ref": "#/definitions/color" },
+              "padding": { "type": "integer", "minimum": 0 },
+              "align": { "type": "string", "enum": ["left", "center", "right"] },
+              "vertical_align": { "type": "string", "enum": ["top", "center", "bottom"] }
             },
             "additionalProperties": false
           }
@@ -181,6 +215,71 @@
               "children": {
                 "type": "array",
                 "maxItems": 1,
+                "items": { "$ref": "#/definitions/widget" }
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        {
+          "if": {
+            "properties": { "widget": { "const": "httpflip" } }
+          },
+          "then": {
+            "required": ["url", "mapping", "default_widget", "children"],
+            "properties": {
+              "widget": { "type": "string" },
+              "name": { "type": "string" },
+              "url": { "type": "string", "format": "uri" },
+              "mapping": {
+                "type": "object",
+                "patternProperties": {
+                  "^.*$": { "type": "string" }
+                },
+                "minProperties": 1,
+                "additionalProperties": false
+              },
+              "default_widget": { "type": "string" },
+              "json_path": { "type": "string" },
+              "auth": { "$ref": "#/definitions/auth_scheme" },
+              "method": { "type": "string", "enum": ["GET", "POST"] },
+              "payload": { "type": "object" },
+              "update_frequency": { "type": "integer", "minimum": 1 },
+              "interval": { "type": "integer", "minimum": 1 },
+              "transition": { "type": "number", "minimum": 0 },
+              "ease": { "type": "integer", "minimum": 1 },
+              "children": {
+                "type": "array",
+                "minItems": 1,
+                "items": { "$ref": "#/definitions/widget" }
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        {
+          "if": {
+            "properties": { "widget": { "const": "scheduleflip" } }
+          },
+          "then": {
+            "required": ["schedule", "children"],
+            "properties": {
+              "widget": { "type": "string" },
+              "name": { "type": "string" },
+              "schedule": {
+                "type": "object",
+                "patternProperties": {
+                  "^([01]\\d|2[0-3]):([0-5]\\d)$": { "type": "string" }
+                },
+                "minProperties": 1,
+                "additionalProperties": false
+              },
+              "interval": { "type": "integer", "minimum": 1 },
+              "transition": { "type": "number", "minimum": 0 },
+              "ease": { "type": "integer", "minimum": 1 },
+              "children": {
+                "type": "array",
+                "minItems": 1,
                 "items": { "$ref": "#/definitions/widget" }
               }
             },

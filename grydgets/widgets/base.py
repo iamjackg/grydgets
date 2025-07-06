@@ -11,6 +11,8 @@ class Widget(object):
         self.logger = logging.getLogger(
             kwargs.get("unique_name") or type(self).__name__
         )
+        self.unique_name = kwargs.get("unique_name") or type(self).__name__
+        self.name = kwargs.get("name") or type(self).__name__
 
     def is_dirty(self):
         return self.dirty
@@ -41,8 +43,8 @@ class ContainerWidget(Widget):
 
 
 class UpdaterWidget(Widget):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.update_frequency = kwargs.get("update_frequency", 30)
         self.update_thread = WidgetUpdaterThread(self, self.update_frequency, **kwargs)
 
@@ -73,6 +75,7 @@ class WidgetUpdaterThread(threading.Thread):
         self.logger.debug("Initialized")
 
     def stop(self):
+        self.logger.debug("Received stop event")
         self._stop_event.set()
 
     def run(self):

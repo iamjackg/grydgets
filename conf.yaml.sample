@@ -7,3 +7,5 @@ graphics:
   flip: false
 logging:
   level: info
+server:
+  port: 5000

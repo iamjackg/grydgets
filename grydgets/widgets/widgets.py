@@ -9,6 +9,7 @@ import grydgets.widgets.image
 import grydgets.widgets.text
 import grydgets.widgets.containers
 import grydgets.widgets.notifiable
+from grydgets.widgets.containers import HTTPFlipWidget
 
 
 class WidgetManager:
@@ -36,9 +37,9 @@ class WidgetManager:
             all_widget_members.extend(inspect.getmembers(sys.modules[module_name]))
         for name, obj in all_widget_members:
             if (
-                    inspect.isclass(obj)
-                    and issubclass(obj, Widget)
-                    and "Widget" in obj.__name__
+                inspect.isclass(obj)
+                and issubclass(obj, Widget)
+                and "Widget" in obj.__name__
             ):
                 class_name = obj.__name__.split("Widget")[0].lower()
                 if class_name:
@@ -99,7 +100,7 @@ class WidgetManager:
             for widget in main_widget.widget_list:
                 logging.debug(f"Going deeper in {main_widget}")
                 self.stop_all_widgets(widget)
-        elif isinstance(main_widget, UpdaterWidget):
+        if isinstance(main_widget, UpdaterWidget):
             logging.debug(f"Stopping UpdaterWidget {main_widget}")
             main_widget.stop()
 
