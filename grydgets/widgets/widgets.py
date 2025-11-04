@@ -9,13 +9,15 @@ import grydgets.widgets.image
 import grydgets.widgets.text
 import grydgets.widgets.containers
 import grydgets.widgets.notifiable
+import grydgets.widgets.provider_widgets
 from grydgets.widgets.containers import HTTPFlipWidget
 
 
 class WidgetManager:
-    def __init__(self):
+    def __init__(self, provider_manager=None):
         self._name_to_widget_map = {}
         self.name_to_instance = {}
+        self.provider_manager = provider_manager
         self.map_all_the_widgets_in_here()
 
     def window(self, seq, n=2):
@@ -32,7 +34,7 @@ class WidgetManager:
 
     def map_all_the_widgets_in_here(self):
         all_widget_members = []
-        for module in ["containers", "image", "notifiable", "text"]:
+        for module in ["containers", "image", "notifiable", "text", "provider_widgets"]:
             module_name = f"grydgets.widgets.{module}"
             all_widget_members.extend(inspect.getmembers(sys.modules[module_name]))
         for name, obj in all_widget_members:
@@ -66,6 +68,21 @@ class WidgetManager:
         logging.debug(f"Adding to widget tree: {unique_name}")
         # Pass the unique name as an extra parameter
         widget_parameters["unique_name"] = unique_name
+
+        # Resolve providers if specified
+        if "providers" in widget_parameters and self.provider_manager:
+            provider_list = widget_parameters["providers"]
+            if not isinstance(provider_list, list):
+                provider_list = [provider_list]
+
+            # Validate and resolve providers
+            self.provider_manager.validate_providers(provider_list)
+            provider_dict = {
+                name: self.provider_manager.get_provider(name)
+                for name in provider_list
+            }
+            widget_parameters["providers"] = provider_dict
+
         widget = self._name_to_widget_map[widget_type_name](**widget_parameters)
         if hasattr(widget, "notify"):
             if callable(widget.notify):

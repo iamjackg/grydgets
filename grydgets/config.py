@@ -50,8 +50,70 @@ config_schema = voluptuous.Schema(
 )
 
 
+# Provider configuration schema
+provider_auth_schema = voluptuous.Schema(
+    voluptuous.Any(
+        {
+            voluptuous.Required("type"): voluptuous.In(["basic", "bearer"]),
+            voluptuous.Optional("username"): str,
+            voluptuous.Optional("password"): str,
+            voluptuous.Optional("token"): str,
+        },
+        {
+            voluptuous.Optional("basic"): {
+                voluptuous.Optional("username"): str,
+                voluptuous.Optional("password"): str,
+            },
+            voluptuous.Optional("bearer"): str,
+        }
+    )
+)
+
+provider_schema = voluptuous.Schema(
+    {
+        voluptuous.Required("providers"): {
+            str: {
+                voluptuous.Required("type"): voluptuous.In(["rest"]),
+                voluptuous.Required("url"): str,
+                voluptuous.Optional("method", default="GET"): voluptuous.In(
+                    ["GET", "POST", "PUT", "DELETE"]
+                ),
+                voluptuous.Optional("headers"): dict,
+                voluptuous.Optional("params"): dict,
+                voluptuous.Optional("body"): voluptuous.Any(dict, str),
+                voluptuous.Optional("payload"): voluptuous.Any(dict, str),
+                voluptuous.Optional("auth"): provider_auth_schema,
+                voluptuous.Optional("json_path"): str,
+                voluptuous.Optional("jq_expression"): str,
+                voluptuous.Optional("update_interval", default=60): voluptuous.All(
+                    int, voluptuous.Range(min=1)
+                ),
+                voluptuous.Optional("jitter", default=0): voluptuous.All(
+                    int, voluptuous.Range(min=0)
+                ),
+            }
+        }
+    }
+)
+
+
 def load_config(filename):
     conf_data = load_yaml(filename)
     config_schema(conf_data)
+
+    return conf_data
+
+
+def load_providers_config(filename):
+    """Load and validate provider configuration.
+
+    Args:
+        filename: Path to providers configuration file
+
+    Returns:
+        Validated provider configuration dict
+    """
+    conf_data = load_yaml(filename)
+    provider_schema(conf_data)
 
     return conf_data

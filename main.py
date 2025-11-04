@@ -10,6 +10,7 @@ from flask import Flask, request, jsonify
 from grydgets import config
 from grydgets.widgets.containers import ScreenWidget
 from grydgets.widgets.widgets import WidgetManager
+from grydgets.providers import ProviderManager
 
 logging.basicConfig(
     format="[%(asctime)s] %(levelname)s:%(name)s:%(message)s", level=logging.DEBUG
@@ -52,7 +53,11 @@ screen_size = tuple(conf["graphics"]["resolution"])
 screen = pygame.display.set_mode(screen_size, pygame_flags)
 pygame.display.set_caption("Grydgets dashboard", "Grydgets")
 
-widget_manager = WidgetManager()
+# Initialize and start providers
+provider_manager = ProviderManager('providers.yaml')
+provider_manager.start_all()
+
+widget_manager = WidgetManager(provider_manager)
 
 screen_widget = ScreenWidget(
     screen_size,
@@ -87,13 +92,26 @@ server_thread.start()
 
 
 def reload_configuration(signum, frame):
-    global screen_widget, widget_tree
+    global screen_widget, widget_tree, provider_manager, widget_manager
     logging.info("Reloading configuration...")
     with reload_lock:
         try:
             new_widget_tree = load_widget_tree()
             logging.info("Stopping all widgets...")
             widget_manager.stop_all_widgets(screen_widget)
+
+            # Stop old providers
+            logging.info("Stopping all providers...")
+            provider_manager.stop_all()
+
+            # Create and start new providers
+            logging.info("Starting new providers...")
+            provider_manager = ProviderManager('providers.yaml')
+            provider_manager.start_all()
+
+            # Create new widget manager with new providers
+            widget_manager = WidgetManager(provider_manager)
+
             screen_widget = ScreenWidget(
                 screen_size,
                 image_path=new_widget_tree.get("background_image", None),
@@ -146,4 +164,5 @@ while not stop_everything.is_set():
         frame_data = list()
 
 widget_manager.stop_all_widgets(screen_widget)
+provider_manager.stop_all()
 pygame.quit()

@@ -9,7 +9,7 @@ import pygame
 import requests
 
 from grydgets.benchmark import benchmark
-from grydgets.json_utils import extract_json_path
+from grydgets.json_utils import extract_data
 from grydgets.widgets.base import ContainerWidget, WidgetUpdaterThread, UpdaterWidget
 
 
@@ -448,6 +448,7 @@ class HTTPFlipWidget(FlipWidget, UpdaterWidget):
         mapping,
         default_widget,
         json_path=None,
+        jq_expression=None,
         auth=None,
         method=None,
         payload=None,
@@ -460,6 +461,7 @@ class HTTPFlipWidget(FlipWidget, UpdaterWidget):
 
         self.url = url
         self.json_path = json_path
+        self.jq_expression = jq_expression
         self.update_frequency = 5
         self.value = ""
         self.method = method or "GET"
@@ -540,10 +542,14 @@ class HTTPFlipWidget(FlipWidget, UpdaterWidget):
                 return
 
             # Extract the value from response
-            if self.json_path is not None:
+            if self.json_path is not None or self.jq_expression is not None:
                 try:
                     response_json = response.json()
-                    self.value = str(extract_json_path(response_json, self.json_path))
+                    self.value = str(extract_data(
+                        response_json,
+                        json_path=self.json_path,
+                        jq_expression=self.jq_expression
+                    ))
                 except Exception as e:
                     self.logger.error(f"JSON extraction error: {e}")
                     return

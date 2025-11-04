@@ -12,7 +12,9 @@ all the dependencies by yourself.
 
 ```
 git clone https://github.com/iamjackg/grydgets
-pip install pygame requests voluptuous pyyaml
+pip install -r requirements.txt
+# Or manually:
+pip install pygame-ce requests voluptuous pyyaml jq
 ```
 
 ## Configuration
@@ -39,6 +41,49 @@ logging:
 
 Similarly, `x-display` is necessary if you're trying to start Grydgets via ssh, and the `DISPLAY` environment variable
 is not properly set.
+
+### Data Providers (`providers.yaml`)
+
+Data providers allow you to fetch data in the background and share it across multiple widgets, eliminating redundant API calls. For example, if three widgets need different fields from the same API endpoint, a single provider can fetch the data once and make it available to all three widgets.
+
+Providers are configured in `providers.yaml`:
+
+```yaml
+providers:
+  hass_calendar:
+    type: rest
+    url: !secret hass_calendar_url
+    headers:
+      Authorization: !secret hass_bearer_token
+    json_path: "events"  # Extract this from response
+    jq_expression: 'map(select(.status == "active"))'  # Further filter with jq
+    update_interval: 60  # Fetch every 60 seconds
+    jitter: 5  # Add random 0-5 second delay
+
+  weather_api:
+    type: rest
+    url: https://api.weather.com/current
+    method: GET
+    auth:
+      bearer: !secret weather_token
+    update_interval: 300
+```
+
+#### Provider Configuration Options
+
+*   `type`: Provider type. Currently only `rest` is supported.
+*   `url`: The URL to fetch from (required).
+*   `method` _(optional)_: HTTP method (`GET`, `POST`, `PUT`, `DELETE`). Defaults to `GET`.
+*   `headers` _(optional)_: Dictionary of HTTP headers.
+*   `params` _(optional)_: Dictionary of query parameters.
+*   `body` or `payload` _(optional)_: Request body for POST/PUT requests.
+*   `auth` _(optional)_: Authentication options (see [Authentication Schemes](#authentication-schemes)).
+*   `json_path` _(optional)_: Simple JSON path to extract from response (e.g., `"events[0].title"`).
+*   `jq_expression` _(optional)_: jq expression for complex data transformations (e.g., `'.events[] | select(.active)'`).
+*   `update_interval` _(optional)_: Seconds between fetches. Defaults to `60`.
+*   `jitter` _(optional)_: Random seconds (0 to this value) added to update interval. Defaults to `0`.
+
+**Note:** If both `json_path` and `jq_expression` are provided, `json_path` is applied first, then `jq_expression` processes the result. This allows you to pre-filter data before complex transformations.
 
 ### Dashboard layout options (`widgets.yaml`)
 
@@ -182,6 +227,7 @@ It supports the following parameters:
 *   `mapping`: A dictionary where keys are expected response values (or extracted JSON paths) and values are the `name` of the child widget to display.
 *   `default_widget`: The `name` of the child widget to display if the response value does not match any entry in `mapping`.
 *   `json_path` _(optional)_: The path to the json item to extract from the HTTP response. If not provided, the raw response text is used.
+*   `jq_expression` _(optional)_: jq expression to extract the comparison value from the JSON response. If both `json_path` and `jq_expression` are provided, `json_path` is applied first.
 *   `auth` _(optional)_: Authentication options (see [Authentication Schemes](#authentication-schemes)).
 *   `method` _(optional)_: The HTTP method to use (`GET` or `POST`). Defaults to `GET`.
 *   `payload` _(optional)_: A dictionary representing the JSON payload for `POST` requests.
@@ -357,6 +403,7 @@ It supports the following parameters:
 
 *   `url`: The URL to retrieve.
 *   `json_path` _(optional)_: The path to the JSON item to extract from the HTTP response. Supports nested objects and array indexing (e.g., `address.city` or `items[0].name`).
+*   `jq_expression` _(optional)_: jq expression for complex data transformations (e.g., `.items[] | select(.active)`). If both `json_path` and `jq_expression` are provided, `json_path` is applied first.
 *   `format_string` _(optional)_: A Python format string to be used to format the final text. The extracted value is passed as the first argument. Defaults to `{}`.
 *   `method` _(optional)_: The HTTP method to use (`GET` or `POST`). Defaults to `GET`.
 *   `payload` _(optional)_: A dictionary representing the JSON payload for `POST` requests.
@@ -383,26 +430,200 @@ Example:
     method: GET
 ```
 
-#### restimage
+#### provider
 
-A widget that makes periodic HTTP requests and displays the retrieved image file. It also supports extracting an image URL from a JSON response and retrieving that image.
+A widget that displays data from a configured data provider. Unlike `rest` widgets that make their own HTTP requests, provider widgets read from shared data providers defined in `providers.yaml`, allowing multiple widgets to efficiently share the same data source.
 
 It supports the following parameters:
 
-*   `url`: The URL to retrieve the image from.
-*   `json_path` _(optional)_: The path to the JSON item that contains an image URL to retrieve. If specified, the value at this path will be used as the actual image URL.
-*   `auth` _(optional)_: Authentication options for the initial `url` request (see [Authentication Schemes](#authentication-schemes)). Note: If `json_path` is used and the extracted `image_url` requires authentication, that needs to be handled by the external resource itself.
-*   `update_frequency` _(optional)_: How often the image should be refreshed, in seconds. Defaults to `30` seconds.
+*   `providers`: A list containing exactly one provider name (e.g., `[hass_calendar]`).
+*   `data_path` _(optional)_: JSON path to extract from provider data.
+*   `jq_expression` _(optional)_: jq expression to extract/transform provider data. If both are provided, `data_path` is applied first.
+*   `format_string` _(optional)_: Python format string for display. The value is passed as `{value}`. Defaults to `"{value}"`.
+*   `fallback_text` _(optional)_: Text to show on error or missing data. Defaults to `"--"`.
+*   `show_errors` _(optional)_: If `true`, displays error messages instead of fallback text. Defaults to `false`.
+*   `font_path` _(optional)_: Path to a ttf font file.
+*   `text_size` _(optional)_: Text size in pixels.
+*   `vertical_align` _(optional)_: Vertical alignment (`top`, `center`, `bottom`). Defaults to `center`.
 
 Example:
 
 ```yaml
+providers:
+  my_calendar:
+    type: rest
+    url: !secret calendar_api
+    update_interval: 60
+
+widgets:
+  - widget: grid
+    rows: 3
+    children:
+      - widget: provider
+        providers: [my_calendar]
+        data_path: "[0].title"
+        fallback_text: "No events"
+      - widget: provider
+        providers: [my_calendar]
+        data_path: "[0].location"
+      - widget: provider
+        providers: [my_calendar]
+        jq_expression: '.[0].start | strptime("%Y-%m-%d") | strftime("%A")'
+```
+
+#### providertemplate
+
+A widget that renders data from providers using Home Assistant's Jinja2 template engine. This is useful for complex formatting that leverages Home Assistant's powerful template functions and filters.
+
+It supports the following parameters:
+
+*   `providers`: A list of provider names (can be multiple, e.g., `[calendar, weather]`).
+*   `template`: Jinja2 template string. Each provider's data is available as `provider_<name>` (e.g., `provider_calendar`, `provider_weather`).
+*   `hass_url`: Home Assistant instance URL (required).
+*   `hass_token`: Home Assistant authentication token (required).
+*   `fallback_text` _(optional)_: Text to show on error. Defaults to `"--"`.
+*   `font_path` _(optional)_: Path to a ttf font file.
+*   `text_size` _(optional)_: Text size in pixels.
+*   `vertical_align` _(optional)_: Vertical alignment. Defaults to `center`.
+
+Example:
+
+```yaml
+- widget: providertemplate
+  providers: [hass_calendar, weather_api]
+  hass_url: !secret hass_url
+  hass_token: !secret hass_token
+  template: |
+    {% set event = provider_hass_calendar[0] %}
+    {% set weather = provider_weather_api %}
+    {{ event.title }} at {{ event.start_time | as_timestamp | timestamp_custom('%I:%M %p') }}
+    Weather: {{ weather.temp }}°F
+  fallback_text: "Loading..."
+```
+
+#### providerflip
+
+A specialized flip widget that conditionally displays child widgets based on data from a provider. Similar to `httpflip`, but reads from a shared provider instead of making its own HTTP requests.
+
+It supports the following parameters:
+
+*   `providers`: A list containing exactly one provider name.
+*   `data_path` _(optional)_: JSON path to extract the comparison value from provider data.
+*   `jq_expression` _(optional)_: jq expression to extract the comparison value.
+*   `mapping`: Dictionary mapping values to child widget names.
+*   `default_widget`: Name of the child widget to display by default or when no mapping matches.
+*   `transition` _(optional)_: Transition animation duration in seconds. Defaults to `1`.
+*   `ease` _(optional)_: Easing factor for transition. Defaults to `2`.
+
+On provider errors, the widget stays on the currently displayed child (does not switch).
+
+Example:
+
+```yaml
+providers:
+  camera_switch:
+    type: rest
+    url: https://homeassistant.example.com/api/template
+    method: POST
+    auth:
+      bearer: !secret hass_token
+    payload:
+      template: '{{ is_state("switch.camera_mode", "on") }}'
+    update_interval: 10
+
+widgets:
+  - widget: providerflip
+    providers: [camera_switch]
+    default_widget: cam_a
+    transition: 0.5
+    mapping:
+      "True": cam_a
+      "False": cam_b
+    children:
+      - widget: restimage
+        name: cam_a
+        url: http://192.168.1.10/image.jpg
+      - widget: restimage
+        name: cam_b
+        url: http://192.168.1.11/image.jpg
+```
+
+#### providerimage
+
+A widget that displays images from URLs contained in provider data. Similar to `restimage`, but reads the image URL from a provider. Supports both HTTP/HTTPS URLs and local file paths using the `file://` protocol.
+
+It supports the following parameters:
+
+*   `providers`: A list containing exactly one provider name.
+*   `data_path` _(optional)_: JSON path to extract the image URL from provider data.
+*   `jq_expression` _(optional)_: jq expression to extract the image URL.
+*   `fallback_image` _(optional)_: Path to a fallback image file to display on error.
+*   `auth` _(optional)_: Authentication for fetching the image from HTTP/HTTPS URLs (not used for `file://` URLs).
+
+The extracted URL can be:
+- HTTP/HTTPS URL: `https://example.com/image.jpg`
+- Local file path: `file:///path/to/image.jpg`
+
+Example:
+
+```yaml
+providers:
+  camera_urls:
+    type: rest
+    url: https://api.example.com/cameras
+    json_path: "active_cameras"
+    update_interval: 30
+
+widgets:
+  - widget: providerimage
+    providers: [camera_urls]
+    data_path: "[0].image_url"
+    fallback_image: "camera_offline.png"
+
+  # Example with file:// URLs
+  - widget: providerimage
+    providers: [local_images]
+    data_path: "current_image"
+    # Provider returns: {"current_image": "file:///home/user/images/photo.jpg"}
+```
+
+#### restimage
+
+A widget that makes periodic HTTP requests and displays the retrieved image file. It also supports extracting an image URL from a JSON response and retrieving that image. Supports both HTTP/HTTPS URLs and local file paths using the `file://` protocol.
+
+It supports the following parameters:
+
+*   `url`: The URL to retrieve the image from (HTTP/HTTPS or `file://` URL).
+*   `json_path` _(optional)_: The path to the JSON item that contains an image URL to retrieve. If specified, the value at this path will be used as the actual image URL.
+*   `jq_expression` _(optional)_: jq expression to extract the image URL from the JSON response. If both `json_path` and `jq_expression` are provided, `json_path` is applied first.
+*   `auth` _(optional)_: Authentication options for HTTP/HTTPS requests (see [Authentication Schemes](#authentication-schemes)). Not used for `file://` URLs.
+*   `update_frequency` _(optional)_: How often the image should be refreshed, in seconds. Defaults to `30` seconds.
+
+The URL (either directly specified or extracted via `json_path`/`jq_expression`) can be:
+- HTTP/HTTPS URL: `https://example.com/image.jpg`
+- Local file path: `file:///path/to/image.jpg`
+
+Examples:
+
+```yaml
+  # HTTP image
   - widget: restimage
     url: 'https://motioneye.example.com/picture/9/current/'
     auth:
       basic:
         username: camera_user
         password: camera_password
+    update_frequency: 10
+
+  # Local file
+  - widget: restimage
+    url: 'file:///home/user/images/current.jpg'
+    update_frequency: 5
+
+  # Extract URL from JSON (can return either HTTP or file:// URL)
+  - widget: restimage
+    url: 'https://api.example.com/current-image'
+    json_path: 'image_url'
     update_frequency: 10
 ```
 
@@ -437,3 +658,81 @@ For example, to show the next two arrival times of all TTC streetcars eastbound 
     font_path: 'OpenSans-Regular.ttf'
     text_size: 40
 ```
+
+## Advanced Features
+
+### Hot Reload
+
+Grydgets supports hot-reloading configuration without restarting the application. Send a `SIGUSR1` signal to the running process to reload both widget configuration and data providers:
+
+```bash
+kill -SIGUSR1 <process_id>
+```
+
+This will:
+- Stop all existing data providers
+- Reload `providers.yaml` and restart providers
+- Reload `widgets.yaml` and rebuild the widget tree
+- Maintain the Flask notification server without interruption
+
+### Data Extraction: json_path vs jq_expression
+
+Grydgets supports two methods for extracting data from JSON responses:
+
+**json_path** - Simple path notation for basic extraction:
+```yaml
+json_path: "events[0].title"  # Get title of first event
+json_path: "user.address.city"  # Navigate nested objects
+```
+
+**jq_expression** - Powerful jq expressions for complex transformations:
+```yaml
+jq_expression: '.events[] | select(.priority == "high")'  # Filter
+jq_expression: '.items | map(.name) | join(", ")'  # Transform
+jq_expression: '.[0].date | strptime("%Y-%m-%d") | strftime("%B %d")'  # Format
+```
+
+**Combining both** - Use json_path to pre-filter, then jq for complex operations:
+```yaml
+json_path: "events"  # Extract events array first
+jq_expression: 'map(select(.active)) | .[0].title'  # Filter and extract
+```
+
+This works in:
+- REST widgets (`rest`, `restimage`, `httpflip`)
+- Data providers (`providers.yaml`)
+- Provider widgets (`provider`, `providerflip`, `providerimage`)
+
+### HTTP Notification Server
+
+Grydgets runs a Flask server on the port specified in `conf.yaml` (default: 5000) that accepts POST requests to trigger notifications on widgets with the `notifiable` prefix.
+
+**Text Notifications:**
+```bash
+curl -X POST -H "Content-Type: application/json" \
+  -d '{"widget": "fullscreen-notification", "text": "Hello!", "duration": 10}' \
+  http://localhost:5000/notify
+```
+
+**Image Notifications:**
+```bash
+curl -X POST -H "Content-Type: application/json" \
+  -d '{"widget": "image-notification", "url": "https://example.com/image.jpg", "duration": 5}' \
+  http://localhost:5000/notify
+```
+
+### Secrets Management
+
+Grydgets supports a `secrets.yaml` file for storing sensitive configuration data. Use the `!secret` tag to reference secrets:
+
+```yaml
+# secrets.yaml
+hass_token: "your_secret_token_here"
+api_key: "your_api_key"
+
+# conf.yaml or widgets.yaml
+auth:
+  bearer: !secret hass_token
+```
+
+The `secrets.yaml` file should not be committed to version control.

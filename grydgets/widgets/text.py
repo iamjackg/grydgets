@@ -7,7 +7,7 @@ import pygame
 from grydgets.widgets.base import Widget, UpdaterWidget, ContainerWidget
 from grydgets.widgets.containers import GridWidget
 from grydgets.fonts import FontCache
-from grydgets.json_utils import extract_json_path
+from grydgets.json_utils import extract_data
 
 font_cache = FontCache()
 
@@ -249,6 +249,7 @@ class RESTWidget(UpdaterWidget):
         self,
         url,
         json_path=None,
+        jq_expression=None,
         format_string=None,
         font_path=None,
         text_size=None,
@@ -260,6 +261,7 @@ class RESTWidget(UpdaterWidget):
     ):
         self.url = url
         self.json_path = json_path
+        self.jq_expression = jq_expression
         self.format_string = format_string or "{}"
         self.update_frequency = 30
         self.value = ""
@@ -303,10 +305,14 @@ class RESTWidget(UpdaterWidget):
             )
             if response.status_code != 200:
                 text = "Error {}".format(response.status_code)
-            elif self.json_path is not None:
+            elif self.json_path is not None or self.jq_expression is not None:
                 response_json = response.json()
                 try:
-                    text = extract_json_path(response_json, self.json_path)
+                    text = extract_data(
+                        response_json,
+                        json_path=self.json_path,
+                        jq_expression=self.jq_expression
+                    )
                 except Exception as e:
                     self.logger.error(e)
                     text = "--"

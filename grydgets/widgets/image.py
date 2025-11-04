@@ -6,7 +6,7 @@ import threading
 import pygame
 import requests
 
-from grydgets.json_utils import extract_json_path
+from grydgets.json_utils import extract_data
 from grydgets.widgets.base import Widget, UpdaterWidget
 
 
@@ -79,9 +79,10 @@ class ImageWidget(Widget):
 
 
 class RESTImageWidget(UpdaterWidget):
-    def __init__(self, url, json_path=None, auth=None, **kwargs):
+    def __init__(self, url, json_path=None, jq_expression=None, auth=None, **kwargs):
         self.url = url
         self.json_path = json_path
+        self.jq_expression = jq_expression
         self.update_frequency = 30
         self.image_widget = ImageWidget()
 
@@ -105,22 +106,50 @@ class RESTImageWidget(UpdaterWidget):
 
     def update(self):
         try:
-            response = requests.get(self.url, **self.requests_kwargs)
-            if self.json_path is not None:
-                response_json = response.json()
-                image_url = extract_json_path(response_json, self.json_path)
+            # Check if main URL is a file:// URL
+            if self.url.startswith("file://"):
+                file_path = self.url[7:]  # Remove 'file://' prefix
+                self.logger.debug(f"Loading image from local file: {file_path}")
 
-                image_response = requests.get(image_url)
-                image_data = image_response.content
+                with open(file_path, "rb") as f:
+                    image_data = f.read()
+
+                self.logger.debug("Updated from local file")
             else:
-                image_data = response.content
+                # Handle HTTP/HTTPS URLs
+                response = requests.get(self.url, **self.requests_kwargs)
+                if self.json_path is not None or self.jq_expression is not None:
+                    response_json = response.json()
+                    image_url = extract_data(
+                        response_json,
+                        json_path=self.json_path,
+                        jq_expression=self.jq_expression
+                    )
+
+                    # Check if extracted URL is a file:// URL
+                    if image_url.startswith("file://"):
+                        file_path = image_url[7:]  # Remove 'file://' prefix
+                        self.logger.debug(f"Loading image from local file: {file_path}")
+
+                        with open(file_path, "rb") as f:
+                            image_data = f.read()
+                    else:
+                        image_response = requests.get(image_url)
+                        image_data = image_response.content
+                else:
+                    image_data = response.content
+
+                self.logger.debug("Updated")
+
+            # Clear old image data before setting new one
+            self.image_widget.image_data = None
+            self.image_widget.old_surface = None
+
+            self.image_widget.set_image(image_data)
+        except FileNotFoundError as e:
+            self.logger.warning("File not found: {}".format(e))
         except Exception as e:
             self.logger.warning("Could not update: {}".format(e))
-            return
-
-        self.logger.debug("Updated")
-
-        self.image_widget.set_image(image_data)
 
     def render(self, size):
         # self.image_widget.set_image(self.image_data)
