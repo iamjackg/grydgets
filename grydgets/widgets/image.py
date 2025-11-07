@@ -11,10 +11,11 @@ from grydgets.widgets.base import Widget, UpdaterWidget
 
 
 class ImageWidget(Widget):
-    def __init__(self, image_data=None, **kwargs):
+    def __init__(self, image_data=None, preserve_aspect_ratio=False, **kwargs):
         super().__init__(**kwargs)
         self.image_update_lock = threading.Lock()
         self.image_data = image_data
+        self.preserve_aspect_ratio = preserve_aspect_ratio
         self.old_surface = None
         self.dirty = True
 
@@ -41,26 +42,42 @@ class ImageWidget(Widget):
                 return self.old_surface
 
             original_size = loaded_image_surface.get_size()
-            adjusted_sizes = list()
 
-            for picture_axis, container_axis in zip(original_size, self.size):
-                if picture_axis != container_axis:
-                    ratio = picture_axis / container_axis
-                    adjusted_sizes.append(
-                        tuple(
-                            int(original_axis / ratio)
-                            for original_axis in original_size
+            if self.preserve_aspect_ratio:
+                # Calculate scaling ratios for both dimensions
+                width_ratio = self.size[0] / original_size[0]
+                height_ratio = self.size[1] / original_size[1]
+
+                # Use the smaller ratio to ensure image fits within container
+                scale_ratio = min(width_ratio, height_ratio)
+
+                # Scale both dimensions using the same ratio
+                final_size = (
+                    int(original_size[0] * scale_ratio),
+                    int(original_size[1] * scale_ratio)
+                )
+            else:
+                # Original behavior: fit image to container
+                adjusted_sizes = list()
+
+                for picture_axis, container_axis in zip(original_size, self.size):
+                    if picture_axis != container_axis:
+                        ratio = picture_axis / container_axis
+                        adjusted_sizes.append(
+                            tuple(
+                                int(original_axis / ratio)
+                                for original_axis in original_size
+                            )
                         )
-                    )
 
-            final_size = self.size
-            for adjusted_size in adjusted_sizes:
-                if (
-                    adjusted_size[0] <= self.size[0]
-                    and adjusted_size[1] <= self.size[1]
-                ):
-                    final_size = adjusted_size
-                    break
+                final_size = self.size
+                for adjusted_size in adjusted_sizes:
+                    if (
+                        adjusted_size[0] <= self.size[0]
+                        and adjusted_size[1] <= self.size[1]
+                    ):
+                        final_size = adjusted_size
+                        break
 
             resized_picture = pygame.transform.smoothscale(
                 loaded_image_surface, final_size
@@ -79,12 +96,12 @@ class ImageWidget(Widget):
 
 
 class RESTImageWidget(UpdaterWidget):
-    def __init__(self, url, json_path=None, jq_expression=None, auth=None, **kwargs):
+    def __init__(self, url, json_path=None, jq_expression=None, auth=None, preserve_aspect_ratio=False, **kwargs):
         self.url = url
         self.json_path = json_path
         self.jq_expression = jq_expression
         self.update_frequency = 30
-        self.image_widget = ImageWidget()
+        self.image_widget = ImageWidget(preserve_aspect_ratio=preserve_aspect_ratio)
 
         self.requests_kwargs = {"headers": {}}
         if auth is not None:

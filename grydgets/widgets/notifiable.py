@@ -100,7 +100,7 @@ class NotifiableTextWidget(ContainerWidget):
 
 
 class NotifiableImageWidget(ContainerWidget):
-    def __init__(self, **kwargs):
+    def __init__(self, preserve_aspect_ratio=False, **kwargs):
         super().__init__(**kwargs)
         self._lock = threading.Lock()
         self.showing_image = False
@@ -110,7 +110,7 @@ class NotifiableImageWidget(ContainerWidget):
         self.image_widget_surface = None
         self.other_widget_surface = None
 
-        self.image_widget = ImageWidget()
+        self.image_widget = ImageWidget(preserve_aspect_ratio=preserve_aspect_ratio)
 
     def add_widget(self, widget):
         if self.widget_list:

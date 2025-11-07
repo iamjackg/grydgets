@@ -426,6 +426,7 @@ class ProviderImageWidget(Widget):
         jq_expression=None,
         fallback_image=None,
         auth=None,
+        preserve_aspect_ratio=False,
         **kwargs,
     ):
         """Initialize the provider image widget.
@@ -436,6 +437,7 @@ class ProviderImageWidget(Widget):
             jq_expression: jq expression to extract image URL from provider data
             fallback_image: Path to fallback image file
             auth: Authentication dict for image fetching (same format as REST)
+            preserve_aspect_ratio: If True, maintain original image aspect ratio when scaling
             **kwargs: Additional widget parameters
         """
         super().__init__(**kwargs)
@@ -454,7 +456,7 @@ class ProviderImageWidget(Widget):
         self.current_image_url = None
 
         # Image widget for rendering
-        self.image_widget = ImageWidget(**kwargs)
+        self.image_widget = ImageWidget(preserve_aspect_ratio=preserve_aspect_ratio, **kwargs)
 
         # Load fallback image if provided
         if fallback_image:
