@@ -441,6 +441,156 @@ class ScheduleFlipWidget(FlipWidget):
             return self.widget_list[self.current_widget].render(size)
 
 
+class PillWidget(ContainerWidget):
+    """A container widget that superimposes a second widget in a pill shape on top of the first.
+
+    The first widget serves as the base/background, and the second widget is displayed
+    in a pill-shaped overlay that can be positioned and sized as needed.
+    """
+
+    def __init__(
+        self,
+        circular_mask=False,
+        pill_background_color=None,
+        pill_width_percent=0.8,
+        pill_height_percent=0.2,
+        pill_position_x=0.5,
+        pill_position_y=0.8,
+        pill_corner_radius=None,
+        pill_size_relative_to_circle=False,
+        **kwargs
+    ):
+        """Initialize the Pill widget.
+
+        Args:
+            circular_mask: If True, apply circular masking to the first (base) widget
+            pill_background_color: Background color of the pill (None = transparent)
+            pill_width_percent: Width of pill as percentage of container (0.0-1.0)
+            pill_height_percent: Height of pill as percentage of container (0.0-1.0)
+            pill_position_x: X position of pill center as percentage (0.0-1.0)
+            pill_position_y: Y position of pill center as percentage (0.0-1.0)
+            pill_corner_radius: Corner radius for pill (None = fully rounded/semicircular ends)
+            pill_size_relative_to_circle: If True, pill size is relative to circle diameter
+            **kwargs: Additional widget parameters
+        """
+        super().__init__(**kwargs)
+        self.circular_mask = circular_mask
+        self.pill_background_color = pill_background_color
+        self.pill_width_percent = pill_width_percent
+        self.pill_height_percent = pill_height_percent
+        self.pill_position_x = pill_position_x
+        self.pill_position_y = pill_position_y
+        self.pill_corner_radius = pill_corner_radius
+        self.pill_size_relative_to_circle = pill_size_relative_to_circle
+
+    def add_widget(self, widget):
+        """Add a child widget. Only accepts exactly 2 children."""
+        if len(self.widget_list) >= 2:
+            raise Exception("PillWidget can only have exactly two children")
+        super().add_widget(widget)
+
+    def is_dirty(self):
+        """Check if widget needs re-rendering.
+
+        Returns True if either child widget is dirty, since changes to either
+        require re-rendering the entire composition.
+        """
+        if len(self.widget_list) < 2:
+            return self.dirty
+        return self.dirty or any(widget.is_dirty() for widget in self.widget_list)
+
+    def tick(self):
+        """Update both child widgets."""
+        for widget in self.widget_list:
+            widget.tick()
+
+    @benchmark
+    def render(self, size):
+        """Render the widget with pill overlay."""
+        if len(self.widget_list) != 2:
+            # Not fully initialized yet
+            surface = pygame.Surface(size, pygame.SRCALPHA, 32)
+            surface.fill((0, 0, 0, 0))
+            return surface
+
+        self.size = size
+        surface = pygame.Surface(size, pygame.SRCALPHA, 32)
+        surface.fill((0, 0, 0, 0))
+
+        # Render the base (first) widget
+        base_widget = self.widget_list[0]
+        base_surface = base_widget.render(size)
+
+        # Apply circular mask to base widget if requested
+        if self.circular_mask:
+            # Create a circular mask
+            mask_surface = pygame.Surface(size, pygame.SRCALPHA, 32)
+            mask_surface.fill((0, 0, 0, 0))
+
+            # Draw a circle in the center
+            radius = min(size[0], size[1]) // 2
+            center = (size[0] // 2, size[1] // 2)
+            pygame.draw.circle(mask_surface, (255, 255, 255, 255), center, radius)
+
+            # Create a temporary surface for the masked base
+            masked_base = pygame.Surface(size, pygame.SRCALPHA, 32)
+            masked_base.fill((0, 0, 0, 0))
+            masked_base.blit(base_surface, (0, 0))
+            masked_base.blit(mask_surface, (0, 0), special_flags=pygame.BLEND_RGBA_MIN)
+            base_surface = masked_base
+
+        # Blit the base widget
+        surface.blit(base_surface, (0, 0))
+
+        # Calculate pill dimensions and position
+        if self.pill_size_relative_to_circle:
+            # Calculate relative to circle diameter (min dimension)
+            circle_diameter = min(size[0], size[1])
+            pill_width = int(circle_diameter * self.pill_width_percent)
+            pill_height = int(circle_diameter * self.pill_height_percent)
+        else:
+            # Calculate relative to container size
+            pill_width = int(size[0] * self.pill_width_percent)
+            pill_height = int(size[1] * self.pill_height_percent)
+        pill_size = (pill_width, pill_height)
+
+        # Calculate pill position (centered at specified percentage)
+        pill_x = int(size[0] * self.pill_position_x - pill_width / 2)
+        pill_y = int(size[1] * self.pill_position_y - pill_height / 2)
+        pill_position = (pill_x, pill_y)
+
+        # Create the pill surface
+        pill_surface = pygame.Surface(pill_size, pygame.SRCALPHA, 32)
+        pill_surface.fill((0, 0, 0, 0))
+
+        # Draw the pill background if specified
+        if self.pill_background_color is not None:
+            # Determine corner radius
+            if self.pill_corner_radius is None:
+                # Make it fully pill-shaped (semicircular ends)
+                corner_radius = pill_height // 2
+            else:
+                corner_radius = self.pill_corner_radius
+
+            pygame.draw.rect(
+                pill_surface,
+                self.pill_background_color,
+                pygame.Rect((0, 0), pill_size),
+                border_radius=corner_radius
+            )
+
+        # Render the pill content (second widget)
+        pill_widget = self.widget_list[1]
+        pill_content = pill_widget.render(pill_size)
+        pill_surface.blit(pill_content, (0, 0))
+
+        # Blit the pill onto the main surface
+        surface.blit(pill_surface, pill_position)
+
+        self.dirty = False
+        return surface
+
+
 class HTTPFlipWidget(FlipWidget, UpdaterWidget):
     def __init__(
         self,
