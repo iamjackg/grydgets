@@ -451,6 +451,7 @@ class PillWidget(ContainerWidget):
     def __init__(
         self,
         circular_mask=False,
+        widget_background_color=None,
         pill_background_color=None,
         pill_width_percent=0.8,
         pill_height_percent=0.2,
@@ -458,7 +459,7 @@ class PillWidget(ContainerWidget):
         pill_position_y=0.8,
         pill_corner_radius=None,
         pill_size_relative_to_circle=False,
-        **kwargs
+        **kwargs,
     ):
         """Initialize the Pill widget.
 
@@ -475,6 +476,7 @@ class PillWidget(ContainerWidget):
         """
         super().__init__(**kwargs)
         self.circular_mask = circular_mask
+        self.widget_background_color = widget_background_color
         self.pill_background_color = pill_background_color
         self.pill_width_percent = pill_width_percent
         self.pill_height_percent = pill_height_percent
@@ -519,7 +521,7 @@ class PillWidget(ContainerWidget):
 
         # Render the base (first) widget
         base_widget = self.widget_list[0]
-        base_surface = base_widget.render(size)
+        base_surface = None
 
         # Apply circular mask to base widget if requested
         if self.circular_mask:
@@ -532,12 +534,19 @@ class PillWidget(ContainerWidget):
             center = (size[0] // 2, size[1] // 2)
             pygame.draw.circle(mask_surface, (255, 255, 255, 255), center, radius)
 
+            base_surface = base_widget.render([radius * 2, radius * 2])
+
             # Create a temporary surface for the masked base
             masked_base = pygame.Surface(size, pygame.SRCALPHA, 32)
-            masked_base.fill((0, 0, 0, 0))
-            masked_base.blit(base_surface, (0, 0))
+            if self.widget_background_color is not None:
+                masked_base.fill(self.widget_background_color)
+            else:
+                masked_base.fill((0, 0, 0, 0))
+            masked_base.blit(base_surface, (center[0] - radius, 0))
             masked_base.blit(mask_surface, (0, 0), special_flags=pygame.BLEND_RGBA_MIN)
             base_surface = masked_base
+        else:
+            base_surface = base_widget.render(size)
 
         # Blit the base widget
         surface.blit(base_surface, (0, 0))
@@ -576,7 +585,7 @@ class PillWidget(ContainerWidget):
                 pill_surface,
                 self.pill_background_color,
                 pygame.Rect((0, 0), pill_size),
-                border_radius=corner_radius
+                border_radius=corner_radius,
             )
 
         # Render the pill content (second widget)
@@ -695,11 +704,13 @@ class HTTPFlipWidget(FlipWidget, UpdaterWidget):
             if self.json_path is not None or self.jq_expression is not None:
                 try:
                     response_json = response.json()
-                    self.value = str(extract_data(
-                        response_json,
-                        json_path=self.json_path,
-                        jq_expression=self.jq_expression
-                    ))
+                    self.value = str(
+                        extract_data(
+                            response_json,
+                            json_path=self.json_path,
+                            jq_expression=self.jq_expression,
+                        )
+                    )
                 except Exception as e:
                     self.logger.error(f"JSON extraction error: {e}")
                     return
