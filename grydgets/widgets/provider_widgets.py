@@ -115,7 +115,7 @@ class ProviderWidget(Widget):
                         value = data
                     text = self.format_string.format(value=value)
                 except (KeyError, IndexError, ValueError, TypeError) as e:
-                    self.logger.error(f"Failed to extract data: {e}")
+                    self.logger.debug(f"Failed to extract data: {e}")
                     text = self.fallback_text
 
         self.text_widget.set_text(text)
@@ -367,7 +367,7 @@ class ProviderFlipWidget(FlipWidget):
                                 )
 
                 except (KeyError, IndexError, ValueError, TypeError) as e:
-                    self.logger.error(f"Failed to extract data: {e}")
+                    self.logger.debug(f"Failed to extract data: {e}")
                     # On extraction error, stay on current widget
 
         # Tick children
@@ -456,7 +456,9 @@ class ProviderImageWidget(Widget):
         self.current_image_url = None
 
         # Image widget for rendering
-        self.image_widget = ImageWidget(preserve_aspect_ratio=preserve_aspect_ratio, **kwargs)
+        self.image_widget = ImageWidget(
+            preserve_aspect_ratio=preserve_aspect_ratio, **kwargs
+        )
 
         # Load fallback image if provided
         if fallback_image:
