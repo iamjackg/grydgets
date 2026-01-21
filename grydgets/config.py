@@ -46,6 +46,21 @@ config_schema = voluptuous.Schema(
                 int, voluptuous.Range(1, 655355)
             )
         },
+        voluptuous.Optional("headless"): {
+            voluptuous.Required("enabled", default=False): bool,
+            voluptuous.Required("output_path", default="./headless_output"): str,
+            voluptuous.Required("render_interval", default=60): voluptuous.All(
+                int, voluptuous.Range(min=1)
+            ),
+            voluptuous.Required("image_format", default="png"): voluptuous.In(
+                ["png", "jpg", "jpeg", "bmp"]
+            ),
+            voluptuous.Optional("filename_pattern", default="grydgets_{timestamp}"): str,
+            voluptuous.Optional("keep_images", default=100): voluptuous.All(
+                int, voluptuous.Range(min=0)
+            ),
+            voluptuous.Optional("create_latest_symlink", default=True): bool,
+        },
     }
 )
 

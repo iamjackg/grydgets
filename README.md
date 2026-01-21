@@ -42,6 +42,51 @@ logging:
 Similarly, `x-display` is necessary if you're trying to start Grydgets via ssh, and the `DISPLAY` environment variable
 is not properly set.
 
+### Headless Mode
+
+Grydgets can run in headless mode, rendering dashboards to image files instead of displaying them on screen. This is ideal for web dashboards, remote monitoring, or running on servers without displays or X servers.
+
+In headless mode, Grydgets:
+- Uses SDL's dummy video driver (no display or X server required)
+- Renders to image files at configurable intervals
+- Maintains a `latest.{format}` symlink for easy web serving
+- Auto-manages disk usage by cleaning up old images
+
+Configuration options:
+
+```yaml
+headless:
+  enabled: true                           # Enable headless mode
+  output_path: "./headless_output"        # Directory for saved images
+  render_interval: 60                     # Seconds between renders
+  image_format: "png"                     # Format: png, jpg, jpeg, or bmp
+  filename_pattern: "grydgets_{timestamp}" # Pattern with {timestamp} and {sequence}
+  create_latest_symlink: true             # Create latest.{format} symlink
+  keep_images: 100                        # Keep last N images (0 = unlimited)
+```
+
+**Performance Note:** Widget ticks (for clocks, animations) run at `fps-limit` rate, but rendering only happens at `render_interval`. For example, with `fps-limit: 1` and `render_interval: 60`, widgets update every second but images are only saved once per minute.
+
+**Example**
+
+```yaml
+# conf.yaml
+graphics:
+  fps-limit: 1
+  resolution: [1920, 1080]
+  fullscreen: false
+
+headless:
+  enabled: true
+  output_path: "/var/www/html/dashboard"
+  render_interval: 60
+  image_format: "png"
+  create_latest_symlink: true
+  keep_images: 1440  # 24 hours at 1-minute intervals
+```
+
+**Important:** Switching between headless and normal mode requires restarting Grydgets. Configuration hot-reload (`SIGUSR1`) will warn and skip the change if the `enabled` flag is modified.
+
 ### Data Providers (`providers.yaml`)
 
 Data providers allow you to fetch data in the background and share it across multiple widgets, eliminating redundant API calls. For example, if three widgets need different fields from the same API endpoint, a single provider can fetch the data once and make it available to all three widgets.
