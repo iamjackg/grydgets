@@ -1,20 +1,28 @@
 # Grydgets
 
-Grydgets allows you to easily create widget-based animated dashboards.
+Grydgets allows you to easily create widget-based dashboards that update in real time, showing local and online data.
 It runs on anything that supports Python, PyGame, and SDL, from the oldest Raspberry Pi to a full-blown modern PC.
 
 ![](images/grydgets-window.png)
 
+_Note:_ while the vast majority of the codebase was originally written by me, my free time has been dwindling more and more. Recent changes have been almost entirely developed with Claude Code. I have reviewed and tested the output, and I am using Grydgets myself 24/7.
+
 ## Installation
 
-The project is still very much a work in progress. For now, the only way to run it is to clone the repository and set up
-all the dependencies by yourself.
+For now, the only way to run it is to clone the repository and set up all the dependencies with `pip` or `uv`.
 
 ```
 git clone https://github.com/iamjackg/grydgets
+
+# pip
+python3 -m venv venv
 pip install -r requirements.txt
-# Or manually:
-pip install pygame-ce requests voluptuous pyyaml jq
+venv/bin/python main.py
+
+# uv
+uv venv
+uv pip install -r requirements.txt
+uv run main.py
 ```
 
 ## Configuration
@@ -65,8 +73,6 @@ headless:
   keep_images: 100                        # Keep last N images (0 = unlimited)
 ```
 
-**Performance Note:** Widget ticks (for clocks, animations) run at `fps-limit` rate, but rendering only happens at `render_interval`. For example, with `fps-limit: 1` and `render_interval: 60`, widgets update every second but images are only saved once per minute.
-
 **Example**
 
 ```yaml
@@ -89,7 +95,7 @@ headless:
 
 ### Data Providers (`providers.yaml`)
 
-Data providers allow you to fetch data in the background and share it across multiple widgets, eliminating redundant API calls. For example, if three widgets need different fields from the same API endpoint, a single provider can fetch the data once and make it available to all three widgets.
+Data providers allow you to fetch data in the background and share it across multiple widgets, eliminating redundant API calls. For example, if you have a widget for the weather forecast of each day of the week, a single provider can fetch all weather data once and make it available to all daily widgets.
 
 Providers are configured in `providers.yaml`:
 
