@@ -661,8 +661,8 @@ class HTTPFlipWidget(FlipWidget, UpdaterWidget):
                 self.mapping[response_value]
             )
         else:
-            self.logger.error(f"No mapping for {response_value}")
-            return None
+            self.logger.debug(f"No mapping for {response_value}")
+            return self.default_widget
 
     def tick(self):
         if self.current_widget is None:

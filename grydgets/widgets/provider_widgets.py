@@ -312,7 +312,7 @@ class ProviderFlipWidget(FlipWidget):
                 return None
         else:
             self.logger.debug(f"No mapping for value '{value}'")
-            return None
+            return self.default_widget
 
     def tick(self):
         """Update widget state based on provider data."""
