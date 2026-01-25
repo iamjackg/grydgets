@@ -141,7 +141,7 @@ providers:
 The tree of widgets that composes your dashboard must be specified in a file called `widgets.yaml` in the main folder. A
 sample file is included in the repository.
 
-The top-level of your `widgets.yaml` can define options for the main screen, which implicitly acts as a `ScreenWidget` container for your entire dashboard.
+The top-level of your `widgets.yaml` defines options for the implicit main screen, which acts as a `ScreenWidget` container for your entire dashboard.
 
 *   `background_image` _(optional)_: The path to an image file to use as the background for the entire screen.
 *   `background_color` _(optional)_: A color for the screen background, as a list of RGB or RGBA components. Defaults to `[0, 0, 0]` (black).
@@ -270,7 +270,7 @@ Example:
 
 #### httpflip
 
-A specialized `flip` widget that determines which child widget to display based on an HTTP request response. It inherits all parameters from `flip` and `updater` widgets.
+A specialized `flip` widget that determines which child widget to display based on an HTTP request response.
 
 It supports the following parameters:
 
@@ -283,6 +283,11 @@ It supports the following parameters:
 *   `method` _(optional)_: The HTTP method to use (`GET` or `POST`). Defaults to `GET`.
 *   `payload` _(optional)_: A dictionary representing the JSON payload for `POST` requests.
 *   `update_frequency` _(optional)_: How often the HTTP request should be made, in seconds. Defaults to `30` seconds.
+
+**Inherited from `flip` widget:**
+*   `interval` _(optional)_: How long to wait before checking for changes, in seconds. Defaults to `5` seconds.
+*   `transition` _(optional)_: How long the animation for transitioning should last, in seconds. Defaults to `1` second.
+*   `ease` _(optional)_: Determines the ease factor of the transition animation. Higher values make the transition more abrupt at the beginning/end. Defaults to `2`.
 
 Example:
 
@@ -333,6 +338,45 @@ Example:
       - widget: text
         name: evening-widget
         text: "Good Evening!"
+```
+
+#### pill
+
+A specialized container widget that superimposes a pill-shaped overlay on top of a base widget. Useful for adding badges, status indicators, or additional information overlays on images or complex widgets.
+
+It supports the following parameters:
+
+*   `circular_mask` _(optional)_: If `true`, applies a circular mask to the base (first) widget. Defaults to `false`.
+*   `widget_background_color` _(optional)_: Background color for the masked widget when using circular mask. As RGB or RGBA.
+*   `pill_background_color` _(optional)_: Background color for the pill overlay. As RGB or RGBA. Defaults to transparent.
+*   `pill_width_percent` _(optional)_: Width of the pill as a percentage of container width (0.0-1.0). Defaults to `0.8`.
+*   `pill_height_percent` _(optional)_: Height of the pill as a percentage of container height (0.0-1.0). Defaults to `0.2`.
+*   `pill_position_x` _(optional)_: Horizontal center position of the pill (0.0-1.0). Defaults to `0.5` (centered).
+*   `pill_position_y` _(optional)_: Vertical center position of the pill (0.0-1.0). Defaults to `0.8` (lower area).
+*   `pill_corner_radius` _(optional)_: Corner radius for the pill shape in pixels. If not specified, the pill is fully rounded (semicircular ends).
+*   `pill_size_relative_to_circle` _(optional)_: If `true` and `circular_mask` is enabled, the pill size is relative to the circle diameter. Defaults to `false`.
+*   `children`: Exactly 2 child widgets. First is the base widget, second is the overlay widget.
+
+Example:
+
+```yaml
+  - widget: pill
+    circular_mask: true
+    widget_background_color: [40, 0, 40, 150]
+    pill_background_color: [0, 0, 0, 150]
+    pill_width_percent: 1.4
+    pill_height_percent: 0.25
+    pill_position_y: 0.85
+    pill_size_relative_to_circle: true
+    children:
+      - widget: restimage
+        url: "file://images/profile.png"
+        preserve_aspect_ratio: true
+      - widget: text
+        text: "Online"
+        font_path: 'OpenSans-Regular.ttf'
+        color: [0, 255, 0]
+        align: center
 ```
 
 #### notifiabletext
@@ -495,6 +539,9 @@ It supports the following parameters:
 *   `show_errors` _(optional)_: If `true`, displays error messages instead of fallback text. Defaults to `false`.
 *   `font_path` _(optional)_: Path to a ttf font file.
 *   `text_size` _(optional)_: Text size in pixels.
+*   `color` _(optional)_: The color of the text, as a list of RGB or RGBA components. Defaults to `[255, 255, 255]` (white).
+*   `padding` _(optional)_: The amount of padding around the text in pixels. Defaults to `0`.
+*   `align` _(optional)_: The horizontal alignment for the text. One of `left`, `center`, or `right`. Defaults to `center`.
 *   `vertical_align` _(optional)_: Vertical alignment (`top`, `center`, `bottom`). Defaults to `center`.
 
 Example:
@@ -563,6 +610,7 @@ It supports the following parameters:
 *   `jq_expression` _(optional)_: jq expression to extract the comparison value.
 *   `mapping`: Dictionary mapping values to child widget names.
 *   `default_widget`: Name of the child widget to display by default or when no mapping matches.
+*   `interval` _(optional)_: How often to check the provider for data changes, in seconds. Defaults to `5` seconds.
 *   `transition` _(optional)_: Transition animation duration in seconds. Defaults to `1`.
 *   `ease` _(optional)_: Easing factor for transition. Defaults to `2`.
 
@@ -610,6 +658,8 @@ It supports the following parameters:
 *   `jq_expression` _(optional)_: jq expression to extract the image URL.
 *   `fallback_image` _(optional)_: Path to a fallback image file to display on error.
 *   `auth` _(optional)_: Authentication for fetching the image from HTTP/HTTPS URLs (not used for `file://` URLs).
+*   `preserve_aspect_ratio` _(optional)_: If `true`, maintains the original image aspect ratio when scaling. If `false` (default), the image is scaled to fill the container.
+*   `show_errors` _(optional)_: If `true`, displays error messages instead of a fallback image. Defaults to `false`.
 
 The extracted URL can be:
 - HTTP/HTTPS URL: `https://example.com/image.jpg`
@@ -649,6 +699,7 @@ It supports the following parameters:
 *   `jq_expression` _(optional)_: jq expression to extract the image URL from the JSON response. If both `json_path` and `jq_expression` are provided, `json_path` is applied first.
 *   `auth` _(optional)_: Authentication options for HTTP/HTTPS requests (see [Authentication Schemes](#authentication-schemes)). Not used for `file://` URLs.
 *   `update_frequency` _(optional)_: How often the image should be refreshed, in seconds. Defaults to `30` seconds.
+*   `preserve_aspect_ratio` _(optional)_: If `true`, maintains the original image aspect ratio when scaling. If `false` (default), the image is scaled to fill the container.
 
 The URL (either directly specified or extracted via `json_path`/`jq_expression`) can be:
 - HTTP/HTTPS URL: `https://example.com/image.jpg`
@@ -685,6 +736,7 @@ A widget that displays a static image. Currently only accepts binary image data 
 It supports the following parameters:
 
 *   `image_data` _(optional)_: Binary contents of the image to display. (Typically set dynamically)
+*   `preserve_aspect_ratio` _(optional)_: If `true`, maintains the original image aspect ratio when scaling. If `false` (default), the image is scaled to fill the container.
 
 #### nextbus
 

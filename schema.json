@@ -54,7 +54,7 @@
       "properties": {
         "widget": {
           "type": "string",
-          "enum": ["notifiabletext", "notifiableimage", "grid", "dateclock", "restimage", "rest", "label", "httpflip", "scheduleflip", "flip"]
+          "enum": ["text", "image", "dateclock", "restimage", "rest", "label", "flip", "httpflip", "scheduleflip", "provider", "providerimage", "providerflip", "providertemplate", "nextbus", "pill", "notifiabletext", "notifiableimage", "grid"]
         }
       },
       "allOf": [
@@ -158,10 +158,12 @@
             "properties": {
               "widget": { "type": "string" },
               "name": { "type": "string" },
-              "url": { "type": "string", "format": "uri" },
+              "url": { "type": "string" },
               "update_frequency": { "type": "integer", "minimum": 1 },
               "json_path": { "type": "string" },
-              "auth": { "$ref": "#/definitions/auth_scheme" }
+              "jq_expression": { "type": "string" },
+              "auth": { "$ref": "#/definitions/auth_scheme" },
+              "preserve_aspect_ratio": { "type": "boolean" }
             },
             "additionalProperties": false
           }
@@ -175,7 +177,7 @@
             "properties": {
               "widget": { "type": "string" },
               "name": { "type": "string" },
-              "url": { "type": "string", "format": "uri" },
+              "url": { "type": "string" },
               "method": {
                 "type": "string",
                 "enum": ["GET", "POST"]
@@ -184,6 +186,7 @@
               "payload": { "type": "object" },
               "auth": { "$ref": "#/definitions/auth_scheme" },
               "json_path": { "type": "string" },
+              "jq_expression": { "type": "string" },
               "format_string": { "type": "string" },
               "font_path": { "type": "string" },
               "text_size": { "type": "integer", "minimum": 1 },
@@ -223,17 +226,23 @@
         },
         {
           "if": {
+            "properties": { "widget": { "const": "flip" } }
+          },
+          "then": {
             "properties": {
-              "properties" : {"widget" :  "flip"}
-            },
-            "then" : {
-              "properties": {
-                "interval" : {"type" : "number"},
-                "widget" : {"type": "string"} ,
-                "transition" : {"type": "number"},
-                "ease" : {"type": "number"}
+              "widget": { "type": "string" },
+              "name": { "type": "string" },
+              "interval": { "type": "integer", "minimum": 1 },
+              "transition": { "type": "number", "minimum": 0 },
+              "ease": { "type": "integer", "minimum": 1 },
+              "children": {
+                "type": "array",
+                "minItems": 1,
+                "items": { "$ref": "#/definitions/widget" }
               }
-            }
+            },
+            "required": ["children"],
+            "additionalProperties": false
           }
         },
         {
@@ -295,6 +304,202 @@
               "children": {
                 "type": "array",
                 "minItems": 1,
+                "items": { "$ref": "#/definitions/widget" }
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        {
+          "if": {
+            "properties": { "widget": { "const": "text" } }
+          },
+          "then": {
+            "properties": {
+              "widget": { "type": "string" },
+              "name": { "type": "string" },
+              "text": { "type": "string" },
+              "font_path": { "type": "string" },
+              "text_size": { "type": "integer", "minimum": 1 },
+              "color": { "$ref": "#/definitions/color" },
+              "padding": { "type": "integer", "minimum": 0 },
+              "align": { "type": "string", "enum": ["left", "center", "right"] },
+              "vertical_align": { "type": "string", "enum": ["top", "center", "bottom"] }
+            },
+            "additionalProperties": false
+          }
+        },
+        {
+          "if": {
+            "properties": { "widget": { "const": "image" } }
+          },
+          "then": {
+            "properties": {
+              "widget": { "type": "string" },
+              "name": { "type": "string" },
+              "preserve_aspect_ratio": { "type": "boolean" }
+            },
+            "additionalProperties": false
+          }
+        },
+        {
+          "if": {
+            "properties": { "widget": { "const": "provider" } }
+          },
+          "then": {
+            "required": ["providers"],
+            "properties": {
+              "widget": { "type": "string" },
+              "name": { "type": "string" },
+              "providers": {
+                "type": "array",
+                "minItems": 1,
+                "items": { "type": "string" }
+              },
+              "data_path": { "type": "string" },
+              "jq_expression": { "type": "string" },
+              "format_string": { "type": "string" },
+              "fallback_text": { "type": "string" },
+              "show_errors": { "type": "boolean" },
+              "font_path": { "type": "string" },
+              "text_size": { "type": "integer", "minimum": 1 },
+              "color": { "$ref": "#/definitions/color" },
+              "padding": { "type": "integer", "minimum": 0 },
+              "align": { "type": "string", "enum": ["left", "center", "right"] },
+              "vertical_align": { "type": "string", "enum": ["top", "center", "bottom"] }
+            },
+            "additionalProperties": false
+          }
+        },
+        {
+          "if": {
+            "properties": { "widget": { "const": "providerimage" } }
+          },
+          "then": {
+            "required": ["providers"],
+            "properties": {
+              "widget": { "type": "string" },
+              "name": { "type": "string" },
+              "providers": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 1,
+                "items": { "type": "string" }
+              },
+              "data_path": { "type": "string" },
+              "jq_expression": { "type": "string" },
+              "fallback_image": { "type": "string" },
+              "auth": { "$ref": "#/definitions/auth_scheme" },
+              "preserve_aspect_ratio": { "type": "boolean" },
+              "show_errors": { "type": "boolean" }
+            },
+            "additionalProperties": false
+          }
+        },
+        {
+          "if": {
+            "properties": { "widget": { "const": "providerflip" } }
+          },
+          "then": {
+            "required": ["providers", "mapping", "default_widget", "children"],
+            "properties": {
+              "widget": { "type": "string" },
+              "name": { "type": "string" },
+              "providers": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 1,
+                "items": { "type": "string" }
+              },
+              "data_path": { "type": "string" },
+              "jq_expression": { "type": "string" },
+              "mapping": {
+                "type": "object",
+                "patternProperties": {
+                  "^.*$": { "type": "string" }
+                },
+                "minProperties": 1,
+                "additionalProperties": false
+              },
+              "default_widget": { "type": "string" },
+              "interval": { "type": "integer", "minimum": 1 },
+              "transition": { "type": "number", "minimum": 0 },
+              "ease": { "type": "integer", "minimum": 1 },
+              "children": {
+                "type": "array",
+                "minItems": 1,
+                "items": { "$ref": "#/definitions/widget" }
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        {
+          "if": {
+            "properties": { "widget": { "const": "providertemplate" } }
+          },
+          "then": {
+            "required": ["providers", "template", "hass_url", "hass_token"],
+            "properties": {
+              "widget": { "type": "string" },
+              "name": { "type": "string" },
+              "providers": {
+                "type": "array",
+                "minItems": 1,
+                "items": { "type": "string" }
+              },
+              "template": { "type": "string" },
+              "hass_url": { "type": "string" },
+              "hass_token": { "type": "string" },
+              "fallback_text": { "type": "string" },
+              "font_path": { "type": "string" },
+              "text_size": { "type": "integer", "minimum": 1 },
+              "vertical_align": { "type": "string", "enum": ["top", "center", "bottom"] }
+            },
+            "additionalProperties": false
+          }
+        },
+        {
+          "if": {
+            "properties": { "widget": { "const": "nextbus" } }
+          },
+          "then": {
+            "required": ["agency", "stop_id"],
+            "properties": {
+              "widget": { "type": "string" },
+              "name": { "type": "string" },
+              "agency": { "type": "string" },
+              "stop_id": { "type": "string" },
+              "route": { "type": "string" },
+              "number": { "type": "integer", "minimum": 1 },
+              "font_path": { "type": "string" },
+              "text_size": { "type": "integer", "minimum": 1 }
+            },
+            "additionalProperties": false
+          }
+        },
+        {
+          "if": {
+            "properties": { "widget": { "const": "pill" } }
+          },
+          "then": {
+            "required": ["children"],
+            "properties": {
+              "widget": { "type": "string" },
+              "name": { "type": "string" },
+              "circular_mask": { "type": "boolean" },
+              "widget_background_color": { "$ref": "#/definitions/color" },
+              "pill_background_color": { "$ref": "#/definitions/color" },
+              "pill_width_percent": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+              "pill_height_percent": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+              "pill_position_x": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+              "pill_position_y": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+              "pill_corner_radius": { "type": "integer", "minimum": 0 },
+              "pill_size_relative_to_circle": { "type": "boolean" },
+              "children": {
+                "type": "array",
+                "minItems": 2,
+                "maxItems": 2,
                 "items": { "$ref": "#/definitions/widget" }
               }
             },
