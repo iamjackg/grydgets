@@ -54,7 +54,7 @@
       "properties": {
         "widget": {
           "type": "string",
-          "enum": ["notifiabletext", "notifiableimage", "grid", "dateclock", "restimage", "rest", "label", "httpflip", "scheduleflip"]
+          "enum": ["notifiabletext", "notifiableimage", "grid", "dateclock", "restimage", "rest", "label", "httpflip", "scheduleflip", "flip"]
         }
       },
       "allOf": [
@@ -219,6 +219,21 @@
               }
             },
             "additionalProperties": false
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "properties" : {"widget" :  "flip"}
+            },
+            "then" : {
+              "properties": {
+                "interval" : {"type" : "number"},
+                "widget" : {"type": "string"} ,
+                "transition" : {"type": "number"},
+                "ease" : {"type": "number"}
+              }
+            }
           }
         },
         {
