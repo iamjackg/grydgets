@@ -54,7 +54,7 @@ class ImageWidget(Widget):
                 # Scale both dimensions using the same ratio
                 final_size = (
                     int(original_size[0] * scale_ratio),
-                    int(original_size[1] * scale_ratio)
+                    int(original_size[1] * scale_ratio),
                 )
             else:
                 # Original behavior: fit image to container
@@ -96,7 +96,15 @@ class ImageWidget(Widget):
 
 
 class RESTImageWidget(UpdaterWidget):
-    def __init__(self, url, json_path=None, jq_expression=None, auth=None, preserve_aspect_ratio=False, **kwargs):
+    def __init__(
+        self,
+        url,
+        json_path=None,
+        jq_expression=None,
+        auth=None,
+        preserve_aspect_ratio=False,
+        **kwargs,
+    ):
         self.url = url
         self.json_path = json_path
         self.jq_expression = jq_expression
@@ -114,7 +122,9 @@ class RESTImageWidget(UpdaterWidget):
                 password = auth["basic"].get("password", "")
                 auth_string = f"{username}:{password}"
                 encoded_auth = base64.b64encode(auth_string.encode()).decode()
-                self.requests_kwargs["headers"]["Authorization"] = f"Basic {encoded_auth}"
+                self.requests_kwargs["headers"][
+                    "Authorization"
+                ] = f"Basic {encoded_auth}"
         # This needs to happen at the end because it actually starts the update thread
         super().__init__(**kwargs)
 
@@ -140,7 +150,7 @@ class RESTImageWidget(UpdaterWidget):
                     image_url = extract_data(
                         response_json,
                         json_path=self.json_path,
-                        jq_expression=self.jq_expression
+                        jq_expression=self.jq_expression,
                     )
 
                     # Check if extracted URL is a file:// URL
@@ -172,3 +182,24 @@ class RESTImageWidget(UpdaterWidget):
         # self.image_widget.set_image(self.image_data)
 
         return self.image_widget.render(size)
+
+
+class EmptyWidget(Widget):
+    def __init__(self, size=None, **kwargs):
+        super().__init__(size, **kwargs)
+        self.surface = None
+
+    def is_dirty(self):
+        if self.dirty:
+            self.dirty = False
+            return True
+        return False
+
+    def tick(self):
+        pass
+
+    def render(self, size):
+        if self.size != size:
+            self.size = size
+            self.surface = pygame.Surface(self.size, pygame.SRCALPHA, 32)
+        return self.surface
