@@ -114,7 +114,13 @@ class ProviderWidget(Widget):
                     else:
                         value = data
                     text = self.format_string.format(value=value)
-                except (KeyError, IndexError, ValueError, TypeError) as e:
+                except (
+                    KeyError,
+                    IndexError,
+                    ValueError,
+                    TypeError,
+                    StopIteration,
+                ) as e:
                     self.logger.debug(f"Failed to extract data: {e}")
                     text = self.fallback_text
 
@@ -366,7 +372,13 @@ class ProviderFlipWidget(FlipWidget):
                                     f"Value changed to '{value}', switching to widget {target_widget}"
                                 )
 
-                except (KeyError, IndexError, ValueError, TypeError) as e:
+                except (
+                    KeyError,
+                    IndexError,
+                    ValueError,
+                    TypeError,
+                    StopIteration,
+                ) as e:
                     self.logger.debug(f"Failed to extract data: {e}")
                     # On extraction error, stay on current widget
 
@@ -521,7 +533,13 @@ class ProviderImageWidget(Widget):
                         self.current_image_url = image_url
                         self._fetch_image(image_url)
 
-                except (KeyError, IndexError, ValueError, TypeError) as e:
+                except (
+                    KeyError,
+                    IndexError,
+                    ValueError,
+                    TypeError,
+                    StopIteration,
+                ) as e:
                     self.logger.error(f"Failed to extract image URL: {e}")
 
         return self.image_widget.render(size)
