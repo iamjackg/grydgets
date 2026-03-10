@@ -54,7 +54,7 @@
       "properties": {
         "widget": {
           "type": "string",
-          "enum": ["text", "image", "dateclock", "restimage", "rest", "label", "flip", "httpflip", "scheduleflip", "provider", "providerimage", "providerflip", "providertemplate", "nextbus", "pill", "notifiabletext", "notifiableimage", "grid", "providerbarchart"]
+          "enum": ["text", "image", "dateclock", "restimage", "rest", "label", "flip", "httpflip", "scheduleflip", "provider", "providerimage", "providerflip", "providertemplate", "pill", "notifiabletext", "notifiableimage", "grid", "providerbarchart"]
         }
       },
       "allOf": [
@@ -455,25 +455,6 @@
               "font_path": { "type": "string" },
               "text_size": { "type": "integer", "minimum": 1 },
               "vertical_align": { "type": "string", "enum": ["top", "center", "bottom"] }
-            },
-            "additionalProperties": false
-          }
-        },
-        {
-          "if": {
-            "properties": { "widget": { "const": "nextbus" } }
-          },
-          "then": {
-            "required": ["agency", "stop_id"],
-            "properties": {
-              "widget": { "type": "string" },
-              "name": { "type": "string" },
-              "agency": { "type": "string" },
-              "stop_id": { "type": "string" },
-              "route": { "type": "string" },
-              "number": { "type": "integer", "minimum": 1 },
-              "font_path": { "type": "string" },
-              "text_size": { "type": "integer", "minimum": 1 }
             },
             "additionalProperties": false
           }

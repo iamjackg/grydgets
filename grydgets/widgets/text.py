@@ -59,13 +59,11 @@ class TextWidget(Widget):
             )
 
             text_size = self.text_size or real_size[1]
-            text_surface = None
-            font = None
-            while text_surface is None or text_surface.get_width() > real_size[0]:
-                font = font_cache.get_font(self.font_path, text_size)
-                text_surface = font.render(self.text, True, self.color)
+            font = font_cache.get_font(self.font_path, text_size)
+            while font.size(self.text)[0] > real_size[0] and text_size > 1:
                 text_size -= 1
-            assert font is not None
+                font = font_cache.get_font(self.font_path, text_size)
+            text_surface = font.render(self.text, True, self.color)
 
             blit_coordinates = [self.padding, self.padding]
             if self.align == "center":
@@ -141,84 +139,6 @@ class DateClockWidget(Widget):
         self.dirty = False
         assert self.surface is not None
         return self.surface
-
-
-import requests
-import xml.etree.ElementTree as ET
-
-
-class NextbusWidget(UpdaterWidget):
-    def __init__(
-        self,
-        agency: str,
-        stop_id: str,
-        route: str | None = None,
-        number: int = 1,
-        font_path: str | None = None,
-        text_size: int | None = None,
-        **kwargs: Any,
-    ) -> None:
-        self.agency = agency
-        self.stop_id = stop_id
-        self.number = number
-        self.prediction_url = "http://webservices.nextbus.com/service/publicXMLFeed?a={}&command=predictions&stopId={}".format(
-            self.agency, self.stop_id
-        )
-        if route:
-            self.prediction_url += "&r={}".format(route)
-        self.value = ""
-
-        self.text_widget = TextWidget(
-            font_path=font_path,
-            color=(255, 255, 255),
-            padding=6,
-            text_size=text_size,
-            align="center",
-            vertical_align="center",
-            **kwargs
-        )
-
-        super().__init__(**kwargs)  # starts the update thread
-
-    def is_dirty(self) -> bool:
-        return self.text_widget.is_dirty()
-
-    def get_next_time(self) -> str:
-        try:
-            response = requests.get(self.prediction_url)
-            if response.status_code != 200:
-                text = "Error {}".format(response.status_code)
-            else:
-                root = ET.fromstring(response.text)
-                upcoming = []
-                for route in root:
-                    routeNumber = route.attrib["routeTag"]
-                    for direction in route:
-                        for prediction in direction:
-                            upcoming.append(
-                                (routeNumber, int(prediction.attrib["minutes"]))
-                            )
-
-                upcoming.sort(key=lambda x: x[1])
-                print(", ".join([b[1].__str__() + "m" for b in upcoming]))
-                limit = min(self.number, len(upcoming))
-                text = " ".join(["{}min".format(b[1]) for b in upcoming[0:limit]])
-        except requests.ConnectionError as e:
-            self.logger.warning("Could not update: {}".format(e))
-            text = "Unavailable"
-        return text
-
-    def update(self) -> None:
-        new_value = self.get_next_time()
-        if new_value != self.value:
-            self.value = new_value
-            self.text_widget.set_text(self.value)
-            self.logger.debug("Updated to {}".format(self.value))
-
-    def render(self, size: tuple[int, int]) -> pygame.Surface:
-        self.size = size
-        self.text_widget.set_text(self.get_next_time())
-        return self.text_widget.render(self.size)
 
 
 class RESTWidget(UpdaterWidget):

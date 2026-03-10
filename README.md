@@ -788,30 +788,6 @@ widgets:
     label_size: 20
 ```
 
-#### nextbus
-
-A widget that displays the time for the next vehicle to arrive at a public transit stop, using the NextBus public API.
-
-It supports the following parameters:
-
-*   `agency`: The agency code, e.g. `ttc` for the Toronto Transit Commission.
-*   `stop_id`: The stop ID to report on.
-*   `route` _(optional)_: Limit results to a specific route tag (e.g., `506` for a specific streetcar route).
-*   `number` _(optional)_: The maximum number of upcoming arrival times to report. Defaults to `1`.
-*   `font_path` _(optional)_: The path to a ttf file to use as font for the arrival times.
-*   `text_size` _(optional)_: The size of the text in pixels.
-
-For example, to show the next two arrival times of all TTC streetcars eastbound at Young & King:
-
-```yaml
-  - widget: nextbus
-    agency: ttc
-    stop_id: 15638
-    number: 2
-    font_path: 'OpenSans-Regular.ttf'
-    text_size: 40
-```
-
 ## Advanced Features
 
 ### Hot Reload
