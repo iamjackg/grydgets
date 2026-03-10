@@ -12,6 +12,8 @@ import requests
 from grydgets.json_utils import extract_data
 from grydgets.widgets.base import Widget, UpdaterWidget
 
+smooth_scaling: bool = True
+
 
 class ImageWidget(Widget):
     def __init__(self, image_data: bytes | None = None, preserve_aspect_ratio: bool = False, **kwargs: Any) -> None:
@@ -84,9 +86,8 @@ class ImageWidget(Widget):
                         final_size = adjusted_size
                         break
 
-            resized_picture = pygame.transform.smoothscale(
-                loaded_image_surface, final_size
-            )
+            scale_fn = pygame.transform.smoothscale if smooth_scaling else pygame.transform.scale
+            resized_picture = scale_fn(loaded_image_surface, final_size)
             picture_position = (
                 (self.size[0] - final_size[0]) / 2,
                 (self.size[1] - final_size[1]) / 2,

@@ -50,6 +50,8 @@ logging:
 Similarly, `x-display` is necessary if you're trying to start Grydgets via ssh, and the `DISPLAY` environment variable
 is not properly set.
 
+`smooth-scaling` controls the algorithm used to resize images in image widgets. It defaults to `true` (bilinear filtering), which produces higher quality results. On low-power hardware such as a Raspberry Pi 2, set it to `false` to use nearest-neighbor scaling instead, which is significantly faster at the cost of some image quality.
+
 ### Headless Mode
 
 Grydgets can run in headless mode, rendering dashboards to image files instead of displaying them on screen. This is ideal for web dashboards, remote monitoring, or running on servers without displays or X servers.

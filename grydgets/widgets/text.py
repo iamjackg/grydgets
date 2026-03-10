@@ -6,6 +6,7 @@ import logging
 from typing import Any
 
 import pygame
+import requests
 
 from grydgets.widgets.base import Widget, UpdaterWidget, ContainerWidget
 from grydgets.widgets.containers import GridWidget

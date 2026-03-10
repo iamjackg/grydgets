@@ -9,6 +9,7 @@ import threading
 from flask import Flask, request, jsonify
 
 from grydgets import config
+from grydgets.widgets import image as image_module
 from grydgets.widgets.containers import ScreenWidget
 from grydgets.widgets.widgets import WidgetManager
 from grydgets.providers import ProviderManager
@@ -46,6 +47,7 @@ if not headless_mode and "x-display" in conf["graphics"]:
     os.environ["DISPLAY"] = conf["graphics"]["x-display"]
 
 fps_limit = conf["graphics"]["fps-limit"]
+image_module.smooth_scaling = conf["graphics"].get("smooth-scaling", True)
 
 pygame_flags = 0
 pygame_flags |= pygame.DOUBLEBUF
