@@ -35,6 +35,7 @@ config_schema = voluptuous.Schema(
             voluptuous.Optional("fb-device"): str,
             voluptuous.Optional("x-display"): str,
             voluptuous.Optional("flip", default=False): bool,
+            voluptuous.Optional("smooth-scaling", default=True): bool,
         },
         voluptuous.Required("logging"): {
             voluptuous.Required("level", default="info"): voluptuous.In(
