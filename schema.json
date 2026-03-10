@@ -505,6 +505,26 @@
               "data_path": { "type": "string" },
               "jq_expression": { "type": "string" },
               "bar_color": { "$ref": "#/definitions/color" },
+              "bar_colors": {
+                "type": "object",
+                "additionalProperties": { "$ref": "#/definitions/color" }
+              },
+              "bar_color_thresholds": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["above", "color"],
+                  "properties": {
+                    "above": { "type": "number" },
+                    "color": { "$ref": "#/definitions/color" }
+                  },
+                  "additionalProperties": false
+                }
+              },
+              "bar_background_colors": {
+                "type": "object",
+                "additionalProperties": { "$ref": "#/definitions/color" }
+              },
               "bar_gap": { "type": "integer", "minimum": 0 },
               "max_value": { "type": "number" },
               "min_value": { "type": "number" },

@@ -749,7 +749,10 @@ It supports the following parameters:
 *   `providers`: A list containing exactly one provider name.
 *   `data_path` _(optional)_: JSON path to extract the list of values from provider data.
 *   `jq_expression` _(optional)_: jq expression that must return a JSON array of numbers.
-*   `bar_color` _(optional)_: Color of the bars, as a list of RGB or RGBA components. Defaults to `[100, 149, 237]` (cornflower blue).
+*   `bar_color` _(optional)_: Default color of the bars, as a list of RGB or RGBA components. Defaults to `[100, 149, 237]` (cornflower blue).
+*   `bar_colors` _(optional)_: A mapping of label strings to RGB or RGBA colors. Bars whose label matches a key are drawn in the corresponding color, taking priority over `bar_color_thresholds` and `bar_color`.
+*   `bar_color_thresholds` _(optional)_: A list of `{above: <value>, color: <RGB/RGBA>}` entries. Each bar is colored by the first threshold whose `above` value is less than or equal to the bar's value. Checked in descending order. Falls back to `bar_color` if no threshold matches.
+*   `bar_background_colors` _(optional)_: A mapping of label strings to RGB or RGBA colors. Draws a full-height background rectangle behind the matching bar. Useful as a visual demarcator — visible even when the bar value is zero.
 *   `bar_gap` _(optional)_: Gap between bars in pixels. Defaults to `2`.
 *   `max_value` _(optional)_: Fixed maximum value for the chart. If not provided, auto-scales to the maximum value in the data.
 *   `min_value` _(optional)_: Minimum value for the chart. Defaults to `0`.
@@ -780,6 +783,13 @@ widgets:
     jq_expression: "[.forecast[:24][].precipitation_probability]"
     labels_jq_expression: "[.forecast[:24][].datetime | .[11:13]]"
     bar_color: [100, 149, 237]
+    bar_color_thresholds:
+      - above: 70
+        color: [220, 80, 80]
+      - above: 40
+        color: [220, 160, 60]
+    bar_background_colors:
+      "00": [255, 255, 255, 25]
     bar_gap: 2
     max_value: 100
     midline: true

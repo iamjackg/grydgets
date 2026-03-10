@@ -19,6 +19,9 @@ class ProviderBarChartWidget(Widget):
         data_path: str | None = None,
         jq_expression: str | None = None,
         bar_color: tuple[int, ...] = (100, 149, 237),
+        bar_colors: dict[str, list[int]] | None = None,
+        bar_color_thresholds: list[dict] | None = None,
+        bar_background_colors: dict[str, list[int]] | None = None,
         bar_gap: int = 2,
         max_value: float | None = None,
         min_value: float = 0,
@@ -45,6 +48,21 @@ class ProviderBarChartWidget(Widget):
         self.data_path = data_path
         self.jq_expression = jq_expression
         self.bar_color = tuple(bar_color)
+        self.bar_colors: dict[str, tuple[int, ...]] = (
+            {k: tuple(v) for k, v in bar_colors.items()} if bar_colors else {}
+        )
+        self.bar_background_colors: dict[str, tuple[int, ...]] = (
+            {k: tuple(v) for k, v in bar_background_colors.items()} if bar_background_colors else {}
+        )
+        # Sort thresholds descending so we check highest first
+        self.bar_color_thresholds: list[dict] = sorted(
+            [
+                {"above": float(t["above"]), "color": tuple(t["color"])}
+                for t in (bar_color_thresholds or [])
+            ],
+            key=lambda t: t["above"],
+            reverse=True,
+        )
         self.bar_gap = bar_gap
         self.max_value = max_value
         self.min_value = min_value
@@ -81,6 +99,14 @@ class ProviderBarChartWidget(Widget):
         if not isinstance(result, list):
             result = [result]
         return [float(v) for v in result]
+
+    def _bar_color_for(self, label: str | None, value: float) -> tuple[int, ...]:
+        if label is not None and label in self.bar_colors:
+            return self.bar_colors[label]
+        for threshold in self.bar_color_thresholds:
+            if value >= threshold["above"]:
+                return threshold["color"]
+        return self.bar_color
 
     def _extract_labels(self, data: Any) -> list[str] | None:
         if not self.labels_jq_expression and not self.labels_data_path:
@@ -179,9 +205,19 @@ class ProviderBarChartWidget(Widget):
             y = chart_height - bar_height
             w = max(1, int(bar_width))
 
-            if bar_height > 0:
+            label = labels[i] if has_labels and labels is not None and i < len(labels) else None
+
+            if label is not None and label in self.bar_background_colors:
                 pygame.draw.rect(
-                    self.surface, self.bar_color, pygame.Rect(x, y, w, bar_height)
+                    self.surface,
+                    self.bar_background_colors[label],
+                    pygame.Rect(x, 0, w, chart_height),
+                )
+
+            if bar_height > 0:
+                color = self._bar_color_for(label, value)
+                pygame.draw.rect(
+                    self.surface, color, pygame.Rect(x, y, w, bar_height)
                 )
 
             if has_labels and font is not None and labels is not None and i < len(labels):
