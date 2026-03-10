@@ -355,7 +355,6 @@ class ScheduleFlipWidget(FlipWidget):
         self.schedule = schedule or {}
         self.destination_widget: int | None = None
 
-    @lru_cache
     def get_current_widget(self, current_time: datetime_time) -> int | None:
         # Convert schedule to sorted list of (time, widget) tuples
         time_widgets = []

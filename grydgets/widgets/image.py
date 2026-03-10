@@ -174,10 +174,6 @@ class RESTImageWidget(UpdaterWidget):
 
                 self.logger.debug("Updated")
 
-            # Clear old image data before setting new one
-            self.image_widget.image_data = None
-            self.image_widget.old_surface = None
-
             self.image_widget.set_image(image_data)
         except FileNotFoundError as e:
             self.logger.warning("File not found: {}".format(e))

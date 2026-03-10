@@ -448,17 +448,11 @@ class ProviderImageWidget(Widget):
                 with open(file_path, "rb") as f:
                     image_data = f.read()
 
-                self.image_widget.image_data = None
-                self.image_widget.old_surface = None
-
                 self.image_widget.set_image(image_data)
                 self.logger.debug(f"Loaded image from {file_path}")
             else:
                 response = requests.get(url, **self.requests_kwargs, timeout=5)
                 if response.status_code == 200:
-                    self.image_widget.image_data = None
-                    self.image_widget.old_surface = None
-
                     self.image_widget.set_image(response.content)
                     self.logger.debug(f"Fetched image from {url}")
                 else:

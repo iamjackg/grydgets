@@ -195,7 +195,7 @@ if headless_mode:
 
 
 def reload_configuration(signum, frame):
-    global screen_widget, widget_tree, provider_manager, widget_manager, last_headless_save, headless_image_sequence
+    global screen_widget, widget_tree, provider_manager, widget_manager, last_headless_save, headless_image_sequence, conf
     logging.info("Reloading configuration...")
     with reload_lock:
         try:
@@ -239,6 +239,7 @@ def reload_configuration(signum, frame):
             )
             screen_widget.add_widget(widget_manager.create_widget_tree(new_widget_tree["widgets"][0]))
             widget_tree = new_widget_tree
+            conf = new_conf
             logging.info("Configuration reloaded successfully.")
         except Exception as e:
             logging.error(f"Failed to reload configuration: {e}")
