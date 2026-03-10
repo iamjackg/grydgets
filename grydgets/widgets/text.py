@@ -1,6 +1,9 @@
+from __future__ import annotations
+
 import base64
 import datetime
 import logging
+from typing import Any
 
 import pygame
 
@@ -15,15 +18,15 @@ font_cache = FontCache()
 class TextWidget(Widget):
     def __init__(
         self,
-        font_path=None,
-        text="",
-        text_size=None,
-        color=(255, 255, 255),
-        padding=0,
-        align="left",
-        vertical_align="top",
-        **kwargs
-    ):
+        font_path: str | None = None,
+        text: str = "",
+        text_size: int | None = None,
+        color: tuple[int, ...] = (255, 255, 255),
+        padding: int = 0,
+        align: str = "left",
+        vertical_align: str = "top",
+        **kwargs: Any,
+    ) -> None:
         super().__init__(**kwargs)
         self.color = color
         self.align = align
@@ -32,23 +35,22 @@ class TextWidget(Widget):
         self.padding = padding
         self.text = text
         self.dirty = True
-        self.surface = None
+        self.surface: pygame.Surface | None = None
         self.text_size = text_size
 
-    def set_text(self, text):
+    def set_text(self, text: str) -> None:
         if text != self.text:
             self.text = text
             self.dirty = True
 
-    def set_color(self, color):
+    def set_color(self, color: tuple[int, ...]) -> None:
         if color != self.color:
             self.color = color
             self.dirty = True
 
-    def render(self, size):
+    def render(self, size: tuple[int, int]) -> pygame.Surface:
         super().render(size)
         if self.dirty:
-            # self.logger.debug('I am dirty')
             self.surface = pygame.Surface(self.size, pygame.SRCALPHA, 32)
 
             real_size = (
@@ -63,31 +65,11 @@ class TextWidget(Widget):
                 font = font_cache.get_font(self.font_path, text_size)
                 text_surface = font.render(self.text, True, self.color)
                 text_size -= 1
-            # clone_text_surface = pygame.Surface(
-            #     text_surface.get_size(), pygame.SRCALPHA, 32
-            # )
-            # clone_text_surface.blit(text_surface, (0, 0))
-
-            # shadow_text = font.render(self.text, True, (0, 0, 0, 255))
-            # shadow_surface = pygame.Surface(
-            #     (shadow_text.get_width() + 20, shadow_text.get_height() + 20),
-            #     pygame.SRCALPHA,
-            #     32,
-            # )
-            # shadow_surface.blit(shadow_text, (10, 10))
-            # shadow_surface.set_alpha(150)
+            assert font is not None
 
             blit_coordinates = [self.padding, self.padding]
             if self.align == "center":
                 blit_coordinates[0] += (real_size[0] - text_surface.get_width()) / 2
-
-            # self.surface.fill((255, 0, 0), pygame.Rect([self.padding, self.padding], [real_size[0], 1]))
-            # self.surface.fill((255, 255, 0), pygame.Rect([self.padding, self.padding + font.get_ascent()], [real_size[0], 1]))
-            # self.surface.fill((0, 255, 0), pygame.Rect([self.padding, self.padding - font.get_descent()], [real_size[0], 1]))
-            # self.surface.fill((0, 255, 255), pygame.Rect([self.padding, self.padding + font.get_height()], [real_size[0], 1]))
-            # self.surface.fill((0, 0, 255), pygame.Rect([self.padding, self.padding + font.get_linesize()], [real_size[0], 1]))
-            # self.surface.fill((255, 0, 255), pygame.Rect([self.padding, self.padding + text_size], [real_size[0], 1]))
-            # print(text_size, font.get_ascent(), font.get_descent(), font.get_height())
 
             blit_coordinates[1] -= font.get_ascent() - text_size - font.get_descent()
             real_text_height = text_size + font.get_descent()
@@ -96,29 +78,24 @@ class TextWidget(Widget):
             elif self.vertical_align == "bottom":
                 blit_coordinates[1] += real_size[1] - real_text_height
 
-            # self.surface.blit(
-            #     pygame.transform.gaussian_blur(shadow_surface, radius=5),
-            #     (blit_coordinates[0] - 10, blit_coordinates[1] - 10),
-            #     # special_flags=pygame.BLEND_PREMULTIPLIED,
-            # )
-
             self.surface.blit(text_surface, blit_coordinates)
 
             self.dirty = False
 
+        assert self.surface is not None
         return self.surface
 
 
 class DateClockWidget(Widget):
     def __init__(
         self,
-        time_font_path=None,
-        date_font_path=None,
-        color=(255, 255, 255),
-        background_color=None,
-        corner_radius=0,
-        **kwargs
-    ):
+        time_font_path: str | None = None,
+        date_font_path: str | None = None,
+        color: tuple[int, ...] = (255, 255, 255),
+        background_color: tuple[int, ...] | None = None,
+        corner_radius: int = 0,
+        **kwargs: Any,
+    ) -> None:
         super().__init__(**kwargs)
         self.grid_widget = GridWidget(
             rows=2,
@@ -146,22 +123,23 @@ class DateClockWidget(Widget):
         )
         self.grid_widget.add_widget(self.hour_widget)
         self.grid_widget.add_widget(self.date_widget)
-        self.surface = None
+        self.surface: pygame.Surface | None = None
 
-    def is_dirty(self):
+    def is_dirty(self) -> bool:
         return self.hour_widget.is_dirty() or self.date_widget.is_dirty()
 
-    def tick(self):
+    def tick(self) -> None:
         self.hour_widget.set_text(datetime.datetime.now().strftime("%H:%M"))
         self.date_widget.set_text(datetime.datetime.now().strftime("%A, %B %d"))
 
-    def render(self, size):
+    def render(self, size: tuple[int, int]) -> pygame.Surface:
         super().render(size)
 
         if self.is_dirty() or self.dirty:
             self.surface = self.grid_widget.render(self.size)
 
         self.dirty = False
+        assert self.surface is not None
         return self.surface
 
 
@@ -172,14 +150,14 @@ import xml.etree.ElementTree as ET
 class NextbusWidget(UpdaterWidget):
     def __init__(
         self,
-        agency,
-        stop_id,
-        route=None,
-        number=1,
-        font_path=None,
-        text_size=None,
-        **kwargs
-    ):
+        agency: str,
+        stop_id: str,
+        route: str | None = None,
+        number: int = 1,
+        font_path: str | None = None,
+        text_size: int | None = None,
+        **kwargs: Any,
+    ) -> None:
         self.agency = agency
         self.stop_id = stop_id
         self.number = number
@@ -202,10 +180,10 @@ class NextbusWidget(UpdaterWidget):
 
         super().__init__(**kwargs)  # starts the update thread
 
-    def is_dirty(self):
+    def is_dirty(self) -> bool:
         return self.text_widget.is_dirty()
 
-    def get_next_time(self):
+    def get_next_time(self) -> str:
         try:
             response = requests.get(self.prediction_url)
             if response.status_code != 200:
@@ -223,7 +201,6 @@ class NextbusWidget(UpdaterWidget):
 
                 upcoming.sort(key=lambda x: x[1])
                 print(", ".join([b[1].__str__() + "m" for b in upcoming]))
-                # text = f"{upcoming[0][1]} min"
                 limit = min(self.number, len(upcoming))
                 text = " ".join(["{}min".format(b[1]) for b in upcoming[0:limit]])
         except requests.ConnectionError as e:
@@ -231,14 +208,14 @@ class NextbusWidget(UpdaterWidget):
             text = "Unavailable"
         return text
 
-    def update(self):
+    def update(self) -> None:
         new_value = self.get_next_time()
         if new_value != self.value:
             self.value = new_value
             self.text_widget.set_text(self.value)
             self.logger.debug("Updated to {}".format(self.value))
 
-    def render(self, size):
+    def render(self, size: tuple[int, int]) -> pygame.Surface:
         self.size = size
         self.text_widget.set_text(self.get_next_time())
         return self.text_widget.render(self.size)
@@ -247,18 +224,18 @@ class NextbusWidget(UpdaterWidget):
 class RESTWidget(UpdaterWidget):
     def __init__(
         self,
-        url,
-        json_path=None,
-        jq_expression=None,
-        format_string=None,
-        font_path=None,
-        text_size=None,
-        auth=None,
-        method=None,
-        payload=None,
-        vertical_align="center",
-        **kwargs
-    ):
+        url: str,
+        json_path: str | None = None,
+        jq_expression: str | None = None,
+        format_string: str | None = None,
+        font_path: str | None = None,
+        text_size: int | None = None,
+        auth: dict[str, Any] | None = None,
+        method: str | None = None,
+        payload: dict[str, Any] | None = None,
+        vertical_align: str = "center",
+        **kwargs: Any,
+    ) -> None:
         self.url = url
         self.json_path = json_path
         self.jq_expression = jq_expression
@@ -278,7 +255,7 @@ class RESTWidget(UpdaterWidget):
             **kwargs
         )
 
-        self.requests_kwargs = {"headers": {}}
+        self.requests_kwargs: dict[str, Any] = {"headers": {}}
         if auth is not None:
             if "bearer" in auth:
                 self.requests_kwargs["headers"]["Authorization"] = "Bearer {}".format(
@@ -295,10 +272,10 @@ class RESTWidget(UpdaterWidget):
         # This needs to happen at the end because it actually starts the update thread
         super().__init__(**kwargs)
 
-    def is_dirty(self):
+    def is_dirty(self) -> bool:
         return self.text_widget.is_dirty()
 
-    def update(self):
+    def update(self) -> None:
         try:
             response = requests.request(
                 method=self.method, url=self.url, **self.requests_kwargs
@@ -329,7 +306,7 @@ class RESTWidget(UpdaterWidget):
 
             self.logger.debug("Updated to {}".format(self.value))
 
-    def render(self, size):
+    def render(self, size: tuple[int, int]) -> pygame.Surface:
         self.size = size
 
         self.text_widget.set_text(self.value)
@@ -340,13 +317,13 @@ class RESTWidget(UpdaterWidget):
 class LabelWidget(ContainerWidget):
     def __init__(
         self,
-        text,
-        font_path=None,
-        position="above",
-        text_size=None,
-        text_color=(255, 255, 255),
-        **kwargs
-    ):
+        text: str,
+        font_path: str | None = None,
+        position: str = "above",
+        text_size: int | None = None,
+        text_color: tuple[int, ...] = (255, 255, 255),
+        **kwargs: Any,
+    ) -> None:
         super().__init__(**kwargs)
         self.text_widget = TextWidget(
             font_path=font_path,
@@ -370,10 +347,10 @@ class LabelWidget(ContainerWidget):
             padding=0,
         )
 
-    def is_dirty(self):
+    def is_dirty(self) -> bool:
         return self.grid_widget.is_dirty()
 
-    def add_widget(self, widget):
+    def add_widget(self, widget: Widget) -> None:
         super(LabelWidget, self).add_widget(widget)
         if self.position == "above":
             self.grid_widget.add_widget(self.text_widget)
@@ -382,5 +359,5 @@ class LabelWidget(ContainerWidget):
             self.grid_widget.add_widget(widget)
             self.grid_widget.add_widget(self.text_widget)
 
-    def render(self, size):
+    def render(self, size: tuple[int, int]) -> pygame.Surface:
         return self.grid_widget.render(size)

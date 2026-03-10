@@ -1,3 +1,4 @@
+import argparse
 import os
 import signal
 import pygame
@@ -16,9 +17,18 @@ logging.basicConfig(
     format="[%(asctime)s] %(levelname)s:%(name)s:%(message)s", level=logging.DEBUG
 )
 
+parser = argparse.ArgumentParser(description="Grydgets dashboard")
+parser.add_argument(
+    "--widgets",
+    default="widgets.yaml",
+    metavar="FILE",
+    help="Widget configuration file (default: widgets.yaml)",
+)
+args = parser.parse_args()
+
 
 def load_widget_tree():
-    return config.load_yaml("widgets.yaml")
+    return config.load_yaml(args.widgets)
 
 
 widget_tree = load_widget_tree()

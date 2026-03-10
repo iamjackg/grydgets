@@ -1,7 +1,10 @@
+from __future__ import annotations
+
 import base64
 import io
 import logging
 import threading
+from typing import Any
 
 import pygame
 import requests
@@ -11,21 +14,21 @@ from grydgets.widgets.base import Widget, UpdaterWidget
 
 
 class ImageWidget(Widget):
-    def __init__(self, image_data=None, preserve_aspect_ratio=False, **kwargs):
+    def __init__(self, image_data: bytes | None = None, preserve_aspect_ratio: bool = False, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self.image_update_lock = threading.Lock()
         self.image_data = image_data
         self.preserve_aspect_ratio = preserve_aspect_ratio
-        self.old_surface = None
+        self.old_surface: pygame.Surface | None = None
         self.dirty = True
 
-    def set_image(self, image_data):
+    def set_image(self, image_data: bytes) -> None:
         if image_data != self.image_data:
             with self.image_update_lock:
                 self.image_data = image_data
             self.dirty = True
 
-    def render(self, size):
+    def render(self, size: tuple[int, int]) -> pygame.Surface:
         super().render(size)
 
         if self.image_data is None:
@@ -39,7 +42,9 @@ class ImageWidget(Widget):
             except pygame.error:
                 with self.image_update_lock:
                     self.image_data = None
-                return self.old_surface
+                if self.old_surface is not None:
+                    return self.old_surface
+                return pygame.Surface(self.size, pygame.SRCALPHA, 32)
 
             original_size = loaded_image_surface.get_size()
 
@@ -92,26 +97,27 @@ class ImageWidget(Widget):
             self.old_surface = final_surface
 
         self.dirty = False
+        assert self.old_surface is not None
         return self.old_surface
 
 
 class RESTImageWidget(UpdaterWidget):
     def __init__(
         self,
-        url,
-        json_path=None,
-        jq_expression=None,
-        auth=None,
-        preserve_aspect_ratio=False,
-        **kwargs,
-    ):
+        url: str,
+        json_path: str | None = None,
+        jq_expression: str | None = None,
+        auth: dict[str, Any] | None = None,
+        preserve_aspect_ratio: bool = False,
+        **kwargs: Any,
+    ) -> None:
         self.url = url
         self.json_path = json_path
         self.jq_expression = jq_expression
         self.update_frequency = 30
         self.image_widget = ImageWidget(preserve_aspect_ratio=preserve_aspect_ratio)
 
-        self.requests_kwargs = {"headers": {}}
+        self.requests_kwargs: dict[str, Any] = {"headers": {}}
         if auth is not None:
             if "bearer" in auth:
                 self.requests_kwargs["headers"]["Authorization"] = "Bearer {}".format(
@@ -128,10 +134,10 @@ class RESTImageWidget(UpdaterWidget):
         # This needs to happen at the end because it actually starts the update thread
         super().__init__(**kwargs)
 
-    def is_dirty(self):
+    def is_dirty(self) -> bool:
         return self.image_widget.is_dirty()
 
-    def update(self):
+    def update(self) -> None:
         try:
             # Check if main URL is a file:// URL
             if self.url.startswith("file://"):
@@ -178,28 +184,27 @@ class RESTImageWidget(UpdaterWidget):
         except Exception as e:
             self.logger.warning("Could not update: {}".format(e))
 
-    def render(self, size):
-        # self.image_widget.set_image(self.image_data)
-
+    def render(self, size: tuple[int, int]) -> pygame.Surface:
         return self.image_widget.render(size)
 
 
 class EmptyWidget(Widget):
-    def __init__(self, size=None, **kwargs):
+    def __init__(self, size: tuple[int, int] | None = None, **kwargs: Any) -> None:
         super().__init__(size, **kwargs)
-        self.surface = None
+        self.surface: pygame.Surface | None = None
 
-    def is_dirty(self):
+    def is_dirty(self) -> bool:
         if self.dirty:
             self.dirty = False
             return True
         return False
 
-    def tick(self):
+    def tick(self) -> None:
         pass
 
-    def render(self, size):
+    def render(self, size: tuple[int, int]) -> pygame.Surface:
         if self.size != size:
             self.size = size
             self.surface = pygame.Surface(self.size, pygame.SRCALPHA, 32)
+        assert self.surface is not None
         return self.surface

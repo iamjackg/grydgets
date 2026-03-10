@@ -1,19 +1,23 @@
+from __future__ import annotations
+
 import base64
 import itertools
 import logging
 import time
+from collections.abc import Sequence
 from datetime import datetime, time as datetime_time
 from functools import lru_cache
+from typing import Any
 
 import pygame
 import requests
 
 from grydgets.benchmark import benchmark
 from grydgets.json_utils import extract_data
-from grydgets.widgets.base import ContainerWidget, WidgetUpdaterThread, UpdaterWidget
+from grydgets.widgets.base import ContainerWidget, WidgetUpdaterThread, UpdaterWidget, Widget
 
 
-def load_and_scale_image(image_path, size):
+def load_and_scale_image(image_path: str, size: tuple[int, int]) -> pygame.Surface:
     # Load the image
     image = pygame.image.load(image_path)
 
@@ -34,25 +38,30 @@ def load_and_scale_image(image_path, size):
 
 class ScreenWidget(ContainerWidget):
     def __init__(
-        self, size, color=(0, 0, 0), image_path=None, drop_shadow=False, **kwargs
-    ):
+        self,
+        size: tuple[int, int],
+        color: tuple[int, ...] = (0, 0, 0),
+        image_path: str | None = None,
+        drop_shadow: bool = False,
+        **kwargs: Any,
+    ) -> None:
         super().__init__(size, **kwargs)
         self.color = color
         self.size = size
         self.image_path = image_path
-        self.image = None
+        self.image: pygame.Surface | None = None
         self.drop_shadow = drop_shadow
         if image_path is not None:
             self.image = load_and_scale_image(image_path, size)
 
-    def add_widget(self, widget):
+    def add_widget(self, widget: Widget) -> None:
         if self.widget_list:
             raise Exception("ScreenWidget can only have one child")
         else:
             super().add_widget(widget)
 
     @benchmark
-    def render(self, size):
+    def render(self, size: tuple[int, int]) -> pygame.Surface:
         super().render(size)
 
         if self.size != size and self.image_path is not None:
@@ -63,8 +72,6 @@ class ScreenWidget(ContainerWidget):
             surface.blit(self.image, (0, 0))
         else:
             surface.fill(self.color)
-
-        # self.size = (self.size[0] - 1, self.size[1])
 
         child_surface = self.widget_list[0].render(self.size)
 
@@ -94,19 +101,19 @@ class ScreenWidget(ContainerWidget):
 class GridWidget(ContainerWidget):
     def __init__(
         self,
-        rows,
-        columns,
-        row_ratios=None,
-        column_ratios=None,
-        padding=0,
-        color=None,
-        widget_color=None,
-        corner_radius=0,
-        widget_corner_radius=0,
-        image_path=None,
-        drop_shadow=False,
-        **kwargs,
-    ):
+        rows: int,
+        columns: int,
+        row_ratios: Sequence[float] | None = None,
+        column_ratios: Sequence[float] | None = None,
+        padding: int = 0,
+        color: tuple[int, ...] | None = None,
+        widget_color: tuple[int, ...] | None = None,
+        corner_radius: int = 0,
+        widget_corner_radius: int = 0,
+        image_path: str | None = None,
+        drop_shadow: bool = False,
+        **kwargs: Any,
+    ) -> None:
         super().__init__(**kwargs)
         self.rows = rows
         self.columns = columns
@@ -126,13 +133,13 @@ class GridWidget(ContainerWidget):
         else:
             self.column_ratios = [1] * self.columns
 
-        self.image = None
+        self.image: pygame.Surface | None = None
         self.image_path = image_path
 
-        self.surface = None
-        self.widget_surface = None
+        self.surface: pygame.Surface | None = None
+        self.widget_surface: pygame.Surface | None = None
 
-    def calculate_percentage_sizes(self, length, ratios):
+    def calculate_percentage_sizes(self, length: int, ratios: Sequence[float]) -> list[int]:
         percentage_ratios = [ratio / sum(ratios) for ratio in ratios]
         percentage_sizes = list(
             map(
@@ -143,7 +150,7 @@ class GridWidget(ContainerWidget):
 
         return percentage_sizes
 
-    def calculate_percentage_coordinates(self, percentage_sizes):
+    def calculate_percentage_coordinates(self, percentage_sizes: list[int]) -> list[int]:
         relative_start_coordinates = [0] + percentage_sizes[:-1]
         absolute_start_coordinates = list(
             itertools.accumulate(relative_start_coordinates)
@@ -152,16 +159,18 @@ class GridWidget(ContainerWidget):
         return absolute_start_coordinates
 
     @benchmark
-    def render(self, size):
+    def render(self, size: tuple[int, int]) -> pygame.Surface:
         if size != self.size:
             self.size = size
             self.dirty = True
             self.surface = pygame.Surface(self.size, pygame.SRCALPHA, 32)
             self.widget_surface = pygame.Surface(self.size, pygame.SRCALPHA, 32)
             if self.image is not None:
+                assert self.image_path is not None
                 self.image = load_and_scale_image(self.image_path, size)
 
         if not (self.is_dirty() or self.dirty):
+            assert self.surface is not None
             return self.surface
 
         if self.image is None and self.image_path is not None:
@@ -175,6 +184,9 @@ class GridWidget(ContainerWidget):
         vertical_sizes = self.calculate_percentage_sizes(self.size[1], self.row_ratios)
         vertical_positions = self.calculate_percentage_coordinates(vertical_sizes)
 
+        assert self.surface is not None
+        assert self.widget_surface is not None
+
         for widget, coords, widget_size in zip(
             self.widget_list,
             itertools.product(horizontal_positions, vertical_positions),
@@ -182,8 +194,6 @@ class GridWidget(ContainerWidget):
         ):
             if not widget.is_dirty() and not self.dirty:
                 continue
-
-            # logging.debug('{} is dirty'.format(widget))
 
             widget_size = list(widget_size)
             widget_size[0] -= self.padding * 2
@@ -194,7 +204,6 @@ class GridWidget(ContainerWidget):
             coords[1] += self.padding
 
             final_widget_surface = pygame.Surface(widget_size, pygame.SRCALPHA, 32)
-            # final_widget_surface.fill((0, 0, 0, 0))
             if self.widget_color is not None:
                 if self.widget_corner_radius != 0:
                     pygame.draw.rect(
@@ -202,17 +211,11 @@ class GridWidget(ContainerWidget):
                         self.widget_color,
                         pygame.Rect((0, 0), widget_size),
                         border_radius=self.widget_corner_radius,
-                        # border_radius=widget_size[1] // 4,
                     )
-                    # print(widget_size)
                 else:
                     final_widget_surface.fill(
                         self.widget_color, pygame.Rect((0, 0), widget_size)
                     )
-
-                # final_widget_surface = (
-                #     final_widget_surface.convert_alpha().premul_alpha()
-                # )
 
             try:
                 if self.logger.getEffectiveLevel() == logging.DEBUG:
@@ -228,23 +231,14 @@ class GridWidget(ContainerWidget):
                 final_widget_surface.blit(
                     widget_surf,
                     (0, 0),
-                    # special_flags=pygame.BLEND_PREMULTIPLIED,
                 )
                 self.widget_surface.fill((0, 0, 0, 0), pygame.Rect(coords, widget_size))
-                # self.surface = self.surface.premul_alpha()
                 self.widget_surface.blit(
                     final_widget_surface,
                     coords,
-                    # special_flags=pygame.BLEND_PREMULTIPLIED,
                 )
             except TypeError:
                 pass
-            # self.surface.fill((0, 0, 0, 0), pygame.Rect(coords, widget_size))
-            # self.surface.blit(
-            #     widget.render(widget_size).premul_alpha(),
-            #     coords,
-            #     special_flags=pygame.BLEND_PREMULTIPLIED,
-            # )
 
         self.dirty = False
 
@@ -284,7 +278,6 @@ class GridWidget(ContainerWidget):
                 (255, 255, 255, 255),
                 pygame.Rect((0, 0), self.size),
                 border_radius=self.corner_radius,
-                # border_radius=self.size[1] // 4,
             )
             self.surface.blit(mask_surface, (0, 0), special_flags=pygame.BLEND_RGBA_MIN)
 
@@ -292,7 +285,7 @@ class GridWidget(ContainerWidget):
 
 
 class FlipWidget(ContainerWidget):
-    def __init__(self, interval=5, transition=1, ease=2, **kwargs):
+    def __init__(self, interval: int = 5, transition: float = 1, ease: int = 2, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self.last_update = int(time.time())
         self.moving = False
@@ -302,13 +295,13 @@ class FlipWidget(ContainerWidget):
         self.transition = transition
         self.ease = ease
 
-    def is_dirty(self):
+    def is_dirty(self) -> bool:
         return self.moving or self.widget_list[self.current_widget].is_dirty()
 
-    def ease_in_out(self, value, ease):
+    def ease_in_out(self, value: float, ease: int) -> float:
         return (value**ease) / ((value**ease) + ((1 - value) ** ease))
 
-    def tick(self):
+    def tick(self) -> None:
         if time.time() - self.last_update >= self.interval:
             if not self.moving:  # This allows for the current animation to complete
                 self.moving = True
@@ -321,7 +314,7 @@ class FlipWidget(ContainerWidget):
         else:
             self.widget_list[self.current_widget].tick()
 
-    def render(self, size):
+    def render(self, size: tuple[int, int]) -> pygame.Surface:
         if self.moving:
             surface = pygame.Surface(size, pygame.SRCALPHA, 32)
             if self.transition != 0:
@@ -356,14 +349,14 @@ class FlipWidget(ContainerWidget):
 
 
 class ScheduleFlipWidget(FlipWidget):
-    def __init__(self, schedule=None, **kwargs):
+    def __init__(self, schedule: dict[str, str] | None = None, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self.current_widget = None
         self.schedule = schedule or {}
-        self.destination_widget = None
+        self.destination_widget: int | None = None
 
     @lru_cache
-    def get_current_widget(self, current_time):
+    def get_current_widget(self, current_time: datetime_time) -> int | None:
         # Convert schedule to sorted list of (time, widget) tuples
         time_widgets = []
         for time_str, widget in self.schedule.items():
@@ -389,7 +382,7 @@ class ScheduleFlipWidget(FlipWidget):
 
         return None
 
-    def tick(self):
+    def tick(self) -> None:
         if self.current_widget is None:
             self.current_widget = self.get_current_widget(datetime.now().time())
         current_widget = self.get_current_widget(datetime.now().time())
@@ -401,16 +394,21 @@ class ScheduleFlipWidget(FlipWidget):
                 self.last_update = int(time.time())
 
         if self.moving:
+            assert self.current_widget is not None
+            assert self.destination_widget is not None
             for widget in (
                 self.widget_list[self.current_widget],
                 self.widget_list[self.destination_widget],
             ):
                 widget.tick()
         else:
+            assert self.current_widget is not None
             self.widget_list[self.current_widget].tick()
 
-    def render(self, size):
+    def render(self, size: tuple[int, int]) -> pygame.Surface:
         if self.moving:
+            assert self.current_widget is not None
+            assert self.destination_widget is not None
             surface = pygame.Surface(size, pygame.SRCALPHA, 32)
             if self.transition != 0:
                 transition_percentage = min(
@@ -438,42 +436,26 @@ class ScheduleFlipWidget(FlipWidget):
 
             return surface
         else:
+            assert self.current_widget is not None
             return self.widget_list[self.current_widget].render(size)
 
 
 class PillWidget(ContainerWidget):
-    """A container widget that superimposes a second widget in a pill shape on top of the first.
-
-    The first widget serves as the base/background, and the second widget is displayed
-    in a pill-shaped overlay that can be positioned and sized as needed.
-    """
+    """A container widget that superimposes a second widget in a pill shape on top of the first."""
 
     def __init__(
         self,
-        circular_mask=False,
-        widget_background_color=None,
-        pill_background_color=None,
-        pill_width_percent=0.8,
-        pill_height_percent=0.2,
-        pill_position_x=0.5,
-        pill_position_y=0.8,
-        pill_corner_radius=None,
-        pill_size_relative_to_circle=False,
-        **kwargs,
-    ):
-        """Initialize the Pill widget.
-
-        Args:
-            circular_mask: If True, apply circular masking to the first (base) widget
-            pill_background_color: Background color of the pill (None = transparent)
-            pill_width_percent: Width of pill as percentage of container (0.0-1.0)
-            pill_height_percent: Height of pill as percentage of container (0.0-1.0)
-            pill_position_x: X position of pill center as percentage (0.0-1.0)
-            pill_position_y: Y position of pill center as percentage (0.0-1.0)
-            pill_corner_radius: Corner radius for pill (None = fully rounded/semicircular ends)
-            pill_size_relative_to_circle: If True, pill size is relative to circle diameter
-            **kwargs: Additional widget parameters
-        """
+        circular_mask: bool = False,
+        widget_background_color: tuple[int, ...] | None = None,
+        pill_background_color: tuple[int, ...] | None = None,
+        pill_width_percent: float = 0.8,
+        pill_height_percent: float = 0.2,
+        pill_position_x: float = 0.5,
+        pill_position_y: float = 0.8,
+        pill_corner_radius: int | None = None,
+        pill_size_relative_to_circle: bool = False,
+        **kwargs: Any,
+    ) -> None:
         super().__init__(**kwargs)
         self.circular_mask = circular_mask
         self.widget_background_color = widget_background_color
@@ -485,32 +467,23 @@ class PillWidget(ContainerWidget):
         self.pill_corner_radius = pill_corner_radius
         self.pill_size_relative_to_circle = pill_size_relative_to_circle
 
-    def add_widget(self, widget):
-        """Add a child widget. Only accepts exactly 2 children."""
+    def add_widget(self, widget: Widget) -> None:
         if len(self.widget_list) >= 2:
             raise Exception("PillWidget can only have exactly two children")
         super().add_widget(widget)
 
-    def is_dirty(self):
-        """Check if widget needs re-rendering.
-
-        Returns True if either child widget is dirty, since changes to either
-        require re-rendering the entire composition.
-        """
+    def is_dirty(self) -> bool:
         if len(self.widget_list) < 2:
             return self.dirty
         return self.dirty or any(widget.is_dirty() for widget in self.widget_list)
 
-    def tick(self):
-        """Update both child widgets."""
+    def tick(self) -> None:
         for widget in self.widget_list:
             widget.tick()
 
     @benchmark
-    def render(self, size):
-        """Render the widget with pill overlay."""
+    def render(self, size: tuple[int, int]) -> pygame.Surface:
         if len(self.widget_list) != 2:
-            # Not fully initialized yet
             surface = pygame.Surface(size, pygame.SRCALPHA, 32)
             surface.fill((0, 0, 0, 0))
             return surface
@@ -519,24 +492,19 @@ class PillWidget(ContainerWidget):
         surface = pygame.Surface(size, pygame.SRCALPHA, 32)
         surface.fill((0, 0, 0, 0))
 
-        # Render the base (first) widget
         base_widget = self.widget_list[0]
-        base_surface = None
+        base_surface: pygame.Surface
 
-        # Apply circular mask to base widget if requested
         if self.circular_mask:
-            # Create a circular mask
             mask_surface = pygame.Surface(size, pygame.SRCALPHA, 32)
             mask_surface.fill((0, 0, 0, 0))
 
-            # Draw a circle in the center
             radius = min(size[0], size[1]) // 2
             center = (size[0] // 2, size[1] // 2)
             pygame.draw.circle(mask_surface, (255, 255, 255, 255), center, radius)
 
-            base_surface = base_widget.render([radius * 2, radius * 2])
+            base_surface = base_widget.render((radius * 2, radius * 2))
 
-            # Create a temporary surface for the masked base
             masked_base = pygame.Surface(size, pygame.SRCALPHA, 32)
             if self.widget_background_color is not None:
                 masked_base.fill(self.widget_background_color)
@@ -548,35 +516,26 @@ class PillWidget(ContainerWidget):
         else:
             base_surface = base_widget.render(size)
 
-        # Blit the base widget
         surface.blit(base_surface, (0, 0))
 
-        # Calculate pill dimensions and position
         if self.pill_size_relative_to_circle:
-            # Calculate relative to circle diameter (min dimension)
             circle_diameter = min(size[0], size[1])
             pill_width = int(circle_diameter * self.pill_width_percent)
             pill_height = int(circle_diameter * self.pill_height_percent)
         else:
-            # Calculate relative to container size
             pill_width = int(size[0] * self.pill_width_percent)
             pill_height = int(size[1] * self.pill_height_percent)
         pill_size = (pill_width, pill_height)
 
-        # Calculate pill position (centered at specified percentage)
         pill_x = int(size[0] * self.pill_position_x - pill_width / 2)
         pill_y = int(size[1] * self.pill_position_y - pill_height / 2)
         pill_position = (pill_x, pill_y)
 
-        # Create the pill surface
         pill_surface = pygame.Surface(pill_size, pygame.SRCALPHA, 32)
         pill_surface.fill((0, 0, 0, 0))
 
-        # Draw the pill background if specified
         if self.pill_background_color is not None:
-            # Determine corner radius
             if self.pill_corner_radius is None:
-                # Make it fully pill-shaped (semicircular ends)
                 corner_radius = pill_height // 2
             else:
                 corner_radius = self.pill_corner_radius
@@ -588,12 +547,10 @@ class PillWidget(ContainerWidget):
                 border_radius=corner_radius,
             )
 
-        # Render the pill content (second widget)
         pill_widget = self.widget_list[1]
         pill_content = pill_widget.render(pill_size)
         pill_surface.blit(pill_content, (0, 0))
 
-        # Blit the pill onto the main surface
         surface.blit(pill_surface, pill_position)
 
         self.dirty = False
@@ -603,17 +560,17 @@ class PillWidget(ContainerWidget):
 class HTTPFlipWidget(FlipWidget, UpdaterWidget):
     def __init__(
         self,
-        url,
-        mapping,
-        default_widget,
-        json_path=None,
-        jq_expression=None,
-        auth=None,
-        method=None,
-        payload=None,
-        **kwargs,
-    ):
-        self.destination_widget = None
+        url: str,
+        mapping: dict[str, str],
+        default_widget: str,
+        json_path: str | None = None,
+        jq_expression: str | None = None,
+        auth: dict[str, Any] | None = None,
+        method: str | None = None,
+        payload: dict[str, Any] | None = None,
+        **kwargs: Any,
+    ) -> None:
+        self.destination_widget: int | None = None
         self.mapping = mapping
         self.default_widget = 0
         self.default_widget_name = default_widget
@@ -626,7 +583,7 @@ class HTTPFlipWidget(FlipWidget, UpdaterWidget):
         self.method = method or "GET"
         self.payload = payload
 
-        self.requests_kwargs = {"headers": {}}
+        self.requests_kwargs: dict[str, Any] = {"headers": {}}
         if auth is not None:
             if "bearer" in auth:
                 self.requests_kwargs["headers"]["Authorization"] = "Bearer {}".format(
@@ -646,13 +603,13 @@ class HTTPFlipWidget(FlipWidget, UpdaterWidget):
         super().__init__(**kwargs)
         self.current_widget = None
 
-    def add_widget(self, widget):
+    def add_widget(self, widget: Widget) -> None:
         super().add_widget(widget)
         if widget.name == self.default_widget_name:
             self.default_widget = len(self.widget_list) - 1
 
     @lru_cache
-    def get_current_widget(self, response_value):
+    def get_current_widget(self, response_value: str) -> int:
         if response_value in self.mapping:
             self.logger.debug(
                 f"Mapped {response_value} to {self.mapping[response_value]}, or {list(map(lambda x: x.name, self.widget_list)).index(self.mapping[response_value])}"
@@ -664,7 +621,7 @@ class HTTPFlipWidget(FlipWidget, UpdaterWidget):
             self.logger.debug(f"No mapping for {response_value}")
             return self.default_widget
 
-    def tick(self):
+    def tick(self) -> None:
         if self.current_widget is None:
             self.current_widget = self.get_current_widget(self.value)
             if self.current_widget is None:
@@ -681,15 +638,18 @@ class HTTPFlipWidget(FlipWidget, UpdaterWidget):
                 self.last_update = int(time.time())
 
         if self.moving:
+            assert self.current_widget is not None
+            assert self.destination_widget is not None
             for widget in (
                 self.widget_list[self.current_widget],
                 self.widget_list[self.destination_widget],
             ):
                 widget.tick()
         else:
+            assert self.current_widget is not None
             self.widget_list[self.current_widget].tick()
 
-    def update(self):
+    def update(self) -> None:
         """Perform HTTP request and determine target widget"""
         try:
             response = requests.request(
@@ -700,7 +660,6 @@ class HTTPFlipWidget(FlipWidget, UpdaterWidget):
                 self.logger.warning(f"HTTP error: {response.status_code}")
                 return
 
-            # Extract the value from response
             if self.json_path is not None or self.jq_expression is not None:
                 try:
                     response_json = response.json()
@@ -724,8 +683,10 @@ class HTTPFlipWidget(FlipWidget, UpdaterWidget):
         except Exception as e:
             self.logger.error(f"Unexpected error: {e}")
 
-    def render(self, size):
+    def render(self, size: tuple[int, int]) -> pygame.Surface:
         if self.moving:
+            assert self.current_widget is not None
+            assert self.destination_widget is not None
             surface = pygame.Surface(size, pygame.SRCALPHA, 32)
             if self.transition != 0:
                 transition_percentage = min(
@@ -753,4 +714,5 @@ class HTTPFlipWidget(FlipWidget, UpdaterWidget):
 
             return surface
         else:
+            assert self.current_widget is not None
             return self.widget_list[self.current_widget].render(size)

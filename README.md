@@ -738,6 +738,56 @@ It supports the following parameters:
 *   `image_data` _(optional)_: Binary contents of the image to display. (Typically set dynamically)
 *   `preserve_aspect_ratio` _(optional)_: If `true`, maintains the original image aspect ratio when scaling. If `false` (default), the image is scaled to fill the container.
 
+#### providerbarchart
+
+A widget that renders a bar chart from a list of numeric values sourced from a data provider. Designed to be minimal — no axes or legend — and efficient enough for low-power hardware like the Raspberry Pi.
+
+It supports the following parameters:
+
+*   `providers`: A list containing exactly one provider name.
+*   `data_path` _(optional)_: JSON path to extract the list of values from provider data.
+*   `jq_expression` _(optional)_: jq expression that must return a JSON array of numbers.
+*   `bar_color` _(optional)_: Color of the bars, as a list of RGB or RGBA components. Defaults to `[100, 149, 237]` (cornflower blue).
+*   `bar_gap` _(optional)_: Gap between bars in pixels. Defaults to `2`.
+*   `max_value` _(optional)_: Fixed maximum value for the chart. If not provided, auto-scales to the maximum value in the data.
+*   `min_value` _(optional)_: Minimum value for the chart. Defaults to `0`.
+*   `midline` _(optional)_: If `true`, draws a horizontal marker line at the 50% point behind the bars. Defaults to `false`.
+*   `midline_thickness` _(optional)_: Thickness of the midline in pixels. Defaults to `1`.
+*   `midline_color` _(optional)_: Color of the midline, as RGB or RGBA. Defaults to `[255, 255, 255]` (white).
+*   `quartline` _(optional)_: If `true`, draws horizontal marker lines at the 25% and 75% points behind the bars. Defaults to `false`.
+*   `quartline_thickness` _(optional)_: Thickness of the quartlines in pixels. Defaults to `1`.
+*   `quartline_color` _(optional)_: Color of the quartlines, as RGB or RGBA. Defaults to `[255, 255, 255]` (white).
+*   `labels_jq_expression` _(optional)_: jq expression that returns a JSON array of strings to use as bar labels.
+*   `labels_data_path` _(optional)_: JSON path alternative to `labels_jq_expression`.
+*   `label_font_path` _(optional)_: Path to a ttf font file for the labels.
+*   `label_size` _(optional)_: Font size for the labels in pixels. Defaults to `12`.
+*   `label_color` _(optional)_: Color of the label text, as RGB or RGBA. Defaults to `[200, 200, 200]`.
+
+Example (hourly rain probability for the next 24 hours):
+
+```yaml
+providers:
+  hourly_weather:
+    type: rest
+    url: https://weather.example.com/api/hourly
+    update_interval: 3600
+
+widgets:
+  - widget: providerbarchart
+    providers: [hourly_weather]
+    jq_expression: "[.forecast[:24][].precipitation_probability]"
+    labels_jq_expression: "[.forecast[:24][].datetime | .[11:13]]"
+    bar_color: [100, 149, 237]
+    bar_gap: 2
+    max_value: 100
+    midline: true
+    midline_color: [255, 255, 255, 120]
+    quartline: true
+    quartline_color: [255, 255, 255, 60]
+    label_font_path: OpenSans-Regular.ttf
+    label_size: 20
+```
+
 #### nextbus
 
 A widget that displays the time for the next vehicle to arrive at a public transit stop, using the NextBus public API.

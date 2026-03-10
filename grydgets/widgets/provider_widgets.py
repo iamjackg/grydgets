@@ -1,15 +1,18 @@
 """Widgets that use data providers."""
+from __future__ import annotations
 
 import base64
 import io
 import logging
 import threading
 import time
+from typing import Any
 
 import pygame
 import requests
 
 from grydgets.json_utils import extract_data
+from grydgets.providers.base import DataProvider
 from grydgets.widgets.base import Widget, ContainerWidget
 from grydgets.widgets.text import TextWidget
 from grydgets.widgets.image import ImageWidget
@@ -17,38 +20,21 @@ from grydgets.widgets.containers import FlipWidget
 
 
 class ProviderWidget(Widget):
-    """Widget that displays data from a provider with format string.
-
-    Similar to RESTWidget but reads from a provider instead of making HTTP calls.
-    """
+    """Widget that displays data from a provider with format string."""
 
     def __init__(
         self,
-        providers,
-        data_path=None,
-        jq_expression=None,
-        format_string="{value}",
-        fallback_text="--",
-        show_errors=False,
-        font_path=None,
-        text_size=None,
-        vertical_align="center",
-        **kwargs,
-    ):
-        """Initialize the provider widget.
-
-        Args:
-            providers: Dict of provider_name -> DataProvider
-            data_path: JSON path to extract from provider data
-            jq_expression: jq expression to extract from provider data
-            format_string: Format string for display (default: "{value}")
-            fallback_text: Text to show on error or missing data (default: "--")
-            show_errors: If True, show error messages instead of fallback (default: False)
-            font_path: Font path for text rendering
-            text_size: Text size
-            vertical_align: Vertical alignment (top, center, bottom)
-            **kwargs: Additional widget parameters
-        """
+        providers: dict[str, DataProvider],
+        data_path: str | None = None,
+        jq_expression: str | None = None,
+        format_string: str = "{value}",
+        fallback_text: str = "--",
+        show_errors: bool = False,
+        font_path: str | None = None,
+        text_size: int | None = None,
+        vertical_align: str = "center",
+        **kwargs: Any,
+    ) -> None:
         super().__init__(**kwargs)
 
         if not providers or len(providers) != 1:
@@ -62,10 +48,8 @@ class ProviderWidget(Widget):
         self.fallback_text = fallback_text
         self.show_errors = show_errors
 
-        # Track when we last checked the provider
         self.last_seen_timestamp = 0
 
-        # Text widget for rendering
         self.text_widget = TextWidget(
             font_path=font_path,
             color=(255, 255, 255),
@@ -76,21 +60,16 @@ class ProviderWidget(Widget):
             **kwargs,
         )
 
-    def is_dirty(self):
-        """Check if widget needs re-rendering."""
-        # Check if provider data has been updated
+    def is_dirty(self) -> bool:
         if self.provider.get_timestamp() > self.last_seen_timestamp:
             return True
         return self.text_widget.is_dirty()
 
-    def render(self, size):
-        """Render the widget."""
+    def render(self, size: tuple[int, int]) -> pygame.Surface:
         self.size = size
 
-        # Update timestamp
         self.last_seen_timestamp = self.provider.get_timestamp()
 
-        # Check for errors
         error = self.provider.get_error()
         if error:
             if self.show_errors:
@@ -98,12 +77,10 @@ class ProviderWidget(Widget):
             else:
                 text = self.fallback_text
         else:
-            # Get data from provider
             data = self.provider.get_data()
             if data is None:
                 text = self.fallback_text
             else:
-                # Extract value from data path or jq expression
                 try:
                     if self.data_path or self.jq_expression:
                         value = extract_data(
@@ -129,36 +106,20 @@ class ProviderWidget(Widget):
 
 
 class ProviderTemplateWidget(Widget):
-    """Widget that renders data using Home Assistant templates.
-
-    Supports multiple providers with namespaced variables.
-    """
+    """Widget that renders data using Home Assistant templates."""
 
     def __init__(
         self,
-        providers,
-        template,
-        hass_url,
-        hass_token,
-        fallback_text="--",
-        font_path=None,
-        text_size=None,
-        vertical_align="center",
-        **kwargs,
-    ):
-        """Initialize the provider template widget.
-
-        Args:
-            providers: Dict of provider_name -> DataProvider
-            template: Jinja2 template string
-            hass_url: Home Assistant URL
-            hass_token: Home Assistant authentication token
-            fallback_text: Text to show on error (default: "--")
-            font_path: Font path for text rendering
-            text_size: Text size
-            vertical_align: Vertical alignment
-            **kwargs: Additional widget parameters
-        """
+        providers: dict[str, DataProvider],
+        template: str,
+        hass_url: str,
+        hass_token: str,
+        fallback_text: str = "--",
+        font_path: str | None = None,
+        text_size: int | None = None,
+        vertical_align: str = "center",
+        **kwargs: Any,
+    ) -> None:
         super().__init__(**kwargs)
 
         if not providers:
@@ -170,10 +131,8 @@ class ProviderTemplateWidget(Widget):
         self.hass_token = hass_token
         self.fallback_text = fallback_text
 
-        # Track when we last checked providers
         self.last_seen_timestamps = {name: 0 for name in providers.keys()}
 
-        # Text widget for rendering
         self.text_widget = TextWidget(
             font_path=font_path,
             color=(255, 255, 255),
@@ -184,46 +143,35 @@ class ProviderTemplateWidget(Widget):
             **kwargs,
         )
 
-    def is_dirty(self):
-        """Check if widget needs re-rendering."""
-        # Check if any provider data has been updated
+    def is_dirty(self) -> bool:
         for name, provider in self.providers.items():
             if provider.get_timestamp() > self.last_seen_timestamps[name]:
                 return True
         return self.text_widget.is_dirty()
 
-    def render(self, size):
-        """Render the widget."""
+    def render(self, size: tuple[int, int]) -> pygame.Surface:
         self.size = size
 
-        # Update timestamps
         for name, provider in self.providers.items():
             self.last_seen_timestamps[name] = provider.get_timestamp()
 
-        # Build template with provider data
         try:
-            # Collect all provider data
             provider_data = {}
             for name, provider in self.providers.items():
                 data = provider.get_data()
                 if data is None:
-                    # If any provider has no data, use fallback
                     text = self.fallback_text
                     self.text_widget.set_text(text)
                     return self.text_widget.render(size)
                 provider_data[f"provider_{name}"] = data
 
-            # Build template with set statements
             template_lines = []
             for var_name, data in provider_data.items():
-                # Convert data to Jinja2 variable assignment
-                # This is a simple approach - might need refinement for complex data
                 template_lines.append(f"{{% set {var_name} = {data} %}}")
 
             template_lines.append(self.template)
             full_template = "\n".join(template_lines)
 
-            # Call Home Assistant template API
             response = requests.post(
                 f"{self.hass_url}/api/template",
                 headers={
@@ -249,30 +197,17 @@ class ProviderTemplateWidget(Widget):
 
 
 class ProviderFlipWidget(FlipWidget):
-    """Widget that conditionally displays children based on provider data.
-
-    Similar to HTTPFlipWidget but reads from a provider instead of HTTP calls.
-    """
+    """Widget that conditionally displays children based on provider data."""
 
     def __init__(
         self,
-        providers,
-        data_path=None,
-        jq_expression=None,
-        mapping=None,
-        default_widget=None,
-        **kwargs,
-    ):
-        """Initialize the provider flip widget.
-
-        Args:
-            providers: Dict of provider_name -> DataProvider
-            data_path: JSON path to extract value from provider data
-            jq_expression: jq expression to extract value from provider data
-            mapping: Dict mapping values to widget names
-            default_widget: Name of widget to show by default
-            **kwargs: Additional widget parameters (transition, ease, etc.)
-        """
+        providers: dict[str, DataProvider],
+        data_path: str | None = None,
+        jq_expression: str | None = None,
+        mapping: dict[str, str] | None = None,
+        default_widget: str | None = None,
+        **kwargs: Any,
+    ) -> None:
         super().__init__(**kwargs)
 
         if not providers or len(providers) != 1:
@@ -282,33 +217,22 @@ class ProviderFlipWidget(FlipWidget):
         self.provider = list(providers.values())[0]
         self.data_path = data_path
         self.jq_expression = jq_expression
-        self.mapping = mapping
+        self.mapping: dict[str, str] = mapping or {}
         self.default_widget = 0
         self.default_widget_name = default_widget
 
-        # Track when we last checked the provider
         self.last_seen_timestamp = 0
-        self.current_value = None
+        self.current_value: str | None = None
 
-        # Will be set to None initially, then resolved in tick()
         self.current_widget = None
-        self.destination_widget = None
+        self.destination_widget: int | None = None
 
-    def add_widget(self, widget):
-        """Add a child widget."""
+    def add_widget(self, widget: Widget) -> None:
         super().add_widget(widget)
         if widget.name == self.default_widget_name:
             self.default_widget = len(self.widget_list) - 1
 
-    def get_current_widget(self, value):
-        """Map a provider value to a widget index.
-
-        Args:
-            value: The value from the provider
-
-        Returns:
-            Widget index, or None if no mapping found
-        """
+    def get_current_widget(self, value: str) -> int | None:
         if value in self.mapping:
             widget_name = self.mapping[value]
             try:
@@ -320,28 +244,22 @@ class ProviderFlipWidget(FlipWidget):
             self.logger.debug(f"No mapping for value '{value}'")
             return self.default_widget
 
-    def tick(self):
-        """Update widget state based on provider data."""
-        # Initialize current widget on first tick
+    def tick(self) -> None:
         if self.current_widget is None:
             self.current_widget = self.default_widget
 
-        # Check if provider data has changed
         provider_timestamp = self.provider.get_timestamp()
         if provider_timestamp > self.last_seen_timestamp:
             self.last_seen_timestamp = provider_timestamp
 
-            # Get data from provider
             data = self.provider.get_data()
             error = self.provider.get_error()
 
             if error or data is None:
-                # On error, stay on current widget (don't switch)
                 self.logger.debug(
                     f"Provider error or no data, staying on current widget"
                 )
             else:
-                # Extract value from data path or jq expression
                 try:
                     if self.data_path or self.jq_expression:
                         value = str(
@@ -354,7 +272,6 @@ class ProviderFlipWidget(FlipWidget):
                     else:
                         value = str(data)
 
-                    # Check if value changed
                     if value != self.current_value:
                         self.current_value = value
                         target_widget = self.get_current_widget(value)
@@ -380,21 +297,23 @@ class ProviderFlipWidget(FlipWidget):
                     StopIteration,
                 ) as e:
                     self.logger.debug(f"Failed to extract data: {e}")
-                    # On extraction error, stay on current widget
 
-        # Tick children
         if self.moving:
+            assert self.current_widget is not None
+            assert self.destination_widget is not None
             for widget in (
                 self.widget_list[self.current_widget],
                 self.widget_list[self.destination_widget],
             ):
                 widget.tick()
         else:
+            assert self.current_widget is not None
             self.widget_list[self.current_widget].tick()
 
-    def render(self, size):
-        """Render the widget."""
+    def render(self, size: tuple[int, int]) -> pygame.Surface:
         if self.moving:
+            assert self.current_widget is not None
+            assert self.destination_widget is not None
             surface = pygame.Surface(size, pygame.SRCALPHA, 32)
             if self.transition != 0:
                 transition_percentage = min(
@@ -422,36 +341,23 @@ class ProviderFlipWidget(FlipWidget):
 
             return surface
         else:
+            assert self.current_widget is not None
             return self.widget_list[self.current_widget].render(size)
 
 
 class ProviderImageWidget(Widget):
-    """Widget that displays images from URLs in provider data.
-
-    Similar to RESTImageWidget but reads URL from a provider.
-    """
+    """Widget that displays images from URLs in provider data."""
 
     def __init__(
         self,
-        providers,
-        data_path=None,
-        jq_expression=None,
-        fallback_image=None,
-        auth=None,
-        preserve_aspect_ratio=False,
-        **kwargs,
-    ):
-        """Initialize the provider image widget.
-
-        Args:
-            providers: Dict of provider_name -> DataProvider
-            data_path: JSON path to extract image URL from provider data
-            jq_expression: jq expression to extract image URL from provider data
-            fallback_image: Path to fallback image file
-            auth: Authentication dict for image fetching (same format as REST)
-            preserve_aspect_ratio: If True, maintain original image aspect ratio when scaling
-            **kwargs: Additional widget parameters
-        """
+        providers: dict[str, DataProvider],
+        data_path: str | None = None,
+        jq_expression: str | None = None,
+        fallback_image: str | None = None,
+        auth: dict[str, Any] | None = None,
+        preserve_aspect_ratio: bool = False,
+        **kwargs: Any,
+    ) -> None:
         super().__init__(**kwargs)
 
         if not providers or len(providers) != 1:
@@ -463,16 +369,13 @@ class ProviderImageWidget(Widget):
         self.jq_expression = jq_expression
         self.fallback_image = fallback_image
 
-        # Track when we last checked the provider
         self.last_seen_timestamp = 0
-        self.current_image_url = None
+        self.current_image_url: str | None = None
 
-        # Image widget for rendering
         self.image_widget = ImageWidget(
             preserve_aspect_ratio=preserve_aspect_ratio, **kwargs
         )
 
-        # Load fallback image if provided
         if fallback_image:
             try:
                 with open(fallback_image, "rb") as f:
@@ -480,8 +383,7 @@ class ProviderImageWidget(Widget):
             except Exception as e:
                 self.logger.warning(f"Failed to load fallback image: {e}")
 
-        # Build request kwargs for image fetching
-        self.requests_kwargs = {"headers": {}}
+        self.requests_kwargs: dict[str, Any] = {"headers": {}}
         if auth is not None:
             if "bearer" in auth:
                 self.requests_kwargs["headers"][
@@ -496,28 +398,22 @@ class ProviderImageWidget(Widget):
                     "Authorization"
                 ] = f"Basic {encoded_auth}"
 
-    def is_dirty(self):
-        """Check if widget needs re-rendering."""
-        # Check if provider data has been updated
+    def is_dirty(self) -> bool:
         if self.provider.get_timestamp() > self.last_seen_timestamp:
             return True
         return self.image_widget.is_dirty()
 
-    def render(self, size):
-        """Render the widget."""
+    def render(self, size: tuple[int, int]) -> pygame.Surface:
         self.size = size
 
-        # Check if provider data has changed
         provider_timestamp = self.provider.get_timestamp()
         if provider_timestamp > self.last_seen_timestamp:
             self.last_seen_timestamp = provider_timestamp
 
-            # Get data from provider
             data = self.provider.get_data()
             error = self.provider.get_error()
 
             if not error and data is not None:
-                # Extract image URL from data path or jq expression
                 try:
                     if self.data_path or self.jq_expression:
                         image_url = extract_data(
@@ -528,7 +424,6 @@ class ProviderImageWidget(Widget):
                     else:
                         image_url = data
 
-                    # Only fetch if URL changed
                     if image_url != self.current_image_url:
                         self.current_image_url = image_url
                         self._fetch_image(image_url)
@@ -544,32 +439,23 @@ class ProviderImageWidget(Widget):
 
         return self.image_widget.render(size)
 
-    def _fetch_image(self, url):
-        """Fetch image from URL or load from local file.
-
-        Args:
-            url: Image URL (http://, https://, or file://)
-        """
+    def _fetch_image(self, url: str) -> None:
         try:
-            # Handle file:// URLs for local images
             if url.startswith("file://"):
-                file_path = url[7:]  # Remove 'file://' prefix
+                file_path = url[7:]
                 self.logger.debug(f"Loading image from local file: {file_path}")
 
                 with open(file_path, "rb") as f:
                     image_data = f.read()
 
-                # Clear old image data before setting new one
                 self.image_widget.image_data = None
                 self.image_widget.old_surface = None
 
                 self.image_widget.set_image(image_data)
                 self.logger.debug(f"Loaded image from {file_path}")
             else:
-                # Handle HTTP/HTTPS URLs
                 response = requests.get(url, **self.requests_kwargs, timeout=5)
                 if response.status_code == 200:
-                    # Clear old image data before setting new one
                     self.image_widget.image_data = None
                     self.image_widget.old_surface = None
 

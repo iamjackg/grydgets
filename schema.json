@@ -54,7 +54,7 @@
       "properties": {
         "widget": {
           "type": "string",
-          "enum": ["text", "image", "dateclock", "restimage", "rest", "label", "flip", "httpflip", "scheduleflip", "provider", "providerimage", "providerflip", "providertemplate", "nextbus", "pill", "notifiabletext", "notifiableimage", "grid"]
+          "enum": ["text", "image", "dateclock", "restimage", "rest", "label", "flip", "httpflip", "scheduleflip", "provider", "providerimage", "providerflip", "providertemplate", "nextbus", "pill", "notifiabletext", "notifiableimage", "grid", "providerbarchart"]
         }
       },
       "allOf": [
@@ -490,8 +490,8 @@
               "circular_mask": { "type": "boolean" },
               "widget_background_color": { "$ref": "#/definitions/color" },
               "pill_background_color": { "$ref": "#/definitions/color" },
-              "pill_width_percent": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
-              "pill_height_percent": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+              "pill_width_percent": { "type": "number", "minimum": 0.0 },
+              "pill_height_percent": { "type": "number", "minimum": 0.0 },
               "pill_position_x": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
               "pill_position_y": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
               "pill_corner_radius": { "type": "integer", "minimum": 0 },
@@ -502,6 +502,42 @@
                 "maxItems": 2,
                 "items": { "$ref": "#/definitions/widget" }
               }
+            },
+            "additionalProperties": false
+          }
+        },
+        {
+          "if": {
+            "properties": { "widget": { "const": "providerbarchart" } }
+          },
+          "then": {
+            "required": ["providers"],
+            "properties": {
+              "widget": { "type": "string" },
+              "name": { "type": "string" },
+              "providers": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 1,
+                "items": { "type": "string" }
+              },
+              "data_path": { "type": "string" },
+              "jq_expression": { "type": "string" },
+              "bar_color": { "$ref": "#/definitions/color" },
+              "bar_gap": { "type": "integer", "minimum": 0 },
+              "max_value": { "type": "number" },
+              "min_value": { "type": "number" },
+              "midline": { "type": "boolean" },
+              "midline_thickness": { "type": "integer", "minimum": 1 },
+              "midline_color": { "$ref": "#/definitions/color" },
+              "quartline": { "type": "boolean" },
+              "quartline_thickness": { "type": "integer", "minimum": 1 },
+              "quartline_color": { "$ref": "#/definitions/color" },
+              "labels_jq_expression": { "type": "string" },
+              "labels_data_path": { "type": "string" },
+              "label_font_path": { "type": "string" },
+              "label_size": { "type": "integer", "minimum": 1 },
+              "label_color": { "$ref": "#/definitions/color" }
             },
             "additionalProperties": false
           }

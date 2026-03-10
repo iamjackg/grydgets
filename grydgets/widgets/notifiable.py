@@ -1,6 +1,9 @@
+from __future__ import annotations
+
 import queue
 import threading
 import time
+from typing import Any
 
 import requests
 
@@ -11,13 +14,18 @@ from grydgets.widgets.text import TextWidget
 
 class NotifiableTextWidget(ContainerWidget):
     def __init__(
-        self, font_path=None, text_size=None, padding=0, color=(255, 255, 255), **kwargs
-    ):
+        self,
+        font_path: str | None = None,
+        text_size: int | None = None,
+        padding: int = 0,
+        color: tuple[int, ...] = (255, 255, 255),
+        **kwargs: Any,
+    ) -> None:
         super().__init__(**kwargs)
         self.showing_text = False
-        self.rendering_start_time = None
+        self.rendering_start_time: float | None = None
         self.newly_created_text = False
-        self.notification_queue = queue.Queue()
+        self.notification_queue: queue.Queue[dict[str, Any]] = queue.Queue()
         self.notification_duration = 5
         self.text_widget_surface = None
         self.other_widget_surface = None
@@ -33,18 +41,18 @@ class NotifiableTextWidget(ContainerWidget):
             **kwargs
         )
 
-    def add_widget(self, widget):
+    def add_widget(self, widget: Any) -> None:
         if self.widget_list:
             raise Exception("NotifiableTextWidget can only have one child")
         else:
             self.logger.debug("Adding widget")
             super().add_widget(widget)
 
-    def notify(self, data):
+    def notify(self, data: dict[str, Any]) -> None:
         self.logger.debug("Received notification")
         self.notification_queue.put(data)
 
-    def is_dirty(self):
+    def is_dirty(self) -> bool:
         if self.showing_text:
             return self.dirty
         elif not self.showing_text and self.rendering_start_time is None and self.dirty:
@@ -52,7 +60,7 @@ class NotifiableTextWidget(ContainerWidget):
         else:
             return self.widget_list[0].is_dirty()
 
-    def tick(self):
+    def tick(self) -> None:
         if (
             self.showing_text
             and self.rendering_start_time is not None
@@ -83,7 +91,7 @@ class NotifiableTextWidget(ContainerWidget):
                     self.notification_duration = data.get("duration", 5)
                     self.dirty = True
 
-    def render(self, size):
+    def render(self, size: tuple[int, int]) -> Any:
         if self.showing_text:
             if self.rendering_start_time is None:
                 self.logger.debug("Started showing text")
@@ -100,30 +108,30 @@ class NotifiableTextWidget(ContainerWidget):
 
 
 class NotifiableImageWidget(ContainerWidget):
-    def __init__(self, preserve_aspect_ratio=False, **kwargs):
+    def __init__(self, preserve_aspect_ratio: bool = False, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self._lock = threading.Lock()
         self.showing_image = False
-        self.rendering_start_time = None
-        self.notification_queue = queue.Queue()
+        self.rendering_start_time: float | None = None
+        self.notification_queue: queue.Queue[dict[str, Any]] = queue.Queue()
         self.notification_duration = 5
         self.image_widget_surface = None
         self.other_widget_surface = None
 
         self.image_widget = ImageWidget(preserve_aspect_ratio=preserve_aspect_ratio)
 
-    def add_widget(self, widget):
+    def add_widget(self, widget: Any) -> None:
         if self.widget_list:
             raise Exception("NotifiableImageWidget can only have one child")
         else:
             self.logger.debug("Adding widget")
             super().add_widget(widget)
 
-    def notify(self, data):
+    def notify(self, data: dict[str, Any]) -> None:
         self.logger.debug("Received image notification")
         self.notification_queue.put(data)
 
-    def is_dirty(self):
+    def is_dirty(self) -> bool:
         with self._lock:
             if self.showing_image:
                 return self.dirty
@@ -132,7 +140,7 @@ class NotifiableImageWidget(ContainerWidget):
             else:
                 return self.widget_list[0].is_dirty()
 
-    def tick(self):
+    def tick(self) -> None:
         with self._lock:
             if (
                     self.showing_image
@@ -160,7 +168,7 @@ class NotifiableImageWidget(ContainerWidget):
                     self._fetch_and_set_image(data["url"])
                     self.notification_duration = data.get("duration", 5)
 
-    def render(self, size):
+    def render(self, size: tuple[int, int]) -> Any:
         with self._lock:
             if self.showing_image:
                 if self.rendering_start_time is None:
@@ -176,16 +184,14 @@ class NotifiableImageWidget(ContainerWidget):
                 self.dirty = False
                 return self.other_widget_surface
 
-
-    def _fetch_and_set_image(self, url):
-        def fetch_image():
+    def _fetch_and_set_image(self, url: str) -> None:
+        def fetch_image() -> None:
             try:
-                response = requests.get(url, timeout=10)  # Add timeout
-                response.raise_for_status()  # Raise for bad status codes
+                response = requests.get(url, timeout=10)
+                response.raise_for_status()
                 image_data = response.content
 
-                # Use a lock for thread safety
-                with self._lock:  # Add this lock as instance variable
+                with self._lock:
                     self.image_widget.set_image(image_data)
                     self.showing_image = True
                     self.dirty = True

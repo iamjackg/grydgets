@@ -10,6 +10,7 @@ import grydgets.widgets.text
 import grydgets.widgets.containers
 import grydgets.widgets.notifiable
 import grydgets.widgets.provider_widgets
+import grydgets.widgets.chart
 from grydgets.widgets.containers import HTTPFlipWidget
 
 
@@ -34,7 +35,7 @@ class WidgetManager:
 
     def map_all_the_widgets_in_here(self):
         all_widget_members = []
-        for module in ["containers", "image", "notifiable", "text", "provider_widgets"]:
+        for module in ["containers", "image", "notifiable", "text", "provider_widgets", "chart"]:
             module_name = f"grydgets.widgets.{module}"
             all_widget_members.extend(inspect.getmembers(sys.modules[module_name]))
         for name, obj in all_widget_members:
