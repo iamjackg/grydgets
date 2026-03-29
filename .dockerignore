@@ -1,0 +1,17 @@
+venv/
+.venv/
+__pycache__/
+*.pyc
+.git/
+.idea/
+*.egg-info/
+dist/
+build/
+headless_output/
+data/
+*.backup
+*.jpg
+*.png
+*.zip
+Noto_Sans_Symbols/
+filter/

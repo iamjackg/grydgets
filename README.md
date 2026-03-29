@@ -9,21 +9,67 @@ _Note:_ while the vast majority of the codebase was originally written by me, my
 
 ## Installation
 
-For now, the only way to run it is to clone the repository and set up all the dependencies with `pip` or `uv`.
+### From source (recommended for Raspberry Pi)
 
-```
+```bash
 git clone https://github.com/iamjackg/grydgets
+cd grydgets
+
+# uv (recommended)
+uv sync
+uv run grydgets
 
 # pip
 python3 -m venv venv
-pip install -r requirements.txt
-venv/bin/python main.py
-
-# uv
-uv venv
-uv pip install -r requirements.txt
-uv run main.py
+venv/bin/pip install .
+venv/bin/grydgets
 ```
+
+To update an existing installation:
+
+```bash
+git pull
+uv sync          # or: venv/bin/pip install .
+```
+
+`python main.py` still works as a shortcut if you prefer not to install the package.
+
+### Docker (headless mode)
+
+A Dockerfile and docker-compose configuration are provided for running Grydgets in headless mode.
+
+1. Create a `data/` directory with your configuration files, fonts, and images:
+
+```
+data/
+├── conf.yaml
+├── widgets.yaml
+├── providers.yaml
+├── secrets.yaml          # optional
+├── OpenSans-Regular.ttf  # fonts referenced in widgets.yaml
+├── OpenSans-ExtraBold.ttf
+└── images/               # images referenced in widgets.yaml
+    └── weather/
+```
+
+2. Make sure `conf.yaml` has headless mode enabled (see [Headless Mode](#headless-mode)).
+
+3. Start the container:
+
+```bash
+docker compose up -d
+```
+
+Rendered images will appear in `data/headless_output/`. The notification endpoint is exposed on port 5000.
+
+### Command-line options
+
+```
+grydgets [--widgets FILE] [--config-dir DIR]
+```
+
+*   `--widgets` — Widget configuration file (default: `widgets.yaml`)
+*   `--config-dir` — Directory containing config files, fonts, and images. All relative paths are resolved from this directory. Defaults to the current working directory.
 
 ## Configuration
 

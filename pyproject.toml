@@ -1,0 +1,22 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "grydgets"
+version = "0.1.0"
+description = "A PyGame-based widget dashboard system with configurable grid layouts"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+dependencies = [
+    "pygame-ce",
+    "requests",
+    "voluptuous",
+    "pyyaml",
+    "jq",
+    "flask",
+]
+
+[project.scripts]
+grydgets = "grydgets.cli:main"
