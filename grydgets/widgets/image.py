@@ -110,6 +110,7 @@ class RESTImageWidget(UpdaterWidget):
         jq_expression: str | None = None,
         auth: dict[str, Any] | None = None,
         preserve_aspect_ratio: bool = False,
+        static: bool = False,
         **kwargs: Any,
     ) -> None:
         self.url = url
@@ -133,7 +134,7 @@ class RESTImageWidget(UpdaterWidget):
                     "Authorization"
                 ] = f"Basic {encoded_auth}"
         # This needs to happen at the end because it actually starts the update thread
-        super().__init__(**kwargs)
+        super().__init__(static=static, **kwargs)
 
     def is_dirty(self) -> bool:
         return self.image_widget.is_dirty()

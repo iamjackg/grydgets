@@ -434,6 +434,7 @@ It supports the following parameters:
 *   `method` _(optional)_: The HTTP method to use (`GET` or `POST`). Defaults to `GET`.
 *   `payload` _(optional)_: A dictionary representing the JSON payload for `POST` requests.
 *   `update_frequency` _(optional)_: How often the HTTP request should be made, in seconds. Defaults to `30` seconds.
+*   `static` _(optional)_: If `true`, the HTTP request is made only once on startup and never repeated. Useful when the mapped value is known to be fixed. Defaults to `false`.
 
 **Inherited from `flip` widget:**
 *   `interval` _(optional)_: How long to wait before checking for changes, in seconds. Defaults to `5` seconds.
@@ -655,6 +656,7 @@ It supports the following parameters:
 *   `payload` _(optional)_: A dictionary representing the JSON payload for `POST` requests.
 *   `auth` _(optional)_: Authentication options (see [Authentication Schemes](#authentication-schemes)).
 *   `update_frequency` _(optional)_: How often the HTTP request should be made, in seconds. Defaults to `30` seconds.
+*   `static` _(optional)_: If `true`, the HTTP request is made only once on startup and never repeated. Useful when displaying a fixed value. Defaults to `false`.
 *   `font_path` _(optional)_: The path to a ttf file to use as font. If not provided, Pygame's default font is used.
 *   `text_size` _(optional)_: The size of the text in pixels. If not provided, it automatically adjusts to fit the widget's height.
 *   `color` _(optional)_: The color of the text, as a list of RGB or RGBA components. Defaults to `[255, 255, 255]` (white).
@@ -850,6 +852,7 @@ It supports the following parameters:
 *   `jq_expression` _(optional)_: jq expression to extract the image URL from the JSON response. If both `json_path` and `jq_expression` are provided, `json_path` is applied first.
 *   `auth` _(optional)_: Authentication options for HTTP/HTTPS requests (see [Authentication Schemes](#authentication-schemes)). Not used for `file://` URLs.
 *   `update_frequency` _(optional)_: How often the image should be refreshed, in seconds. Defaults to `30` seconds.
+*   `static` _(optional)_: If `true`, the image is loaded only once on startup and never re-fetched. Useful for local files or remote images that never change. Defaults to `false`.
 *   `preserve_aspect_ratio` _(optional)_: If `true`, maintains the original image aspect ratio when scaling. If `false` (default), the image is scaled to fill the container.
 
 The URL (either directly specified or extracted via `json_path`/`jq_expression`) can be:

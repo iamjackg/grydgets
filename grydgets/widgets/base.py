@@ -46,19 +46,22 @@ class ContainerWidget(Widget):
 
 
 class UpdaterWidget(Widget):
-    def __init__(self, update_frequency: int = 30, **kwargs: Any) -> None:
+    def __init__(self, update_frequency: int = 30, static: bool = False, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self.update_frequency = kwargs.get("update_frequency", update_frequency)
+        self.static = static
         self.update_thread = WidgetUpdaterThread(self, self.update_frequency, **kwargs)
 
         self.update()
-        self.update_thread.start()
+        if not self.static:
+            self.update_thread.start()
 
     def stop(self) -> None:
-        self.update_thread.stop()
-        self.logger.debug("waiting for thread to terminate")
-        self.update_thread.join()
-        self.logger.debug("thread joined")
+        if self.update_thread.is_alive():
+            self.update_thread.stop()
+            self.logger.debug("waiting for thread to terminate")
+            self.update_thread.join()
+            self.logger.debug("thread joined")
 
     def update(self) -> None:
         pass

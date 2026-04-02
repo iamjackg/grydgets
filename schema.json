@@ -163,7 +163,8 @@
               "json_path": { "type": "string" },
               "jq_expression": { "type": "string" },
               "auth": { "$ref": "#/definitions/auth_scheme" },
-              "preserve_aspect_ratio": { "type": "boolean" }
+              "preserve_aspect_ratio": { "type": "boolean" },
+              "static": { "type": "boolean" }
             },
             "additionalProperties": false
           }
@@ -193,7 +194,8 @@
               "color": { "$ref": "#/definitions/color" },
               "padding": { "type": "integer", "minimum": 0 },
               "align": { "type": "string", "enum": ["left", "center", "right"] },
-              "vertical_align": { "type": "string", "enum": ["top", "center", "bottom"] }
+              "vertical_align": { "type": "string", "enum": ["top", "center", "bottom"] },
+              "static": { "type": "boolean" }
             },
             "additionalProperties": false
           }
@@ -272,6 +274,7 @@
               "interval": { "type": "integer", "minimum": 1 },
               "transition": { "type": "number", "minimum": 0 },
               "ease": { "type": "integer", "minimum": 1 },
+              "static": { "type": "boolean" },
               "children": {
                 "type": "array",
                 "minItems": 1,
