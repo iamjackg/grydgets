@@ -52,7 +52,7 @@ data/
     └── weather/
 ```
 
-2. Make sure `conf.yaml` has headless mode enabled (see [Headless Mode](#headless-mode)).
+2. Make sure `conf.yaml` has a file output configured (see [Outputs](#outputs)).
 
 3. Start the container:
 
@@ -75,71 +75,174 @@ grydgets [--widgets FILE] [--config-dir DIR]
 
 ### General Grydgets options (`conf.yaml`)
 
-Configuration for Grydgets must be stored in a `conf.yaml` file in its main folder. A sample file is provided in the
-repo.
+Configuration for Grydgets must be stored in a `conf.yaml` file in its main folder. A sample file is provided in the repo.
 
-These are the currently available options:
+#### Render settings
 
 ```yaml
 graphics:
   fps-limit: 10
-  fb-device: '/dev/fb1'
-  x-display: ':0'
-  fullscreen: True
   resolution: [480, 320]
+  smooth-scaling: true
+  flip: false
 logging:
   level: info
+server:
+  port: 5000
 ```
 
-`fb-device` is only needed if you're using a non-standard display device, like an SPI screen on the Raspberry Pi.
+*   `fps-limit`: Maximum frames per second. Defaults to `60`.
+*   `resolution`: Screen resolution as `[width, height]`.
+*   `smooth-scaling` _(optional)_: Use bilinear filtering for image scaling (`true`, default) or faster nearest-neighbor (`false`). Set to `false` on low-power hardware like a Raspberry Pi 2.
+*   `flip` _(optional)_: Rotate the output 180 degrees. Defaults to `false`.
 
-Similarly, `x-display` is necessary if you're trying to start Grydgets via ssh, and the `DISPLAY` environment variable
-is not properly set.
+### Outputs
 
-`smooth-scaling` controls the algorithm used to resize images in image widgets. It defaults to `true` (bilinear filtering), which produces higher quality results. On low-power hardware such as a Raspberry Pi 2, set it to `false` to use nearest-neighbor scaling instead, which is significantly faster at the cost of some image quality.
-
-### Headless Mode
-
-Grydgets can run in headless mode, rendering dashboards to image files instead of displaying them on screen. This is ideal for web dashboards, remote monitoring, or running on servers without displays or X servers.
-
-In headless mode, Grydgets:
-- Uses SDL's dummy video driver (no display or X server required)
-- Renders to image files at configurable intervals
-- Maintains a `latest.{format}` symlink for easy web serving
-- Auto-manages disk usage by cleaning up old images
-
-Configuration options:
+Grydgets uses a pluggable output system. You can configure one or more outputs to control where the rendered dashboard is displayed or sent. Add an `outputs` list to `conf.yaml`:
 
 ```yaml
-headless:
-  enabled: true                           # Enable headless mode
-  output_path: "./headless_output"        # Directory for saved images
-  render_interval: 60                     # Seconds between renders
-  image_format: "png"                     # Format: png, jpg, jpeg, or bmp
-  filename_pattern: "grydgets_{timestamp}" # Pattern with {timestamp} and {sequence}
-  create_latest_symlink: true             # Create latest.{format} symlink
-  keep_images: 100                        # Keep last N images (0 = unlimited)
+outputs:
+  - type: window
+    fullscreen: true
 ```
 
-**Example**
+If no `outputs` key is present, Grydgets falls back to legacy behavior based on the `graphics` and `headless` keys (see [Legacy Configuration](#legacy-configuration)).
+
+**Rules:**
+- At most one display output (`window` or `framebuffer`)
+- Any number of non-display outputs (`file`, `post`)
+- At least one output is required
+- If no display output is configured, SDL runs in dummy mode (no screen needed)
+
+#### window
+
+Displays the dashboard in an SDL window.
+
+*   `fullscreen` _(optional)_: Run in fullscreen mode. Defaults to `false`.
+*   `x_display` _(optional)_: X display to use (e.g. `":0"`). Only needed when starting via SSH.
 
 ```yaml
-# conf.yaml
-graphics:
-  fps-limit: 1
-  resolution: [1920, 1080]
-  fullscreen: false
-
-headless:
-  enabled: true
-  output_path: "/var/www/html/dashboard"
-  render_interval: 60
-  image_format: "png"
-  create_latest_symlink: true
-  keep_images: 1440  # 24 hours at 1-minute intervals
+outputs:
+  - type: window
+    fullscreen: true
+    x_display: ":0"
 ```
 
-**Important:** Switching between headless and normal mode requires restarting Grydgets. Configuration hot-reload (`SIGUSR1`) will warn and skip the change if the `enabled` flag is modified.
+#### framebuffer
+
+Renders directly to a Linux framebuffer device (e.g. SPI screens on Raspberry Pi).
+
+*   `device`: Path to the framebuffer device (e.g. `"/dev/fb1"`).
+
+```yaml
+outputs:
+  - type: framebuffer
+    device: /dev/fb1
+```
+
+#### file
+
+Saves rendered images to disk at regular intervals. Ideal for web dashboards, monitoring, or timelapse.
+
+*   `output_path` _(optional)_: Directory for saved images. Defaults to `"./headless_output"`.
+*   `render_interval` _(optional)_: Seconds between saves. Defaults to `60`.
+*   `image_format` _(optional)_: `png`, `jpg`, `jpeg`, or `bmp`. Defaults to `"png"`.
+*   `filename_pattern` _(optional)_: Pattern with `{timestamp}` and `{sequence}` placeholders. Defaults to `"grydgets_{timestamp}"`.
+*   `keep_images` _(optional)_: Keep the last N images, deleting older ones. `0` = unlimited. Defaults to `100`.
+*   `create_latest_symlink` _(optional)_: Create a `latest.{format}` symlink to the newest image. Defaults to `true`.
+
+```yaml
+outputs:
+  - type: file
+    output_path: "/var/www/html/dashboard"
+    render_interval: 60
+    image_format: png
+    keep_images: 1440
+```
+
+#### post
+
+Pushes the rendered image via HTTP POST to a remote endpoint. Works with any device or service that accepts image uploads — networked displays, smart signage, ingestion APIs, etc.
+
+*   `url`: The endpoint to POST to.
+*   `image_format` _(optional)_: `png`, `jpg`, `jpeg`, or `bmp`. Defaults to `"png"`.
+*   `trigger` _(optional)_: When to push. `"on_dirty"` only pushes when content has changed. `"interval"` pushes on a fixed schedule regardless. Defaults to `"on_dirty"`.
+*   `min_interval` _(optional)_: Minimum seconds between pushes. Defaults to `60`.
+*   `auth` _(optional)_: Authentication. Supports `bearer` token or `basic` username/password.
+*   `multipart` _(optional)_: Send the image as a `multipart/form-data` upload instead of raw bytes. Required for endpoints that expect a browser-style file upload.
+    *   `field_name` _(optional)_: The form field name. Defaults to `"file"`.
+    *   `filename` _(optional)_: The filename reported in the upload. Defaults to `image.<format>` (e.g. `image.jpeg`).
+*   `after_post` _(optional)_: An additional HTTP request to fire after a successful upload. Useful for devices that require a separate "apply" or "display" call once the upload is complete.
+    *   `url`: The URL to request.
+    *   `method` _(optional)_: HTTP method. Defaults to `"GET"`.
+
+By default the POST sends raw image bytes with the appropriate `Content-Type` header (`image/png`, `image/jpeg`, etc.). POSTs run in a background thread and will not block the main loop.
+
+```yaml
+outputs:
+  - type: post
+    url: https://display.local/image
+    image_format: jpeg
+    trigger: on_dirty
+    min_interval: 300
+    auth:
+      bearer: !secret display_token
+```
+
+For devices that use a multipart file upload and require a separate call to display the image:
+
+```yaml
+outputs:
+  - type: post
+    url: http://display.local/doUpload?dir=/image/
+    image_format: jpeg
+    trigger: on_dirty
+    min_interval: 60
+    multipart:
+      field_name: file
+    after_post:
+      url: http://display.local/set?img=/image/image.jpeg
+```
+
+#### Combining outputs
+
+You can use multiple outputs simultaneously. For example, display on screen while also pushing to a remote display:
+
+```yaml
+outputs:
+  - type: window
+    fullscreen: true
+  - type: post
+    url: https://display.local/image
+    image_format: jpeg
+    trigger: on_dirty
+    min_interval: 300
+```
+
+Or save to disk and push to a remote endpoint (no display needed):
+
+```yaml
+outputs:
+  - type: file
+    output_path: "./snapshots"
+    render_interval: 300
+  - type: post
+    url: https://dashboard-api.example.com/ingest
+    trigger: interval
+    min_interval: 60
+```
+
+#### Legacy configuration
+
+For backwards compatibility, Grydgets still accepts the old `graphics` display settings and `headless` key. These are automatically translated to the new output system:
+
+*   `headless.enabled: true` becomes a `file` output
+*   `graphics.fb-device` becomes a `framebuffer` output
+*   Otherwise, a `window` output is created from `graphics.fullscreen`
+
+If you add an `outputs` key, the legacy display settings (`fullscreen`, `fb-device`, `x-display`) and `headless` block are ignored.
+
+**Important:** Switching between display and non-display modes requires restarting Grydgets. Configuration hot-reload (`SIGUSR1`) will warn and skip the change if the display mode changes.
 
 ### Data Providers (`providers.yaml`)
 

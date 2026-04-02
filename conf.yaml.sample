@@ -1,11 +1,36 @@
 graphics:
   fps-limit: 60
-  fullscreen: False
   resolution: [480, 320]
-  fb-device: '/dev/fb1'
-  x-display: ':0'
-  flip: false
+  smooth-scaling: true
+  # flip: false  # Rotate output 180 degrees
 logging:
   level: info
 server:
   port: 5000
+
+# Output configuration — at least one output is required.
+# You can combine multiple outputs (e.g. window + post).
+outputs:
+  - type: window
+    fullscreen: false
+    # x_display: ':0'  # Only needed when starting via SSH
+
+  # Framebuffer output (for SPI screens on Raspberry Pi, etc.)
+  # - type: framebuffer
+  #   device: /dev/fb1
+
+  # File output (save rendered images to disk)
+  # - type: file
+  #   output_path: "./headless_output"
+  #   render_interval: 60
+  #   image_format: png
+  #   keep_images: 100
+
+  # HTTP POST output (push images to remote endpoints)
+  # - type: post
+  #   url: https://esp-screen.local/image
+  #   image_format: jpeg
+  #   trigger: on_dirty  # or "interval"
+  #   min_interval: 300
+  #   auth:
+  #     bearer: !secret esp_token

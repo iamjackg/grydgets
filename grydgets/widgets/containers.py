@@ -596,7 +596,7 @@ class HTTPFlipWidget(FlipWidget, UpdaterWidget):
                 self.requests_kwargs["headers"][
                     "Authorization"
                 ] = f"Basic {encoded_auth}"
-        if self.method == "POST" and self.payload:
+        if self.method in ("POST", "PUT", "PATCH") and self.payload:
             self.requests_kwargs["json"] = self.payload
         # This needs to happen at the end because it actually starts the update thread
         super().__init__(**kwargs)
