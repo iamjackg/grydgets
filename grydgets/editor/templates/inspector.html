@@ -1,0 +1,150 @@
+{% import "_macros.html" as macros %}
+<h2><span class="badge type">{{ widget_type }}</span> {{ node.name or '(unnamed)' }}</h2>
+<p class="path"><code>{{ path }}</code></p>
+
+{% if not spec %}
+<p class="placeholder">Unknown widget type "{{ widget_type }}" -- not found in schema.json. Editing all of its fields as raw YAML; nothing will be dropped.</p>
+{% endif %}
+
+<form class="inspector-form" hx-post="/node/{{ path }}" hx-target="#inspector" hx-swap="innerHTML">
+  <label>name</label>
+  <input type="text" name="name" value="{{ node.name or '' }}">
+
+  {% for field in visible_fields(spec, node) %}
+    {% set value = node.get(field.name) %}
+    {% set error = field_errors.get(field.name) if field_errors else none %}
+    <div class="field-label-row">
+      <label>{{ field.name }}{% if field.required %}<span class="required-star"> *</span>{% endif %}</label>
+      {% if not field.required %}
+        <button type="button" class="small danger" hx-delete="/node/{{ path }}/field/{{ field.name }}" hx-target="#inspector" hx-swap="innerHTML" hx-confirm="Remove '{{ field.name }}' from this node?">remove</button>
+      {% endif %}
+    </div>
+
+    {% if is_secret(value) %}
+      {{ macros.secret_capable_field(field.name, value, secret_keys) }}
+
+    {% elif field.name == "auth" %}
+      {% set auth_is_mapping = value is mapping %}
+      {% set auth_type = "basic" if auth_is_mapping and value.get("basic") is not none else "bearer" %}
+      <div class="secret-capable">
+        <label class="inline"><input type="radio" name="auth_type" value="bearer" {% if auth_type == "bearer" %}checked{% endif %}> bearer</label>
+        <label class="inline"><input type="radio" name="auth_type" value="basic" {% if auth_type == "basic" %}checked{% endif %}> basic</label>
+      </div>
+      <p class="placeholder">bearer token</p>
+      {{ macros.secret_capable_field("auth_bearer", value.get("bearer") if auth_is_mapping else none, secret_keys) }}
+      <p class="placeholder">basic auth (username / password)</p>
+      {{ macros.secret_capable_field("auth_username", value.get("basic", {}).get("username") if auth_is_mapping and value.get("basic") else none, secret_keys) }}
+      {{ macros.secret_capable_field("auth_password", value.get("basic", {}).get("password") if auth_is_mapping and value.get("basic") else none, secret_keys) }}
+
+    {% elif contains_secret(value) %}
+      <pre class="secret-chip">&#128274; {{ dump_value(value) }}</pre>
+      <div class="placeholder">contains a !secret value nested somewhere other than auth.bearer/username/password -- read-only in the editor, edit widgets.yaml by hand if needed</div>
+
+    {% elif field.name in name_ref_fields %}
+      {% set ref_kind = name_ref_fields[field.name] %}
+      {% set nameable_siblings = siblings|selectattr('name')|list %}
+      {% set unnamed_count = siblings|length - nameable_siblings|length %}
+      {% if ref_kind == "single" %}
+        <select name="{{ field.name }}">
+          <option value="">-- none --</option>
+          {% for sib in nameable_siblings %}
+            <option value="{{ sib.name }}" {% if sib.name == value %}selected{% endif %}>{{ sib.name }}</option>
+          {% endfor %}
+        </select>
+      {% else %}
+        <div class="mapping-rows">
+          {% for k, v in (value.items() if value else []) %}
+            <div class="mapping-row">
+              <input type="text" name="{{ field.name }}_key" value="{{ k }}" placeholder="key">
+              <select name="{{ field.name }}_val">
+                <option value="">-- none --</option>
+                {% for sib in nameable_siblings %}
+                  <option value="{{ sib.name }}" {% if sib.name == v %}selected{% endif %}>{{ sib.name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          {% endfor %}
+          <div class="mapping-row">
+            <input type="text" name="{{ field.name }}_key" value="" placeholder="new key">
+            <select name="{{ field.name }}_val">
+              <option value="">-- none --</option>
+              {% for sib in nameable_siblings %}
+                <option value="{{ sib.name }}">{{ sib.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+      {% endif %}
+      {% if unnamed_count %}
+        <div class="placeholder">{{ unnamed_count }} child{{ '' if unnamed_count == 1 else 'ren' }} without a name can't be targeted here -- give {{ 'it' if unnamed_count == 1 else 'them' }} a name first.</div>
+      {% endif %}
+
+    {% elif field.control == "checkbox" %}
+      <input type="checkbox" name="{{ field.name }}" {% if value %}checked{% endif %}>
+
+    {% elif field.control == "select" %}
+      <select name="{{ field.name }}">
+        {% for opt in field.enum %}
+          <option value="{{ opt }}" {% if opt == value %}selected{% endif %}>{{ opt }}</option>
+        {% endfor %}
+      </select>
+
+    {% elif field.control == "color" %}
+      {{ macros.color_field(field.name, value) }}
+
+    {% elif field.control == "number" %}
+      <input type="number" name="{{ field.name }}" value="{{ value if value is not none else '' }}" {% if field.minimum is not none %}min="{{ field.minimum }}"{% endif %} {% if field.maximum is not none %}max="{{ field.maximum }}"{% endif %} step="{{ '1' if field.json_type == 'integer' else 'any' }}">
+
+    {% elif field.control == "list" %}
+      <textarea name="{{ field.name }}" rows="4" placeholder="one item per line">{{ (value or [])|join('\n') }}</textarea>
+
+    {% elif field.control == "textarea" %}
+      <textarea name="{{ field.name }}" rows="6">{{ value or '' }}</textarea>
+
+    {% elif field.control == "raw" %}
+      <textarea name="{{ field.name }}" rows="6">{{ value|to_yaml }}</textarea>
+
+    {% else %}
+      <input type="text" name="{{ field.name }}" value="{{ value or '' }}">
+    {% endif %}
+
+    {% if error %}<div class="field-error">{{ error }}</div>{% endif %}
+  {% endfor %}
+
+  {% set unknown_keys = node.keys()|list|reject('in', ['widget', 'name', 'children'])|reject('in', spec.fields.keys()|list if spec else [])|list %}
+  {% if unknown_keys %}
+    <hr>
+    <p class="placeholder">Fields present in this node but not in schema.json (edited as raw YAML, never dropped):</p>
+    {% for key in unknown_keys %}
+      {% set value = node.get(key) %}
+      <div class="field-label-row">
+        <label>{{ key }} <span class="placeholder">(unknown to schema)</span></label>
+        <button type="button" class="small danger" hx-delete="/node/{{ path }}/field/{{ key }}" hx-target="#inspector" hx-swap="innerHTML" hx-confirm="Remove '{{ key }}' from this node?">remove</button>
+      </div>
+      {% if is_secret(value) %}
+        {{ macros.secret_capable_field("unknown__" + key, value, secret_keys) }}
+      {% elif contains_secret(value) %}
+        <pre class="secret-chip">&#128274; {{ dump_value(value) }}</pre>
+      {% else %}
+        <textarea name="unknown__{{ key }}" rows="3">{{ value|to_yaml }}</textarea>
+      {% endif %}
+    {% endfor %}
+  {% endif %}
+
+  <p><button type="submit" class="primary">Apply</button></p>
+</form>
+
+{% if spec %}
+{% set unset_optional = spec.optional_fields()|rejectattr('name', 'in', node.keys()|list)|list %}
+{% if unset_optional %}
+<form hx-post="/node/{{ path }}/add-field" hx-target="#inspector" hx-swap="innerHTML" style="margin-top:16px;">
+  <label>add property</label>
+  <select name="field_name">
+    {% for field in unset_optional %}
+      <option value="{{ field.name }}">{{ field.name }}</option>
+    {% endfor %}
+  </select>
+  <button type="submit" class="small">Add</button>
+</form>
+{% endif %}
+{% endif %}

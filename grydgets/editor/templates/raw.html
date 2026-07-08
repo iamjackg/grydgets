@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Raw YAML -- Grydgets Widget Editor</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header>
+    <h1>raw YAML preview</h1>
+    <span class="path">{{ widgets_path }} (in-memory, unsaved edits included)</span>
+    <span class="spacer"></span>
+    <a class="btn" href="/">back to editor</a>
+  </header>
+  <pre class="raw-yaml">{{ content }}</pre>
+</body>
+</html>

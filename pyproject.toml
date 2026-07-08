@@ -16,7 +16,10 @@ dependencies = [
     "pyyaml",
     "jq",
     "flask",
+    "ruamel.yaml",
+    "jsonschema",
 ]
 
 [project.scripts]
 grydgets = "grydgets.cli:main"
+grydgets-editor = "grydgets.editor.app:main"

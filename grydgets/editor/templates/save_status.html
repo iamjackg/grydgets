@@ -1,0 +1,7 @@
+{% if reloaded is defined and reloaded %}
+<div class="save-status ok">Reloaded from disk.</div>
+{% elif ok %}
+<div class="save-status ok">Saved{% if backup %} -- backup written to <code>{{ backup }}</code>{% endif %}.</div>
+{% else %}
+<div class="save-status error">Save failed: {{ error }}</div>
+{% endif %}

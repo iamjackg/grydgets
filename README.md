@@ -1029,3 +1029,37 @@ auth:
 ```
 
 The `secrets.yaml` file should not be committed to version control.
+
+### Widget Editor
+
+A local, browser-based editor for `widgets.yaml` -- browse the widget tree,
+add/remove/reorder children on container widgets, and edit each widget's
+properties through forms generated from `schema.json`, without hand-editing
+the YAML file directly.
+
+```bash
+uv run grydgets-editor --widgets widgets.yaml
+# or: uv run python -m grydgets.editor --widgets widgets.yaml
+```
+
+Then open `http://127.0.0.1:5050/` in a browser. Options:
+
+| Flag | Default | Purpose |
+|---|---|---|
+| `--widgets` | `widgets.yaml` | file to edit |
+| `--host` | `127.0.0.1` | bind address |
+| `--port` | `5050` | bind port |
+| `--debug` | off | Flask debug mode |
+
+Notes:
+- The editor only reads/writes the widgets file you point it at. It has no
+  connection to a running dashboard -- reload your dashboard yourself
+  (e.g. `kill -SIGUSR1`, see [Hot Reload](#hot-reload)) after saving.
+- Saving writes a timestamped backup (`widgets.yaml-YYYYMMDDHHMM.backup`)
+  before overwriting the file, matching the existing backup convention in
+  this repo.
+- `!secret` values (and any field containing one, e.g. `auth.bearer`) are
+  shown read-only and can't be edited or clobbered through the editor.
+- Schema violations are shown as non-blocking warnings on save -- the
+  schema documents the current widget set but isn't treated as ground
+  truth, so a save is never refused because of a schema mismatch.

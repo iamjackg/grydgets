@@ -1,0 +1,41 @@
+{% set spec = get_widget_spec(node.widget) %}
+{% set children = node.children if node.children else [] %}
+{% set pid = row_id(path) %}
+{% if spec and spec.is_container() %}
+<details class="node" id="node-{{ pid }}" {% if oob %}open hx-swap-oob="true"{% endif %}>
+  <summary onclick="if (event.target !== event.currentTarget) event.preventDefault();">
+    <div class="row">
+      {% with oob=False %}{% include "_row_main.html" %}{% endwith %}
+      <span class="row-toolbar" onclick="event.stopPropagation()">
+        {% if spec.max_children is none or children|length < spec.max_children %}
+        <button class="small" hx-get="/node/{{ path }}/add-child-form" hx-target="#add-child-slot-{{ pid }}" hx-swap="innerHTML">+ child</button>
+        {% endif %}
+        <button class="small" hx-post="/node/{{ path }}/move" hx-vals='{"direction": "up"}' hx-swap="none">&uarr;</button>
+        <button class="small" hx-post="/node/{{ path }}/move" hx-vals='{"direction": "down"}' hx-swap="none">&darr;</button>
+        <button class="small danger" hx-delete="/node/{{ path }}" hx-confirm="Delete '{{ node.name or node.widget }}' and all its children?" hx-swap="none">delete</button>
+      </span>
+    </div>
+  </summary>
+
+  <div id="add-child-slot-{{ pid }}"></div>
+
+  <div class="children-container">
+    {% for child in children %}
+      {% with node=child, path=child_path(path, loop.index0), oob=False %}
+        {% include "tree_node.html" %}
+      {% endwith %}
+    {% endfor %}
+  </div>
+</details>
+{% else %}
+<div class="node-row leaf" id="node-{{ pid }}" {% if oob %}hx-swap-oob="true"{% endif %}>
+  <div class="row">
+    {% with oob=False %}{% include "_row_main.html" %}{% endwith %}
+    <span class="row-toolbar">
+      <button class="small" hx-post="/node/{{ path }}/move" hx-vals='{"direction": "up"}' hx-swap="none">&uarr;</button>
+      <button class="small" hx-post="/node/{{ path }}/move" hx-vals='{"direction": "down"}' hx-swap="none">&darr;</button>
+      <button class="small danger" hx-delete="/node/{{ path }}" hx-confirm="Delete '{{ node.name or node.widget }}'?" hx-swap="none">delete</button>
+    </span>
+  </div>
+</div>
+{% endif %}

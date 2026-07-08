@@ -1,0 +1,5 @@
+{% for child in widgets %}
+{% with node=child, path=child_path(None, loop.index0) %}
+{% include "tree_node.html" %}
+{% endwith %}
+{% endfor %}

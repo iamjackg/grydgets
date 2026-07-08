@@ -1,0 +1,33 @@
+{% macro secret_capable_field(name, value, secret_keys) %}
+<div class="secret-capable">
+  <label class="inline">
+    <input type="radio" name="{{ name }}_kind" value="plain" {% if not is_secret(value) %}checked{% endif %}>
+    plain
+  </label>
+  <input type="text" name="{{ name }}_plain_value" value="{{ '' if is_secret(value) else (value or '') }}" placeholder="plain value">
+
+  <label class="inline">
+    <input type="radio" name="{{ name }}_kind" value="secret" {% if is_secret(value) %}checked{% endif %}>
+    !secret
+  </label>
+  <select name="{{ name }}_secret_key">
+    <option value="">-- choose --</option>
+    {% for k in secret_keys %}
+      <option value="{{ k }}" {% if is_secret(value) and value.value == k %}selected{% endif %}>{{ k }}</option>
+    {% endfor %}
+  </select>
+  {% if not secret_keys %}<span class="placeholder">(no keys found in secrets.yaml)</span>{% endif %}
+</div>
+{% endmacro %}
+
+{% macro color_field(name, value) %}
+<div class="color-row" data-color-field="{{ name }}">
+  <span class="color-swatch" data-role="swatch"></span>
+  <input type="color" data-role="picker">
+  {% for i in range(4) %}
+    <input type="number" min="0" max="255" name="{{ name }}__{{ i }}"
+           value="{{ value[i] if value and value|length > i else '' }}"
+           placeholder="{{ ['r', 'g', 'b', 'a'][i] }}" data-role="channel">
+  {% endfor %}
+</div>
+{% endmacro %}

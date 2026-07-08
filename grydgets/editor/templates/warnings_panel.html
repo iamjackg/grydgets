@@ -1,0 +1,10 @@
+{% if warnings %}
+<div class="warnings-panel">
+  <h3>&#9888; {{ warnings|length }} validation warning{{ '' if warnings|length == 1 else 's' }} (schema is advisory -- these never block a save)</h3>
+  <ul>
+    {% for w in warnings %}
+      <li><code>{{ w.path }}</code>: {{ w.message }}</li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}

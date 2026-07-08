@@ -1,0 +1,17 @@
+{% import "_macros.html" as macros %}
+<h2><span class="badge type">root</span> document settings</h2>
+<p class="path"><code>{{ widgets_path if widgets_path is defined else '' }}</code></p>
+
+<form class="inspector-form" hx-post="/node/{{ path }}" hx-target="#inspector" hx-swap="innerHTML">
+  <label>background_image</label>
+  <input type="text" name="background_image" value="{{ node.get('background_image') or '' }}">
+
+  <label>drop_shadow</label>
+  <input type="checkbox" name="drop_shadow" {% if node.get('drop_shadow') %}checked{% endif %}>
+
+  <label>background_color</label>
+  {{ macros.color_field("background_color", node.get('background_color')) }}
+  {% if field_errors and field_errors.get('background_color') %}<div class="field-error">{{ field_errors.get('background_color') }}</div>{% endif %}
+
+  <p><button type="submit" class="primary">Apply</button></p>
+</form>

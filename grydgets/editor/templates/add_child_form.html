@@ -1,0 +1,10 @@
+<form hx-post="/node/{{ path }}/children" hx-target="#add-child-slot-{{ row_id(path) }}" hx-swap="innerHTML" style="display:flex; gap:6px; align-items:center; margin:4px 0;">
+  <select name="widget_type">
+    {% for wt in widget_types %}
+      <option value="{{ wt }}">{{ wt }}</option>
+    {% endfor %}
+  </select>
+  <input type="text" name="name" placeholder="name (optional)" style="width:160px;">
+  <button type="submit" class="small primary">Add</button>
+  <button type="button" class="small" onclick="this.closest('form').remove()">cancel</button>
+</form>

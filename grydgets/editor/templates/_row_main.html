@@ -1,0 +1,16 @@
+{# The clickable label of a tree row (badge + name + child-count/grid badge).
+   Rendered inline by tree_node.html, and on its own -- with oob=True -- after
+   a non-structural field edit, so only the row's name/badges refresh without
+   re-rendering (and thereby collapsing/reopening) the whole <details> node. #}
+{% set spec = get_widget_spec(node.widget) %}
+<span class="row-main" id="row-{{ row_id(path) }}" data-path="{{ path }}"{% if oob %} hx-swap-oob="true"{% endif %} hx-get="/node/{{ path }}/inspect" hx-target="#inspector" hx-swap="innerHTML">
+  <span class="badge type">{{ node.widget }}</span>
+  <span class="node-name {{ '' if node.name else 'unnamed' }}">{{ node.name or '(unnamed)' }}</span>
+  {% if spec and spec.is_container() %}
+    {% if node.widget == 'grid' %}
+      <span class="badge dim">{{ node.rows }}&times;{{ node.columns }}</span>
+    {% else %}
+      <span class="badge dim">{{ (node.children if node.children else [])|length }} child{{ '' if (node.children if node.children else [])|length == 1 else 'ren' }}</span>
+    {% endif %}
+  {% endif %}
+</span>

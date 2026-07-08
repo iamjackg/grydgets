@@ -54,7 +54,7 @@
       "properties": {
         "widget": {
           "type": "string",
-          "enum": ["text", "image", "dateclock", "restimage", "rest", "label", "flip", "httpflip", "scheduleflip", "provider", "providerimage", "providerflip", "providertemplate", "pill", "notifiabletext", "notifiableimage", "grid", "providerbarchart"]
+          "enum": ["text", "image", "empty", "dateclock", "restimage", "rest", "label", "flip", "httpflip", "scheduleflip", "provider", "providerimage", "providerflip", "providertemplate", "pill", "notifiabletext", "notifiableimage", "grid", "providerbarchart"]
         }
       },
       "allOf": [
@@ -88,6 +88,7 @@
             "properties": {
               "widget": { "type": "string" },
               "name": { "type": "string" },
+              "preserve_aspect_ratio": { "type": "boolean" },
               "children": {
                 "type": "array",
                 "maxItems": 1,
@@ -181,7 +182,7 @@
               "url": { "type": "string" },
               "method": {
                 "type": "string",
-                "enum": ["GET", "POST"]
+                "enum": ["GET", "POST", "PUT", "PATCH"]
               },
               "update_frequency": { "type": "integer", "minimum": 1 },
               "payload": { "type": "object" },
@@ -267,8 +268,9 @@
               },
               "default_widget": { "type": "string" },
               "json_path": { "type": "string" },
+              "jq_expression": { "type": "string" },
               "auth": { "$ref": "#/definitions/auth_scheme" },
-              "method": { "type": "string", "enum": ["GET", "POST"] },
+              "method": { "type": "string", "enum": ["GET", "POST", "PUT", "PATCH"] },
               "payload": { "type": "object" },
               "update_frequency": { "type": "integer", "minimum": 1 },
               "interval": { "type": "integer", "minimum": 1 },
@@ -347,6 +349,18 @@
         },
         {
           "if": {
+            "properties": { "widget": { "const": "empty" } }
+          },
+          "then": {
+            "properties": {
+              "widget": { "type": "string" },
+              "name": { "type": "string" }
+            },
+            "additionalProperties": false
+          }
+        },
+        {
+          "if": {
             "properties": { "widget": { "const": "provider" } }
           },
           "then": {
@@ -369,7 +383,8 @@
               "color": { "$ref": "#/definitions/color" },
               "padding": { "type": "integer", "minimum": 0 },
               "align": { "type": "string", "enum": ["left", "center", "right"] },
-              "vertical_align": { "type": "string", "enum": ["top", "center", "bottom"] }
+              "vertical_align": { "type": "string", "enum": ["top", "center", "bottom"] },
+              "auth": { "$ref": "#/definitions/auth_scheme" }
             },
             "additionalProperties": false
           }

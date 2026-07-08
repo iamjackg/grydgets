@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Grydgets Widget Editor</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="/static/htmx.min.js"></script>
+</head>
+<body>
+  <header>
+    <h1>widgets.yaml editor</h1>
+    <span class="path">{{ widgets_path }}</span>
+    <span class="spacer"></span>
+    {% include "dirty_badge.html" %}
+    <button hx-post="/save" hx-target="#save-status" hx-swap="innerHTML" hx-indicator="#save-spinner" class="primary">Save</button>
+    <span id="save-spinner" class="htmx-indicator">saving&hellip;</span>
+    <button hx-post="/reload" hx-target="#save-status" hx-confirm="Discard all unsaved changes and reload from disk?">Reload from disk</button>
+    <a class="btn" href="/raw" target="_blank">View raw YAML</a>
+  </header>
+
+  <div id="save-status"></div>
+  <div id="warnings">
+    {% include "warnings_panel.html" %}
+  </div>
+
+  <div class="layout">
+    <div id="tree-pane">
+      <div class="root-row" data-path="{{ ROOT_PATH }}" hx-get="/node/root/inspect" hx-target="#inspector">
+        <span class="badge type">root</span>
+        <span class="node-name">background / drop-shadow</span>
+      </div>
+
+      <div class="tree-toolbar">
+        <button class="small" onclick="document.querySelectorAll('#tree-root-list details').forEach(function(d){d.open=true})">Expand all</button>
+        <button class="small" onclick="document.querySelectorAll('#tree-root-list details').forEach(function(d){d.open=false})">Collapse all</button>
+      </div>
+
+      <div id="tree-root-list">
+        {% include "root_list.html" %}
+      </div>
+
+      <div class="add-child-inline">
+        <button class="small" hx-get="/node/root/add-child-form" hx-target="#add-child-slot-root" hx-swap="innerHTML">+ Add top-level widget</button>
+        <div id="add-child-slot-root"></div>
+      </div>
+    </div>
+
+    <div id="inspector-pane">
+      <div id="inspector"><div class="placeholder">Select a node to edit.</div></div>
+    </div>
+  </div>
+
+  <script>
+    // Selection is purely client-side: track which node's inspector is open
+    // and re-apply the highlight after every htmx swap (including the OOB
+    // subtree re-renders that structural edits trigger), since a swap
+    // replaces the DOM node any earlier .selected class was sitting on.
+    (function () {
+      var selectedPath = null;
+      // Which pane the user last interacted with. Arrow keys only drive tree
+      // navigation while it's "tree"; once they click into the inspector pane
+      // (even on non-input content), arrows are left alone so they can scroll
+      // it instead of yanking focus back to the tree.
+      var navContext = "tree";
+
+      function applySelection() {
+        document.querySelectorAll(".selected").forEach(function (el) {
+          el.classList.remove("selected");
+        });
+        if (!selectedPath) return;
+        var el = document.querySelector('[data-path="' + selectedPath + '"]');
+        if (el) el.classList.add("selected");
+      }
+
+      document.body.addEventListener("click", function (evt) {
+        navContext = evt.target.closest("#inspector-pane") ? "inspector" : "tree";
+        var row = evt.target.closest("[data-path]");
+        if (!row) return;
+        selectedPath = row.dataset.path;
+        applySelection();
+      });
+
+      document.body.addEventListener("htmx:afterSettle", applySelection);
+
+      // Arrow-key tree navigation: up/down move between visible rows,
+      // left/right collapse/expand (falling back to move-to-parent /
+      // move-to-first-child once a node is already collapsed/expanded).
+      function isEditableFocus() {
+        var el = document.activeElement;
+        if (!el) return false;
+        var tag = el.tagName;
+        return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || el.isContentEditable;
+      }
+
+      function isVisible(el) {
+        // Chromium hides collapsed <details> content via content-visibility,
+        // not display:none, so offsetParent/getComputedStyle don't reveal
+        // it -- walk the ancestor chain and check each enclosing <details>
+        // .open directly instead. A node climbing out through its own
+        // <summary> doesn't need that details' own openness checked (a
+        // collapsed node's own row is still visible -- only its children
+        // are hidden), only the ones it climbs out through via the
+        // children-container side.
+        var node = el;
+        while (node && node !== document.body) {
+          var parent = node.parentElement;
+          if (parent && parent.tagName === "DETAILS" && parent.classList.contains("node")) {
+            if (node.tagName !== "SUMMARY" && !parent.open) return false;
+          }
+          node = parent;
+        }
+        return true;
+      }
+
+      function visibleRows() {
+        return Array.prototype.filter.call(document.querySelectorAll("[data-path]"), isVisible);
+      }
+
+      function ownDetails(el) {
+        // A container's own row-main sits directly inside its own
+        // <summary>; a leaf's (or root's) does not, since <summary> is
+        // always a sibling of a node's children, never an ancestor of them.
+        var summary = el.closest("summary");
+        return summary ? summary.closest("details.node") : null;
+      }
+
+      function selectAndLoad(el) {
+        if (!el) return;
+        el.click();
+        el.scrollIntoView({ block: "nearest" });
+      }
+
+      document.addEventListener("keydown", function (evt) {
+        if (isEditableFocus()) return;
+        if (navContext !== "tree") return;
+        if (evt.metaKey || evt.ctrlKey || evt.altKey) return;
+        if (evt.key !== "ArrowUp" && evt.key !== "ArrowDown" && evt.key !== "ArrowLeft" && evt.key !== "ArrowRight") return;
+
+        var rows = visibleRows();
+        if (!rows.length) return;
+        var currentEl = null;
+        var idx = -1;
+        if (selectedPath) {
+          for (var i = 0; i < rows.length; i++) {
+            if (rows[i].dataset.path === selectedPath) { currentEl = rows[i]; idx = i; break; }
+          }
+        }
+
+        if (evt.key === "ArrowDown") {
+          evt.preventDefault();
+          selectAndLoad(rows[Math.min(idx + 1, rows.length - 1)] || rows[0]);
+        } else if (evt.key === "ArrowUp") {
+          evt.preventDefault();
+          selectAndLoad(idx > 0 ? rows[idx - 1] : rows[0]);
+        } else if (evt.key === "ArrowRight") {
+          if (!currentEl) return;
+          evt.preventDefault();
+          var details = ownDetails(currentEl);
+          if (!details) return; // leaf or root: nothing to expand
+          if (!details.open) {
+            details.open = true;
+          } else {
+            var childRow = details.querySelector(".children-container [data-path]");
+            selectAndLoad(childRow);
+          }
+        } else if (evt.key === "ArrowLeft") {
+          if (!currentEl) return;
+          evt.preventDefault();
+          var ownDet = ownDetails(currentEl);
+          if (ownDet && ownDet.open) {
+            ownDet.open = false;
+            return;
+          }
+          var containerDiv = currentEl.closest(".children-container");
+          var parentDetails = containerDiv ? containerDiv.closest("details.node") : null;
+          if (parentDetails) selectAndLoad(parentDetails.querySelector("[data-path]"));
+        }
+      });
+    })();
+
+    // Color fields: a live swatch + a native color picker synced with the
+    // r/g/b/a number inputs (the picker itself has no alpha channel, so
+    // alpha stays a plain number input). Runs once per .color-row -- marked
+    // with data-color-init so re-running after every htmx swap is a no-op
+    // for rows that already exist, and picks up newly-rendered ones (e.g.
+    // after "add property" or opening a different node's inspector).
+    (function () {
+      function clamp255(raw, fallback) {
+        var n = parseInt(raw, 10);
+        if (isNaN(n)) return fallback;
+        return Math.max(0, Math.min(255, n));
+      }
+
+      function toHex(n) {
+        return clamp255(n, 0).toString(16).padStart(2, "0");
+      }
+
+      function initColorFields() {
+        document.querySelectorAll(".color-row[data-color-field]:not([data-color-init])").forEach(function (row) {
+          row.setAttribute("data-color-init", "true");
+          var swatch = row.querySelector('[data-role="swatch"]');
+          var picker = row.querySelector('[data-role="picker"]');
+          var channels = Array.prototype.slice.call(row.querySelectorAll('[data-role="channel"]'));
+
+          function fromChannels() {
+            var r = clamp255(channels[0].value, 0);
+            var g = clamp255(channels[1].value, 0);
+            var b = clamp255(channels[2].value, 0);
+            var a = channels[3].value === "" ? 255 : clamp255(channels[3].value, 255);
+            picker.value = "#" + toHex(r) + toHex(g) + toHex(b);
+            swatch.style.backgroundColor = "rgba(" + r + "," + g + "," + b + "," + (a / 255).toFixed(2) + ")";
+          }
+
+          function fromPicker() {
+            var hex = picker.value;
+            channels[0].value = parseInt(hex.slice(1, 3), 16);
+            channels[1].value = parseInt(hex.slice(3, 5), 16);
+            channels[2].value = parseInt(hex.slice(5, 7), 16);
+            fromChannels();
+          }
+
+          channels.forEach(function (input) {
+            input.addEventListener("input", fromChannels);
+          });
+          picker.addEventListener("input", fromPicker);
+
+          fromChannels();
+        });
+      }
+
+      document.body.addEventListener("htmx:afterSettle", initColorFields);
+      initColorFields();
+    })();
+
+    // Two-click confirmation in place of a browser confirm() dialog: the first
+    // click on any hx-confirm control arms it (its label becomes "Sure?"); a
+    // second click within a few seconds issues the request. Clicking anything
+    // else, or waiting, disarms it. Applies to every hx-confirm element -- node
+    // delete, field remove, reload-from-disk.
+    (function () {
+      var armed = null;      // currently-armed element, if any
+      var armedLabel = "";   // its original innerHTML
+      var timer = null;
+
+      function disarm() {
+        if (!armed) return;
+        armed.innerHTML = armedLabel;
+        armed.classList.remove("confirm-armed");
+        armed = null;
+        if (timer) { clearTimeout(timer); timer = null; }
+      }
+
+      document.body.addEventListener("htmx:confirm", function (evt) {
+        if (!evt.detail.question) return;   // no hx-confirm on this element
+        evt.preventDefault();               // never fall through to window.confirm
+        var btn = evt.detail.elt;
+        if (btn === armed) {                // second click: proceed
+          disarm();
+          evt.detail.issueRequest(true);
+          return;
+        }
+        disarm();                           // arming a different control
+        armed = btn;
+        armedLabel = btn.innerHTML;
+        btn.classList.add("confirm-armed");
+        btn.innerHTML = "Sure?";
+        timer = setTimeout(disarm, 3000);
+      });
+
+      // A click anywhere other than the armed control cancels it. Capture phase
+      // so it runs before htmx handles the click that re-fires htmx:confirm.
+      document.body.addEventListener("click", function (evt) {
+        if (armed && evt.target !== armed && !armed.contains(evt.target)) disarm();
+      }, true);
+    })();
+  </script>
+</body>
+</html>
