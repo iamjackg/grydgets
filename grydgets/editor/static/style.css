@@ -298,3 +298,90 @@ pre.raw-yaml {
 }
 
 .add-child-inline { margin: 6px 0 6px 20px; display: flex; gap: 6px; }
+
+/* ---- REST "test request" panel ---- */
+.test-section { margin-top: 16px; }
+.test-warning {
+  color: var(--warn);
+  background: #322a1a;
+  border: 1px solid #5a4a24;
+  border-radius: 4px;
+  padding: 6px 8px;
+  font-size: 12.5px;
+  margin: 6px 0;
+}
+.test-warning code { color: var(--warn); }
+.test-panel { margin-top: 8px; }
+.test-request {
+  background: #14161b;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 8px;
+  margin-bottom: 8px;
+  overflow-x: auto;
+}
+.test-line { font-family: monospace; font-size: 12.5px; }
+.test-method { color: var(--accent); font-weight: 600; }
+.test-url { color: var(--text); word-break: break-all; }
+.test-header { font-family: monospace; font-size: 12px; color: var(--dim); margin-top: 2px; }
+.test-sub { color: var(--dim); font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; margin: 8px 0 3px; }
+.test-status { font-size: 12.5px; font-weight: 600; margin: 4px 0; }
+.test-status.ok { color: var(--ok); }
+.test-status.err { color: var(--danger); }
+.test-body, .test-final {
+  background: #14161b;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 8px;
+  font-family: monospace;
+  font-size: 12.5px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 260px;
+  overflow: auto;
+  margin: 0;
+}
+.test-body.err { color: var(--danger); }
+.test-final { color: var(--ok); border-color: #2f5a40; }
+.test-extract { margin: 4px 0 8px; }
+.test-extract label {
+  display: block;
+  margin: 6px 0 4px;
+  color: var(--dim);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.test-extract input[type=text],
+.test-extract textarea {
+  display: block;
+  width: 100%;
+  max-width: 560px;
+  background: #14161b;
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 6px 8px;
+  border-radius: 4px;
+  font-family: inherit;
+  box-sizing: border-box;
+}
+.test-extract textarea {
+  font-family: monospace;
+  min-height: 50px;
+  white-space: pre;
+}
+.test-image {
+  max-width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background:
+    linear-gradient(45deg, #2a2e38 25%, transparent 25%, transparent 75%, #2a2e38 75%),
+    linear-gradient(45deg, #2a2e38 25%, transparent 25%, transparent 75%, #2a2e38 75%);
+  background-size: 16px 16px;
+  background-position: 0 0, 8px 8px;
+}
+.test-error {
+  color: var(--danger);
+  font-size: 12.5px;
+  padding: 6px 0;
+}

@@ -1,0 +1,40 @@
+<div class="test-panel">
+  {% include "_test_request.html" %}
+
+  {% if result.connection_error %}
+    <div class="test-status err">connection error</div>
+    <pre class="test-body">{{ result.connection_error }}</pre>
+  {% else %}
+    <div class="test-status {{ 'ok' if result.status_code == 200 else 'err' }}">
+      HTTP {{ result.status_code }}{% if result.elapsed_ms is not none %} &middot; {{ '%.0f'|format(result.elapsed_ms) }} ms{% endif %}
+    </div>
+    {% if result.raw_text is not none %}
+      <div class="test-sub">response body</div>
+      <pre class="test-body">{{ result.raw_text }}</pre>
+    {% endif %}
+  {% endif %}
+
+  {% if can_extract %}
+    <hr>
+    <div class="test-sub">extraction &mdash; tweak and re-run against the response above (no new request)</div>
+    <form class="test-extract"
+          hx-post="/node/{{ path }}/test/extract"
+          hx-target="#extraction-output" hx-swap="innerHTML"
+          hx-trigger="input changed delay:400ms">
+      <label>json_path</label>
+      <input type="text" name="json_path" value="{{ node.get('json_path') or '' }}" placeholder="field[0].subfield">
+      <label>jq_expression</label>
+      <textarea name="jq_expression" rows="2" placeholder=".field | .value">{{ node.get('jq_expression') or '' }}</textarea>
+      <label>format_string</label>
+      <input type="text" name="format_string" value="{{ node.get('format_string') or '{}' }}">
+    </form>
+    {% set value = result.value %}
+    {% set extracted = result.extracted %}
+    {% set extraction_error = result.extraction_error %}
+    {% set stale = false %}
+    <div id="extraction-output">{% include "extraction_output.html" %}</div>
+  {% else %}
+    <div class="test-sub">final value</div>
+    <pre class="test-final">{{ result.value }}</pre>
+  {% endif %}
+</div>

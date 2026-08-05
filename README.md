@@ -1037,6 +1037,11 @@ add/remove/reorder children on container widgets, and edit each widget's
 properties through forms generated from `schema.json`, without hand-editing
 the YAML file directly.
 
+It works, but it's still rough: the forms cover what's in the schema and
+nothing more, error handling is thin in places, and the UI hasn't had much
+polish. Treat it as a convenience for the common edits rather than a
+replacement for opening `widgets.yaml` in an editor.
+
 ```bash
 uv run grydgets-editor --widgets widgets.yaml
 # or: uv run python -m grydgets.editor --widgets widgets.yaml
@@ -1063,3 +1068,13 @@ Notes:
 - Schema violations are shown as non-blocking warnings on save -- the
   schema documents the current widget set but isn't treated as ground
   truth, so a save is never refused because of a schema mismatch.
+- `rest` and `restimage` widgets have a **Test request** button in their
+  inspector. It runs the widget's actual request (resolving `!secret`
+  auth server-side, shown redacted in the panel) and displays the status,
+  raw response, extracted value, and final value -- so you can get
+  `json_path`/`jq_expression`/`format_string` right against live data. For
+  a `rest` widget you can tweak the extraction and re-run it against the
+  already-fetched response without making another request. Testing a
+  `POST`/`PUT`/`PATCH` widget sends a real request to the endpoint (the
+  panel warns before you do). Provider-backed widgets aren't testable this
+  way -- they read from shared providers, not their own HTTP call.

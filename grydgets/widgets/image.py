@@ -1,15 +1,13 @@
 from __future__ import annotations
 
-import base64
 import io
 import logging
 import threading
 from typing import Any
 
 import pygame
-import requests
 
-from grydgets.json_utils import extract_data
+from grydgets import rest_fetch
 from grydgets.widgets.base import Widget, UpdaterWidget
 
 smooth_scaling: bool = True
@@ -119,20 +117,7 @@ class RESTImageWidget(UpdaterWidget):
         self.update_frequency = 30
         self.image_widget = ImageWidget(preserve_aspect_ratio=preserve_aspect_ratio)
 
-        self.requests_kwargs: dict[str, Any] = {"headers": {}}
-        if auth is not None:
-            if "bearer" in auth:
-                self.requests_kwargs["headers"]["Authorization"] = "Bearer {}".format(
-                    auth["bearer"]
-                )
-            elif "basic" in auth:
-                username = auth["basic"].get("username", "")
-                password = auth["basic"].get("password", "")
-                auth_string = f"{username}:{password}"
-                encoded_auth = base64.b64encode(auth_string.encode()).decode()
-                self.requests_kwargs["headers"][
-                    "Authorization"
-                ] = f"Basic {encoded_auth}"
+        self.auth = auth
         # This needs to happen at the end because it actually starts the update thread
         super().__init__(static=static, **kwargs)
 
@@ -140,47 +125,20 @@ class RESTImageWidget(UpdaterWidget):
         return self.image_widget.is_dirty()
 
     def update(self) -> None:
-        try:
-            # Check if main URL is a file:// URL
-            if self.url.startswith("file://"):
-                file_path = self.url[7:]  # Remove 'file://' prefix
-                self.logger.debug(f"Loading image from local file: {file_path}")
+        result = rest_fetch.fetch_image(
+            self.url,
+            json_path=self.json_path,
+            jq_expression=self.jq_expression,
+            auth=self.auth,
+        )
+        if result.extraction_error is not None:
+            self.logger.warning("Could not update: {}".format(result.extraction_error))
+        if result.error is not None:
+            self.logger.warning("Could not update: {}".format(result.error))
 
-                with open(file_path, "rb") as f:
-                    image_data = f.read()
-
-                self.logger.debug("Updated from local file")
-            else:
-                # Handle HTTP/HTTPS URLs
-                response = requests.get(self.url, **self.requests_kwargs)
-                if self.json_path is not None or self.jq_expression is not None:
-                    response_json = response.json()
-                    image_url = extract_data(
-                        response_json,
-                        json_path=self.json_path,
-                        jq_expression=self.jq_expression,
-                    )
-
-                    # Check if extracted URL is a file:// URL
-                    if image_url.startswith("file://"):
-                        file_path = image_url[7:]  # Remove 'file://' prefix
-                        self.logger.debug(f"Loading image from local file: {file_path}")
-
-                        with open(file_path, "rb") as f:
-                            image_data = f.read()
-                    else:
-                        image_response = requests.get(image_url)
-                        image_data = image_response.content
-                else:
-                    image_data = response.content
-
-                self.logger.debug("Updated")
-
-            self.image_widget.set_image(image_data)
-        except FileNotFoundError as e:
-            self.logger.warning("File not found: {}".format(e))
-        except Exception as e:
-            self.logger.warning("Could not update: {}".format(e))
+        if result.image_bytes is not None:
+            self.image_widget.set_image(result.image_bytes)
+            self.logger.debug("Updated")
 
     def render(self, size: tuple[int, int]) -> pygame.Surface:
         return self.image_widget.render(size)

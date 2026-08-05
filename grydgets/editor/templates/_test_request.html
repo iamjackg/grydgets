@@ -1,0 +1,10 @@
+<div class="test-request">
+  <div class="test-line"><span class="test-method">{{ summary.method }}</span> <span class="test-url">{{ summary.url }}</span></div>
+  {% for header, val in summary.headers.items() %}
+    <div class="test-header">{{ header }}: {{ val }}</div>
+  {% endfor %}
+  {% if summary.payload is not none %}
+    <div class="test-sub">payload</div>
+    <pre class="test-body">{{ summary.payload | tojson(indent=2) }}</pre>
+  {% endif %}
+</div>

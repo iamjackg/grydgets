@@ -1,0 +1,27 @@
+<div class="test-panel">
+  {% include "_test_request.html" %}
+
+  {% if result.error %}
+    <div class="test-status err">request error</div>
+    <pre class="test-body">{{ result.error }}</pre>
+  {% else %}
+    {% if result.status_code is not none %}
+      <div class="test-status {{ 'ok' if result.status_code == 200 else 'err' }}">
+        HTTP {{ result.status_code }}{% if result.elapsed_ms is not none %} &middot; {{ '%.0f'|format(result.elapsed_ms) }} ms{% endif %}
+      </div>
+    {% endif %}
+    {% if result.extracted_url %}
+      <div class="test-sub">extracted image URL</div>
+      <pre class="test-body">{{ result.extracted_url }}</pre>
+    {% endif %}
+    {% if result.extraction_error %}
+      <pre class="test-body err">extraction error: {{ result.extraction_error }}</pre>
+    {% endif %}
+    {% if image_data_uri %}
+      <div class="test-sub">image ({{ image_size }} bytes{% if result.content_type %}, {{ result.content_type }}{% endif %})</div>
+      <img class="test-image" src="{{ image_data_uri }}" alt="rendered preview">
+    {% elif not result.extraction_error %}
+      <div class="test-status err">No image data returned.</div>
+    {% endif %}
+  {% endif %}
+</div>

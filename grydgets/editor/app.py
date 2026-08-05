@@ -6,14 +6,18 @@ for a session. Save is the only thing that writes to disk.
 """
 
 import argparse
+import base64
 from pathlib import Path
 
 import yaml as pyyaml
 from flask import Flask, render_template, request
 from ruamel.yaml import YAMLError
 
-from grydgets.editor import schema as schema_mod
+from grydgets import rest_fetch
+from grydgets.editor import rest_test, schema as schema_mod
 from grydgets.editor import secrets_util, tree, validation, yamlio
+
+TESTABLE_WIDGETS = ("rest", "restimage")
 
 ROOT_PATH = "root"
 
@@ -27,12 +31,16 @@ class EditorState:
         self.warnings = []
         self.last_backup = None
         self.error = None
+        # path -> last parsed JSON response, so the "test request" panel can
+        # re-run json_path/jq extraction without hitting the network again.
+        self.test_cache = {}
 
     def reload(self):
         self.doc = yamlio.load_doc(self.widgets_path)
         self.dirty = False
         self.warnings = []
         self.error = None
+        self.test_cache = {}
 
     def mark_dirty(self):
         self.dirty = True
@@ -574,6 +582,77 @@ def create_app(widgets_path):
             field_errors={},
         )
         return inspector_html + render_dirty_badge(oob=True) + refresh_warnings_oob()
+
+    @app.route("/node/<path:path>/test", methods=["POST"])
+    def test_node(path):
+        """Actually run a rest/restimage widget's request and show the result.
+
+        Live network call: for a POST/PUT/PATCH widget this sends the real
+        request to the endpoint (the panel warns about that). Secrets are
+        resolved server-side to make the call but never rendered."""
+        node = tree.get_node(state.doc, path)
+        widget_type = node.get("widget")
+        if widget_type not in TESTABLE_WIDGETS:
+            return (
+                f'<div class="test-error">\'{widget_type}\' widgets can\'t be '
+                f"tested here.</div>"
+            )
+
+        if widget_type == "restimage":
+            summary, result = rest_test.test_image(node, str(state.secrets_path))
+            state.test_cache.pop(path, None)
+            image_data_uri = None
+            if result.image_bytes is not None:
+                mime = result.content_type or "image/png"
+                if not mime.startswith("image/"):
+                    mime = "image/png"
+                encoded = base64.b64encode(result.image_bytes).decode()
+                image_data_uri = f"data:{mime};base64,{encoded}"
+            return render_template(
+                "test_panel_image.html",
+                path=path,
+                summary=summary,
+                result=result,
+                image_data_uri=image_data_uri,
+                image_size=len(result.image_bytes) if result.image_bytes else 0,
+            )
+
+        summary, result = rest_test.test_rest(node, str(state.secrets_path))
+        can_extract = result.json is not None
+        if can_extract:
+            state.test_cache[path] = result.json
+        else:
+            state.test_cache.pop(path, None)
+        return render_template(
+            "test_panel_rest.html",
+            path=path,
+            summary=summary,
+            result=result,
+            node=node,
+            can_extract=can_extract,
+        )
+
+    @app.route("/node/<path:path>/test/extract", methods=["POST"])
+    def test_extract(path):
+        """Re-run just json_path/jq/format extraction against the response
+        cached by the last /test call -- no new network request. Lets the user
+        iterate on the extraction against real data."""
+        cached = state.test_cache.get(path)
+        json_path = request.form.get("json_path", "").strip() or None
+        jq_expression = request.form.get("jq_expression", "").strip() or None
+        format_string = request.form.get("format_string", "") or "{}"
+        if cached is None:
+            return render_template("extraction_output.html", stale=True)
+        value, extracted, error = rest_fetch.apply_extraction(
+            cached, json_path, jq_expression, format_string
+        )
+        return render_template(
+            "extraction_output.html",
+            stale=False,
+            value=value,
+            extracted=extracted,
+            extraction_error=error,
+        )
 
     @app.route("/save", methods=["POST"])
     def save():

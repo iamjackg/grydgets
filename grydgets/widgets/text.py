@@ -1,17 +1,15 @@
 from __future__ import annotations
 
-import base64
 import datetime
 import logging
 from typing import Any
 
 import pygame
-import requests
 
+from grydgets import rest_fetch
 from grydgets.widgets.base import Widget, UpdaterWidget, ContainerWidget
 from grydgets.widgets.containers import GridWidget
 from grydgets.fonts import FontCache
-from grydgets.json_utils import extract_data
 
 font_cache = FontCache()
 
@@ -176,20 +174,7 @@ class RESTWidget(UpdaterWidget):
             **kwargs
         )
 
-        self.requests_kwargs: dict[str, Any] = {"headers": {}}
-        if auth is not None:
-            if "bearer" in auth:
-                self.requests_kwargs["headers"]["Authorization"] = "Bearer {}".format(
-                    auth["bearer"]
-                )
-            elif "basic" in auth:
-                username = auth["basic"].get("username", "")
-                password = auth["basic"].get("password", "")
-                auth_string = f"{username}:{password}"
-                encoded_auth = base64.b64encode(auth_string.encode()).decode()
-                self.requests_kwargs["headers"]["Authorization"] = f"Basic {encoded_auth}"
-        if self.method in ("POST", "PUT", "PATCH") and self.payload:
-            self.requests_kwargs["json"] = self.payload
+        self.auth = auth
         # This needs to happen at the end because it actually starts the update thread
         super().__init__(**kwargs)
 
@@ -197,32 +182,22 @@ class RESTWidget(UpdaterWidget):
         return self.text_widget.is_dirty()
 
     def update(self) -> None:
-        try:
-            response = requests.request(
-                method=self.method, url=self.url, **self.requests_kwargs
-            )
-            if response.status_code != 200:
-                text = "Error {}".format(response.status_code)
-            elif self.json_path is not None or self.jq_expression is not None:
-                response_json = response.json()
-                try:
-                    text = extract_data(
-                        response_json,
-                        json_path=self.json_path,
-                        jq_expression=self.jq_expression
-                    )
-                except Exception as e:
-                    self.logger.error(e)
-                    text = "--"
-            else:
-                text = response.text
-        except requests.ConnectionError as e:
-            self.logger.warning("Could not update: {}".format(e))
-            text = "Unavailable"
+        result = rest_fetch.fetch_text(
+            self.url,
+            method=self.method,
+            payload=self.payload,
+            auth=self.auth,
+            json_path=self.json_path,
+            jq_expression=self.jq_expression,
+            format_string=self.format_string,
+        )
+        if result.connection_error is not None:
+            self.logger.warning("Could not update: {}".format(result.connection_error))
+        if result.extraction_error is not None:
+            self.logger.error(result.extraction_error)
 
-        formatted_value = self.format_string.format(text)
-        if formatted_value != self.value:
-            self.value = formatted_value
+        if result.value != self.value:
+            self.value = result.value
             self.text_widget.set_text(self.value)
 
             self.logger.debug("Updated to {}".format(self.value))

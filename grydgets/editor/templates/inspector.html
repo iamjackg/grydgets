@@ -134,6 +134,26 @@
   <p><button type="submit" class="primary">Apply</button></p>
 </form>
 
+{% if widget_type in ("rest", "restimage") %}
+<div class="test-section">
+  <hr>
+  <div class="field-label-row">
+    <label>test request</label>
+    <button type="button" class="small"
+            hx-post="/node/{{ path }}/test"
+            hx-target="#test-result" hx-swap="innerHTML"
+            hx-indicator="#test-spinner">Run</button>
+    <span id="test-spinner" class="htmx-indicator">testing&hellip;</span>
+  </div>
+  <p class="placeholder">Runs this widget's actual request and shows what it returns. Applies saved-in-memory values (edit above and Apply first to test changes).</p>
+  {% set method = node.get("method") or "GET" %}
+  {% if method in ("POST", "PUT", "PATCH") %}
+    <div class="test-warning">&#9888; This widget uses <code>{{ method }}</code> &mdash; running the test sends a real {{ method }} request to the endpoint.</div>
+  {% endif %}
+  <div id="test-result"></div>
+</div>
+{% endif %}
+
 {% if spec %}
 {% set unset_optional = spec.optional_fields()|rejectattr('name', 'in', node.keys()|list)|list %}
 {% if unset_optional %}

@@ -1,0 +1,12 @@
+{% if stale %}
+  <div class="test-status err">The cached response is gone -- run the test again.</div>
+{% else %}
+  <div class="test-sub">extracted value</div>
+  {% if extraction_error %}
+    <pre class="test-body err">extraction error: {{ extraction_error }}</pre>
+  {% else %}
+    <pre class="test-body">{{ extracted if extracted is not none else '(nothing extracted)' }}</pre>
+  {% endif %}
+  <div class="test-sub">final value (after format_string)</div>
+  <pre class="test-final">{{ value }}</pre>
+{% endif %}
