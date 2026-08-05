@@ -19,14 +19,14 @@ every time and force a redraw on hardware that can't spare it.
 
 from __future__ import annotations
 
-from typing import Any, Sequence
+from typing import Any, Sequence, Union
 
 import pygame
 
 Color = tuple[int, int, int, int]
 
 # What a widget accepts for a colour parameter, before parsing.
-ColorInput = str | Sequence[int]
+ColorInput = Union[str, Sequence[int]]
 
 
 class ColorError(ValueError):
