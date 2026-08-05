@@ -1,6 +1,7 @@
 import argparse
 import os
 import signal
+import sys
 import pygame
 from pygame.transform import rotate
 import logging
@@ -8,7 +9,7 @@ import time
 import threading
 from flask import Flask, request, jsonify
 
-from grydgets import config
+from grydgets import config, theme
 from grydgets.outputs import create_outputs
 from grydgets.widgets import image as image_module
 from grydgets.widgets.containers import ScreenWidget
@@ -29,6 +30,13 @@ def parse_args():
         help="Widget configuration file (default: widgets.yaml)",
     )
     parser.add_argument(
+        "--theme",
+        default=None,
+        metavar="FILE",
+        help="Theme file replacing the widgets file's theme block "
+        "(default: use the theme in the widgets file)",
+    )
+    parser.add_argument(
         "--config-dir",
         default=None,
         metavar="DIR",
@@ -37,17 +45,44 @@ def parse_args():
     return parser.parse_args()
 
 
+def fail(error, config_dir):
+    """Report a bad config file and stop.
+
+    Nothing about these is a bug in grydgets, so they exit with the message
+    on its own rather than a traceback. ``config_dir`` is the absolute
+    directory relative paths were resolved against, or None if the process
+    never moved: worth saying when --config-dir was given, because then the
+    file that wasn't found is not the one in the directory you ran from.
+    """
+    message = f"grydgets: {error}"
+    if config_dir is not None:
+        message += f"\ngrydgets: config paths are relative to {config_dir}"
+    sys.exit(message)
+
+
 def main():
     args = parse_args()
 
+    config_dir = None
     if args.config_dir is not None:
-        os.chdir(args.config_dir)
+        try:
+            os.chdir(args.config_dir)
+        except OSError as e:
+            sys.exit(f"grydgets: --config-dir {args.config_dir}: {e.strerror}")
+        # Read back rather than joining: every config path from here on is
+        # relative to this, and it's what error messages have to quote.
+        config_dir = os.getcwd()
 
     def load_widget_tree():
-        return config.load_widget_config(args.widgets)
+        # Read on every call, not once, so SIGUSR1 picks up an edited theme
+        # file the same way it picks up an edited widgets file.
+        return config.load_widget_config(args.widgets, theme_file=args.theme)
 
-    widget_tree = load_widget_tree()
-    conf = config.load_config("conf.yaml")
+    try:
+        widget_tree = load_widget_tree()
+        conf = config.load_config("conf.yaml")
+    except (config.ConfigError, theme.ThemeError) as e:
+        fail(e, config_dir)
     conf = config.migrate_config(conf)
 
     render_config = conf["graphics"]
@@ -79,7 +114,10 @@ def main():
         output.setup(screen_size)
 
     # Initialize and start providers
-    provider_manager = ProviderManager('providers.yaml')
+    try:
+        provider_manager = ProviderManager('providers.yaml')
+    except (config.ConfigError, theme.ThemeError) as e:
+        fail(e, config_dir)
     provider_manager.start_all()
 
     widget_manager = WidgetManager(provider_manager)

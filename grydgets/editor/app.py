@@ -8,13 +8,14 @@ for a session. Save is the only thing that writes to disk.
 import argparse
 import base64
 import copy
+import sys
 from pathlib import Path
 
 from flask import Flask, render_template, request
 from ruamel.yaml import YAMLError
 from ruamel.yaml.comments import CommentedSeq
 
-from grydgets import colors, rest_fetch, theme as theme_mod
+from grydgets import colors, config, rest_fetch, theme as theme_mod
 from grydgets.editor import rest_test, schema as schema_mod
 from grydgets.editor import secrets_util, theme_ui, tree, validation, yamlio
 
@@ -971,7 +972,17 @@ def main():
     parser.add_argument("--debug", action="store_true")
     args = parser.parse_args()
 
-    app = create_app(args.widgets)
+    # A file that can't be read is the user's, not a bug, so it gets the
+    # message on its own -- the same treatment main.py gives conf.yaml.
+    try:
+        app = create_app(args.widgets)
+    except OSError as e:
+        sys.exit(
+            f"grydgets-editor: {config.describe_read_failure(args.widgets, e)}"
+        )
+    except YAMLError as e:
+        sys.exit(f"grydgets-editor: {args.widgets} is not valid YAML:\n{e}")
+
     app.run(host=args.host, port=args.port, debug=args.debug)
 
 

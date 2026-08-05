@@ -34,6 +34,15 @@ constructor: a ``!color`` under ``widgets:`` is constructed before
 file. So the constructor only records a :class:`Token`, and
 :func:`apply_theme` replaces those once everything is loaded.
 
+The block lives in widgets.yaml, and that copy is the base theme. ``main.py
+--theme FILE`` replaces it entirely with a file whose root is a theme block
+(see :func:`grydgets.config.load_theme_file`); :func:`check_replacement`
+requires the replacement to define everything the base did, since a partial
+one would take ``defaults`` away with it. Nothing else in the loader can
+tell which theme it got -- the swap happens before resolution, so tokens
+inside an override's ``defaults`` resolve against that override's sections
+like any other.
+
 Nothing in this module knows which parameters a widget takes or what type
 they are. The document walk reads one key, ``widget``, to decide which
 defaults apply to a node; every other key and value is copied through
@@ -301,6 +310,51 @@ def reject_tokens(document: Any, filename: str) -> None:
     raise ThemeError(
         f"{filename}: theme tokens are only resolved in the widgets file, "
         f"but this one uses {where}"
+    )
+
+
+def _entry_paths(value: Any, prefix: tuple[str, ...] = ()) -> Iterator[str]:
+    """Every dotted path from a theme block down to a value that isn't a
+    mapping: ``colors.panel``, ``groups.text-like``,
+    ``defaults.text-like.font_path``."""
+    if isinstance(value, dict) and value:
+        for key, child in value.items():
+            yield from _entry_paths(child, prefix + (str(key),))
+    elif prefix:
+        yield ".".join(prefix)
+
+
+def check_replacement(base: Any, override: Any, filename: str) -> None:
+    """Raise unless ``override`` defines everything ``base`` does.
+
+    A theme file replaces the whole block rather than merging into it, so a
+    file that lists only ``colors:`` would take ``theme.defaults`` away with
+    it -- and a dashboard that inherits ``font_path`` from the theme then
+    fails inside the widget constructors, a long way from the cause. Checking
+    the two shapes against each other reports it at load time and names the
+    entries that are missing.
+
+    Only the base's entries have to be present; an override is free to define
+    more, and no value is compared -- that's the point of overriding.
+    """
+    if not isinstance(base, dict):
+        return
+    if not isinstance(override, dict):
+        raise ThemeError(f"{filename}: a theme file must be a mapping")
+
+    have = set(_entry_paths(override))
+    missing = [path for path in _entry_paths(base) if path not in have]
+    if not missing:
+        return
+
+    shown = ", ".join(missing[:10])
+    if len(missing) > 10:
+        shown += f", and {len(missing) - 10} more"
+    raise ThemeError(
+        f"{filename} is missing {len(missing)} "
+        f"{'entry' if len(missing) == 1 else 'entries'} that the widgets "
+        f"file's own theme defines: {shown}. A theme file replaces the whole "
+        f"theme block, so it has to define everything the base theme does."
     )
 
 

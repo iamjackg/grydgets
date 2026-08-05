@@ -1,3 +1,5 @@
+import os
+
 import voluptuous
 import yaml
 
@@ -6,13 +8,55 @@ from grydgets import theme
 __SECRETS = {"main_secrets": {}}
 
 
+class ConfigError(Exception):
+    """A config file is missing, unreadable, or not what it should be.
+
+    Carries a message meant to be shown on its own -- the entry points print
+    it and exit rather than letting a traceback out, because every one of
+    these is something about the user's files rather than a bug to report.
+    """
+
+
+def describe_read_failure(filename, error):
+    """A one-line explanation of why a config file couldn't be read.
+
+    The absolute path is in the message because relative ones are the
+    confusing case: ``--config-dir`` chdirs, so "conf.yaml" alone doesn't
+    say which conf.yaml was looked for.
+    """
+    path = os.path.abspath(filename)
+    if isinstance(error, FileNotFoundError):
+        return f"{filename}: no such file (looked for {path})"
+    if isinstance(error, IsADirectoryError):
+        return f"{filename}: is a directory, not a file ({path})"
+    if isinstance(error, PermissionError):
+        return f"{filename}: not readable ({path})"
+    return f"{filename}: could not be read ({path}): {error}"
+
+
 def secret_loader(_, node):
     if not __SECRETS["main_secrets"]:
-        with open("secrets.yaml") as secrets_f:
-            secret_data = yaml.load(secrets_f, Loader=yaml.SafeLoader)
-            __SECRETS["main_secrets"] = secret_data
+        try:
+            with open("secrets.yaml") as secrets_f:
+                secret_data = yaml.load(secrets_f, Loader=yaml.SafeLoader)
+        except OSError as e:
+            raise ConfigError(
+                f"{describe_read_failure('secrets.yaml', e)}, and it is "
+                f"needed to resolve '!secret {node.value}'"
+            ) from None
+        except yaml.YAMLError as e:
+            raise ConfigError(f"secrets.yaml is not valid YAML:\n{e}") from None
+        if not isinstance(secret_data, dict):
+            raise ConfigError("secrets.yaml must be a mapping of name to secret")
+        __SECRETS["main_secrets"] = secret_data
 
-    return __SECRETS["main_secrets"][node.value]
+    try:
+        return __SECRETS["main_secrets"][node.value]
+    except KeyError:
+        known = ", ".join(sorted(__SECRETS["main_secrets"])) or "nothing"
+        raise ConfigError(
+            f"'!secret {node.value}' is not in secrets.yaml (it defines: {known})"
+        ) from None
 
 
 yaml.add_constructor("!secret", secret_loader)
@@ -20,18 +64,64 @@ theme.register_constructors()
 
 
 def load_yaml(filename):
-    with open(filename) as conf_f:
-        parsed_yaml = yaml.load(conf_f, Loader=yaml.FullLoader)
+    try:
+        with open(filename) as conf_f:
+            parsed_yaml = yaml.load(conf_f, Loader=yaml.FullLoader)
+    except OSError as e:
+        raise ConfigError(describe_read_failure(filename, e)) from None
+    except yaml.YAMLError as e:
+        raise ConfigError(f"{filename} is not valid YAML:\n{e}") from None
     return parsed_yaml
 
 
-def load_widget_config(filename):
+def load_theme_file(filename):
+    """Read a theme file: a document whose root *is* a theme block.
+
+    No ``theme:`` key wrapping it, so the file is exactly what you would
+    paste under ``theme:`` in the widgets file. A wrapped file is the
+    plausible mistake, so it gets told what's wrong rather than being read as
+    a theme with one section named "theme".
+    """
+    document = load_yaml(filename)
+    if document is None:
+        raise theme.ThemeError(f"{filename} is empty")
+    if not isinstance(document, dict):
+        raise theme.ThemeError(f"{filename}: a theme file must be a mapping")
+    if set(document) == {"theme"}:
+        raise theme.ThemeError(
+            f"{filename}: a theme file's top level is the theme block itself "
+            f"-- remove the 'theme:' key and unindent what's under it"
+        )
+    return document
+
+
+def load_widget_config(filename, theme_file=None):
     """Load the widgets file and resolve its theme block.
 
     Kept separate from :func:`load_yaml` so that conf.yaml and providers.yaml,
     which share the loader, don't pick up theme semantics.
+
+    ``theme_file`` replaces the widgets file's ``theme:`` block outright, so
+    the same widget tree can be rendered with a different look without being
+    edited. The widgets file's own block is the base theme and stays the one
+    that loads when no override is given.
     """
-    return theme.apply_theme(load_yaml(filename))
+    document = load_yaml(filename)
+    if not isinstance(document, dict) or "widgets" not in document:
+        raise ConfigError(
+            f"{filename} has no top-level 'widgets:' key, so there is no "
+            f"dashboard to draw"
+        )
+    if not isinstance(document["widgets"], list) or not document["widgets"]:
+        raise ConfigError(
+            f"{filename}: 'widgets:' must be a list holding the one widget "
+            f"that fills the screen, usually a grid"
+        )
+    if theme_file is not None:
+        override = load_theme_file(theme_file)
+        theme.check_replacement(document.get("theme"), override, theme_file)
+        document["theme"] = override
+    return theme.apply_theme(document)
 
 
 # Output sub-schemas
@@ -245,10 +335,22 @@ provider_schema = voluptuous.Schema(
 )
 
 
+def _validate(schema, conf_data, filename):
+    """Run a voluptuous schema, reporting a failure as a :class:`ConfigError`.
+
+    voluptuous's own message says what's wrong and where ("required key not
+    provided @ data['server']"); all this adds is which file it's about.
+    """
+    try:
+        return schema(conf_data)
+    except voluptuous.Invalid as e:
+        raise ConfigError(f"{filename} is not valid: {e}") from None
+
+
 def load_config(filename):
     conf_data = load_yaml(filename)
     theme.reject_tokens(conf_data, filename)
-    config_schema(conf_data)
+    _validate(config_schema, conf_data, filename)
 
     return conf_data
 
@@ -264,6 +366,6 @@ def load_providers_config(filename):
     """
     conf_data = load_yaml(filename)
     theme.reject_tokens(conf_data, filename)
-    provider_schema(conf_data)
+    _validate(provider_schema, conf_data, filename)
 
     return conf_data

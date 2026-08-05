@@ -65,10 +65,11 @@ Rendered images will appear in `data/headless_output/`. The notification endpoin
 ### Command-line options
 
 ```
-grydgets [--widgets FILE] [--config-dir DIR]
+grydgets [--widgets FILE] [--theme FILE] [--config-dir DIR]
 ```
 
 *   `--widgets` — Widget configuration file (default: `widgets.yaml`)
+*   `--theme` — Theme file replacing the widgets file's `theme:` block, see [Theme files](#theme-files). Without it, the theme in the widgets file is used.
 *   `--config-dir` — Directory containing config files, fonts, and images. All relative paths are resolved from this directory. Defaults to the current working directory.
 
 ## Configuration
@@ -401,6 +402,57 @@ type rather than applied to everything.
 
 Tokens are only resolved in the widgets file. Using one in `conf.yaml` or
 `providers.yaml` is an error.
+
+#### Theme files
+
+The `theme:` block in the widgets file is the base theme — the one that loads
+when nothing else is said. `--theme FILE` replaces it with another, so the same
+widget tree can be rendered with a different look without being edited:
+
+```bash
+grydgets --theme themes/light.yaml
+```
+
+A theme file's top level **is** the theme block: the same sections, `groups` and
+`defaults` you would write under `theme:`, unindented by one level and with no
+`theme:` key above them.
+
+```yaml
+# themes/light.yaml
+colors:
+  text: '#2e3440'
+  panel: '#d8dee9'
+fonts:
+  regular: fonts/Inter-400.ttf
+  bold: fonts/Inter-800.ttf
+sizes:
+  radius: 25
+
+groups:
+  text-like: [text, rest, provider, providertemplate, notifiabletext, label]
+defaults:
+  text-like:
+    font_path: !font regular
+    color: !color text
+  grid:
+    widget_corner_radius: !size radius
+```
+
+Replacement is total: nothing of the base theme is merged in, and tokens in an
+override's own `defaults` resolve against that override. So a theme file has to
+define **everything** the base theme does, `groups` and `defaults` included — a
+file listing only colours would take the defaults away with it and leave the
+text widgets with no font. Loading one that's incomplete is an error naming the
+entries it's missing, rather than a failure later on inside a widget. Defining
+*more* than the base is fine.
+
+Relative paths inside a theme file are resolved like any other, from
+`--config-dir`. The file is re-read on [reload](#hot-reload), so editing a theme
+and sending `SIGUSR1` shows it without a restart.
+
+The [widget editor](#widget-editor) knows nothing about `--theme`: it reads and
+writes the base theme in the widgets file, and a document edited while an
+override is loaded still shows the base theme's values.
 
 ## Widgets
 

@@ -335,3 +335,153 @@ def test_malformed_theme_blocks_raise(body):
 def test_a_document_with_no_theme_is_unchanged():
     text = "widgets: [{widget: text, color: '#bf616a'}]\n"
     assert resolve(text) == load(text)
+
+
+# --- theme files (main.py --theme) ---------------------------------------
+
+
+BASE = """
+theme:
+  colors:
+    text: '#eceff4'
+    panel: '#3b4252'
+  fonts:
+    regular: fonts/Inter-400.ttf
+  groups:
+    text-like: [text, rest]
+  defaults:
+    text-like:
+      font_path: !font regular
+      color: !color text
+    grid:
+      widget_background_color: !color panel
+
+widgets:
+  - widget: grid
+    children:
+      - widget: text
+        text: Kitchen
+"""
+
+OVERRIDE = """
+colors:
+  text: '#2e3440'
+  panel: '#d8dee9'
+fonts:
+  regular: fonts/Fraunces-400.ttf
+groups:
+  text-like: [text, rest]
+defaults:
+  text-like:
+    font_path: !font regular
+    color: !color text
+  grid:
+    widget_background_color: !color panel
+"""
+
+
+def write(tmp_path, widgets=BASE, theme_text=OVERRIDE):
+    (tmp_path / "widgets.yaml").write_text(widgets)
+    (tmp_path / "theme.yaml").write_text(theme_text)
+    return str(tmp_path / "widgets.yaml"), str(tmp_path / "theme.yaml")
+
+
+def test_without_the_flag_the_widgets_file_theme_is_used(tmp_path):
+    widgets, _ = write(tmp_path)
+    doc = config.load_widget_config(widgets)
+    node = doc["widgets"][0]["children"][0]
+    assert node["color"] == "#eceff4"
+    assert node["font_path"] == "fonts/Inter-400.ttf"
+
+
+def test_a_theme_file_replaces_the_block_and_its_defaults(tmp_path):
+    widgets, theme_path = write(tmp_path)
+    doc = config.load_widget_config(widgets, theme_file=theme_path)
+
+    grid = doc["widgets"][0]
+    node = grid["children"][0]
+    # Tokens inside the override's own defaults resolve against it.
+    assert node["color"] == "#2e3440"
+    assert node["font_path"] == "fonts/Fraunces-400.ttf"
+    assert grid["widget_background_color"] == "#d8dee9"
+    # Nothing of the base theme survives.
+    assert doc["theme"]["colors"]["text"] == "#2e3440"
+    assert node["text"] == "Kitchen"
+
+
+def test_a_token_in_the_widget_tree_reads_from_the_override(tmp_path):
+    widgets, theme_path = write(
+        tmp_path, widgets=BASE + "background_color: !color panel\n"
+    )
+    doc = config.load_widget_config(widgets, theme_file=theme_path)
+    assert doc["background_color"] == "#d8dee9"
+
+
+def test_a_widgets_files_own_value_still_beats_the_override(tmp_path):
+    widgets, theme_path = write(
+        tmp_path, widgets=BASE.replace("        text: Kitchen", "        color: '#bf616a'")
+    )
+    doc = config.load_widget_config(widgets, theme_file=theme_path)
+    assert doc["widgets"][0]["children"][0]["color"] == "#bf616a"
+
+
+def test_an_override_may_define_more_than_the_base(tmp_path):
+    widgets, theme_path = write(
+        tmp_path, theme_text=OVERRIDE + "sizes:\n  radius: 25\n"
+    )
+    doc = config.load_widget_config(widgets, theme_file=theme_path)
+    assert doc["theme"]["sizes"]["radius"] == 25
+
+
+def test_a_partial_override_names_what_it_is_missing(tmp_path):
+    widgets, theme_path = write(
+        tmp_path, theme_text="colors:\n  text: '#2e3440'\n  panel: '#d8dee9'\n"
+    )
+    with pytest.raises(ThemeError) as excinfo:
+        config.load_widget_config(widgets, theme_file=theme_path)
+    message = str(excinfo.value)
+    assert "theme.yaml" in message
+    assert "fonts.regular" in message
+    assert "defaults.text-like.font_path" in message
+
+
+def test_a_missing_group_is_reported_too(tmp_path):
+    """Dropping theme.groups would leave 'text-like' keying nothing, which
+    is otherwise silent: the defaults just stop applying."""
+    widgets, theme_path = write(
+        tmp_path, theme_text=OVERRIDE.replace("groups:\n  text-like: [text, rest]\n", "")
+    )
+    with pytest.raises(ThemeError) as excinfo:
+        config.load_widget_config(widgets, theme_file=theme_path)
+    assert "groups.text-like" in str(excinfo.value)
+
+
+def test_a_wrapped_theme_file_says_to_unwrap_it(tmp_path):
+    widgets, theme_path = write(
+        tmp_path, theme_text="theme:\n" + "\n".join("  " + l for l in OVERRIDE.splitlines())
+    )
+    with pytest.raises(ThemeError) as excinfo:
+        config.load_widget_config(widgets, theme_file=theme_path)
+    assert "remove the 'theme:' key" in str(excinfo.value)
+
+
+@pytest.mark.parametrize("body", ["", "- a\n- b\n", "just a string\n"])
+def test_a_theme_file_that_is_not_a_theme_block_errors(tmp_path, body):
+    widgets, theme_path = write(tmp_path, theme_text=body)
+    with pytest.raises(ThemeError):
+        config.load_widget_config(widgets, theme_file=theme_path)
+
+
+def test_an_unknown_token_in_an_override_still_errors(tmp_path):
+    widgets, theme_path = write(
+        tmp_path, theme_text=OVERRIDE.replace("    font_path: !font regular", "    font_path: !font bold")
+    )
+    with pytest.raises(ThemeError) as excinfo:
+        config.load_widget_config(widgets, theme_file=theme_path)
+    assert "!font bold" in str(excinfo.value)
+
+
+def test_a_widgets_file_with_no_theme_takes_any_override(tmp_path):
+    widgets, theme_path = write(tmp_path, widgets="widgets: [{widget: text}]\n")
+    doc = config.load_widget_config(widgets, theme_file=theme_path)
+    assert doc["widgets"][0]["color"] == "#2e3440"
