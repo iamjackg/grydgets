@@ -87,7 +87,7 @@ def main():
     screen_widget = ScreenWidget(
         screen_size,
         image_path=widget_tree.get("background_image", None),
-        color=widget_tree.get("background_color", (0, 0, 0)),
+        background_color=widget_tree.get("background_color", (0, 0, 0)),
         drop_shadow=widget_tree.get("drop_shadow", False),
     )
 
@@ -160,7 +160,7 @@ def main():
                 screen_widget = ScreenWidget(
                     screen_size,
                     image_path=new_widget_tree.get("background_image", None),
-                    color=new_widget_tree.get("background_color", (0, 0, 0)),
+                    background_color=new_widget_tree.get("background_color", (0, 0, 0)),
                     drop_shadow=new_widget_tree.get("drop_shadow", False),
                 )
                 screen_widget.add_widget(widget_manager.create_widget_tree(new_widget_tree["widgets"][0]))

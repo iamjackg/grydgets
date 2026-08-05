@@ -34,6 +34,10 @@ class ProviderWidget(Widget):
         font_path: str | None = None,
         text_size: int | None = None,
         color: ColorInput = (255, 255, 255),
+        background_color: ColorInput | None = None,
+        corner_radius: int = 0,
+        padding: int = 6,
+        align: str = "center",
         vertical_align: str = "center",
         **kwargs: Any,
     ) -> None:
@@ -55,9 +59,11 @@ class ProviderWidget(Widget):
         self.text_widget = TextWidget(
             font_path=font_path,
             color=parse_color(color, "color"),
-            padding=6,
+            background_color=background_color,
+            corner_radius=corner_radius,
+            padding=padding,
             text_size=text_size,
-            align="center",
+            align=align,
             vertical_align=vertical_align,
             **kwargs,
         )
@@ -120,6 +126,10 @@ class ProviderTemplateWidget(Widget):
         font_path: str | None = None,
         text_size: int | None = None,
         color: ColorInput = (255, 255, 255),
+        background_color: ColorInput | None = None,
+        corner_radius: int = 0,
+        padding: int = 6,
+        align: str = "center",
         vertical_align: str = "center",
         **kwargs: Any,
     ) -> None:
@@ -139,9 +149,11 @@ class ProviderTemplateWidget(Widget):
         self.text_widget = TextWidget(
             font_path=font_path,
             color=parse_color(color, "color"),
-            padding=6,
+            background_color=background_color,
+            corner_radius=corner_radius,
+            padding=padding,
             text_size=text_size,
-            align="center",
+            align=align,
             vertical_align=vertical_align,
             **kwargs,
         )

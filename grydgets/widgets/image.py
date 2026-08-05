@@ -8,7 +8,9 @@ from typing import Any
 import pygame
 
 from grydgets import rest_fetch
+from grydgets.colors import ColorInput, parse_optional_color
 from grydgets.widgets.base import Widget, UpdaterWidget
+from grydgets.widgets.painting import paint_background
 
 smooth_scaling: bool = True
 
@@ -145,8 +147,16 @@ class RESTImageWidget(UpdaterWidget):
 
 
 class EmptyWidget(Widget):
-    def __init__(self, size: tuple[int, int] | None = None, **kwargs: Any) -> None:
+    def __init__(
+        self,
+        size: tuple[int, int] | None = None,
+        color: ColorInput | None = None,
+        corner_radius: int = 0,
+        **kwargs: Any,
+    ) -> None:
         super().__init__(size, **kwargs)
+        self.color = parse_optional_color(color, "color")
+        self.corner_radius = corner_radius
         self.surface: pygame.Surface | None = None
 
     def is_dirty(self) -> bool:
@@ -159,8 +169,10 @@ class EmptyWidget(Widget):
         pass
 
     def render(self, size: tuple[int, int]) -> pygame.Surface:
-        if self.size != size:
+        if self.size != size or self.surface is None:
             self.size = size
             self.surface = pygame.Surface(self.size, pygame.SRCALPHA, 32)
-        assert self.surface is not None
+            # The colour never changes after construction, so painting once
+            # per resize is enough -- every other frame reuses the surface.
+            paint_background(self.surface, self.color, self.size, self.corner_radius)
         return self.surface

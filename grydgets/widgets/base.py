@@ -7,6 +7,35 @@ import time
 from typing import Any
 
 
+def renamed_parameter(
+    logger: logging.Logger,
+    new_name: str,
+    new_value: Any,
+    old_name: str,
+    old_value: Any,
+) -> Any:
+    """Resolve a parameter that used to go by another name.
+
+    Old configs keep working; the log line is the only nudge to migrate. If
+    both names are present the new one wins, because that's the one the
+    author most likely edited last.
+    """
+    if old_value is None:
+        return new_value
+
+    if new_value is not None:
+        logger.warning(
+            "Both '%s' and the older '%s' were given; using '%s'",
+            new_name,
+            old_name,
+            new_name,
+        )
+        return new_value
+
+    logger.warning("'%s' has been renamed to '%s'", old_name, new_name)
+    return old_value
+
+
 class Widget(object):
     def __init__(self, size: tuple[int, int] | None = None, name: str | None = None, **kwargs: Any) -> None:
         self.size: tuple[int, int] = size if size is not None else (0, 0)

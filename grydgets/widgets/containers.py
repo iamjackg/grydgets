@@ -7,7 +7,7 @@ import time
 from collections.abc import Sequence
 from datetime import datetime, time as datetime_time
 from functools import lru_cache
-from typing import Any
+from typing import Any, Callable, Dict, Optional, TypeVar, Union
 
 import pygame
 import requests
@@ -15,7 +15,71 @@ import requests
 from grydgets.benchmark import benchmark
 from grydgets.colors import ColorInput, parse_color, parse_optional_color
 from grydgets.json_utils import extract_data
-from grydgets.widgets.base import ContainerWidget, WidgetUpdaterThread, UpdaterWidget, Widget
+from grydgets.widgets.painting import paint_background
+from grydgets.widgets.base import (
+    ContainerWidget,
+    WidgetUpdaterThread,
+    UpdaterWidget,
+    Widget,
+    renamed_parameter,
+)
+
+T = TypeVar("T")
+
+# A per-cell override for a grid: either a mapping keyed on the child's
+# ``name``, or a list positional to the children. In list form a ``null``
+# entry means "use the grid-wide default for this one".
+PerWidget = Union[Dict[str, T], Sequence[Optional[T]]]
+
+
+def _parse_per_widget(
+    spec: Any,
+    label: str,
+    parse_one: Callable[[Any, str], T],
+) -> Union[Dict[str, T], list[Optional[T]], None]:
+    if spec is None:
+        return None
+
+    if isinstance(spec, str):
+        # A bare string is a Sequence, so without this it would be read as a
+        # list of one-character entries rather than rejected.
+        raise ValueError(
+            f"{label} takes a list or a mapping of child names, not a single value"
+        )
+
+    if isinstance(spec, dict):
+        return {
+            name: parse_one(value, f"{label}.{name}") for name, value in spec.items()
+        }
+
+    return [
+        None if value is None else parse_one(value, f"{label}[{index}]")
+        for index, value in enumerate(spec)
+    ]
+
+
+def _per_widget_value(
+    spec: Union[Dict[str, T], list[Optional[T]], None],
+    index: int,
+    widget: Widget,
+    default: Optional[T],
+) -> Optional[T]:
+    """Pick this child's override, falling back to the grid-wide default.
+
+    Dict lookups go by ``widget.name``, which is only meaningful for children
+    that actually set ``name:`` -- an unnamed widget's name is its class name,
+    so it would match every other unnamed widget of that type.
+    """
+    if spec is None:
+        return default
+
+    if isinstance(spec, dict):
+        return spec.get(widget.name, default)
+
+    if 0 <= index < len(spec) and spec[index] is not None:
+        return spec[index]
+
+    return default
 
 
 def load_and_scale_image(image_path: str, size: tuple[int, int]) -> pygame.Surface:
@@ -41,13 +105,13 @@ class ScreenWidget(ContainerWidget):
     def __init__(
         self,
         size: tuple[int, int],
-        color: ColorInput = (0, 0, 0),
+        background_color: ColorInput = (0, 0, 0),
         image_path: str | None = None,
         drop_shadow: bool = False,
         **kwargs: Any,
     ) -> None:
         super().__init__(size, **kwargs)
-        self.color = parse_color(color, "background_color")
+        self.background_color = parse_color(background_color, "background_color")
         self.size = size
         self.image_path = image_path
         self.image: pygame.Surface | None = None
@@ -72,7 +136,7 @@ class ScreenWidget(ContainerWidget):
         if self.image is not None:
             surface.blit(self.image, (0, 0))
         else:
-            surface.fill(self.color)
+            surface.fill(self.background_color)
 
         child_surface = self.widget_list[0].render(self.size)
 
@@ -107,22 +171,48 @@ class GridWidget(ContainerWidget):
         row_ratios: Sequence[float] | None = None,
         column_ratios: Sequence[float] | None = None,
         padding: int = 0,
-        color: ColorInput | None = None,
-        widget_color: ColorInput | None = None,
+        background_color: ColorInput | None = None,
+        widget_background_color: ColorInput | None = None,
+        widget_background_colors: PerWidget[ColorInput] | None = None,
         corner_radius: int = 0,
         widget_corner_radius: int = 0,
+        widget_corner_radii: PerWidget[int] | None = None,
         image_path: str | None = None,
         drop_shadow: bool = False,
+        color: ColorInput | None = None,
+        widget_color: ColorInput | None = None,
         **kwargs: Any,
     ) -> None:
         super().__init__(**kwargs)
         self.rows = rows
         self.columns = columns
         self.padding = padding
-        self.color = parse_optional_color(color, "color")
-        self.widget_color = parse_optional_color(widget_color, "widget_color")
+        background_color = renamed_parameter(
+            self.logger, "background_color", background_color, "color", color
+        )
+        widget_background_color = renamed_parameter(
+            self.logger,
+            "widget_background_color",
+            widget_background_color,
+            "widget_color",
+            widget_color,
+        )
+        self.background_color = parse_optional_color(
+            background_color, "background_color"
+        )
+        self.widget_background_color = parse_optional_color(
+            widget_background_color, "widget_background_color"
+        )
+        self.widget_background_colors = _parse_per_widget(
+            widget_background_colors,
+            "widget_background_colors",
+            lambda value, label: parse_color(value, label),
+        )
         self.corner_radius = corner_radius
         self.widget_corner_radius = widget_corner_radius
+        self.widget_corner_radii = _parse_per_widget(
+            widget_corner_radii, "widget_corner_radii", lambda value, label: int(value)
+        )
         self.drop_shadow = drop_shadow
         if row_ratios is not None:
             self.row_ratios = row_ratios
@@ -188,10 +278,12 @@ class GridWidget(ContainerWidget):
         assert self.surface is not None
         assert self.widget_surface is not None
 
-        for widget, coords, widget_size in zip(
-            self.widget_list,
-            itertools.product(horizontal_positions, vertical_positions),
-            itertools.product(horizontal_sizes, vertical_sizes),
+        for index, (widget, coords, widget_size) in enumerate(
+            zip(
+                self.widget_list,
+                itertools.product(horizontal_positions, vertical_positions),
+                itertools.product(horizontal_sizes, vertical_sizes),
+            )
         ):
             if not widget.is_dirty() and not self.dirty:
                 continue
@@ -205,18 +297,23 @@ class GridWidget(ContainerWidget):
             coords[1] += self.padding
 
             final_widget_surface = pygame.Surface(widget_size, pygame.SRCALPHA, 32)
-            if self.widget_color is not None:
-                if self.widget_corner_radius != 0:
-                    pygame.draw.rect(
-                        final_widget_surface,
-                        self.widget_color,
-                        pygame.Rect((0, 0), widget_size),
-                        border_radius=self.widget_corner_radius,
-                    )
-                else:
-                    final_widget_surface.fill(
-                        self.widget_color, pygame.Rect((0, 0), widget_size)
-                    )
+            paint_background(
+                final_widget_surface,
+                _per_widget_value(
+                    self.widget_background_colors,
+                    index,
+                    widget,
+                    self.widget_background_color,
+                ),
+                widget_size,
+                _per_widget_value(
+                    self.widget_corner_radii,
+                    index,
+                    widget,
+                    self.widget_corner_radius,
+                )
+                or 0,
+            )
 
             try:
                 if self.logger.getEffectiveLevel() == logging.DEBUG:
@@ -246,7 +343,7 @@ class GridWidget(ContainerWidget):
         if self.image is not None:
             self.surface.blit(self.image, (0, 0))
         else:
-            self.surface.fill(self.color or (0, 0, 0, 0))
+            self.surface.fill(self.background_color or (0, 0, 0, 0))
 
         if self.drop_shadow:
             mask = pygame.mask.from_surface(self.widget_surface, threshold=200)

@@ -28,7 +28,6 @@ NAME_REF_FIELDS = {
 }
 
 COLOR_REF = "#/definitions/color"
-AUTH_REF = "#/definitions/auth_scheme"
 
 
 class FieldSpec:
@@ -75,7 +74,10 @@ def _field_spec(name, prop, required_names):
     ref = prop.get("$ref")
     if ref == COLOR_REF:
         return FieldSpec(name, "color", control="color", required=name in required_names)
-    if ref == AUTH_REF:
+    if ref is not None:
+        # Everything else behind a $ref (auth schemes, the per-cell grid
+        # overrides) is a mapping or a list of mixed types, so it gets the
+        # raw YAML box rather than a control that would flatten it on apply.
         return FieldSpec(name, "object", control="raw", required=name in required_names)
 
     json_type = prop.get("type")

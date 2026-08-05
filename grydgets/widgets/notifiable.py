@@ -20,9 +20,15 @@ class NotifiableTextWidget(ContainerWidget):
         text_size: int | None = None,
         padding: int = 0,
         color: ColorInput = (255, 255, 255),
+        background_color: ColorInput | None = None,
+        corner_radius: int = 0,
         **kwargs: Any,
     ) -> None:
         super().__init__(**kwargs)
+        # Kept so each notification starts from the configured look rather
+        # than inheriting whatever the previous one asked for.
+        self.default_color = color
+        self.default_background_color = background_color
         self.showing_text = False
         self.rendering_start_time: float | None = None
         self.newly_created_text = False
@@ -36,6 +42,8 @@ class NotifiableTextWidget(ContainerWidget):
             text_size=text_size,
             text="",
             color=color,
+            background_color=background_color,
+            corner_radius=corner_radius,
             align="center",
             vertical_align="center",
             padding=padding,
@@ -87,19 +95,34 @@ class NotifiableTextWidget(ContainerWidget):
                 if "text" in data:
                     self.showing_text = True
                     self.text_widget.set_text(data["text"])
-                    if "color" in data:
-                        # Comes straight off the /notify payload, so a bad
-                        # value is a caller error, not a config error -- warn
-                        # and keep the current colour rather than taking the
-                        # whole render loop down with it.
-                        try:
-                            self.text_widget.set_color(data["color"])
-                        except ColorError as e:
-                            self.logger.warning(
-                                "Ignoring colour in notification: {}".format(e)
-                            )
+                    # Anything the payload leaves out goes back to the
+                    # configured value, so a red alert doesn't tint the next
+                    # notification that didn't ask for a colour.
+                    self._apply_notification_color(
+                        self.text_widget.set_color,
+                        data.get("color", self.default_color),
+                        "color",
+                    )
+                    self._apply_notification_color(
+                        self.text_widget.set_background_color,
+                        data.get("background_color", self.default_background_color),
+                        "background_color",
+                    )
                     self.notification_duration = data.get("duration", 5)
                     self.dirty = True
+
+    def _apply_notification_color(
+        self, setter: Any, value: Any, field: str
+    ) -> None:
+        # Comes straight off the /notify payload, so a bad value is a caller
+        # error, not a config error -- warn and keep the current colour rather
+        # than taking the whole render loop down with it.
+        try:
+            setter(value)
+        except ColorError as e:
+            self.logger.warning(
+                "Ignoring {} in notification: {}".format(field, e)
+            )
 
     def render(self, size: tuple[int, int]) -> Any:
         if self.showing_text:

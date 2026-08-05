@@ -354,6 +354,27 @@ a `notifiabletext` widget over the [notification server](#http-notification-serv
 that arrives at runtime from an outside caller, so a bad value is logged and
 ignored instead of interrupting the dashboard.
 
+#### Naming
+
+Two names mean the same thing wherever they appear:
+
+*   `color` — the widget's own content: text, a bar, the fill of an `empty`.
+*   `background_color` — what's painted behind that content.
+
+Anything more specific is prefixed with what it applies to (`time_color`,
+`pill_background_color`, `widget_background_color`).
+
+Three parameters were renamed to fit this. The old names still load, with a
+warning naming the replacement, so existing files keep working:
+
+| Widget | Old name | New name |
+|---|---|---|
+| `grid` | `color` | `background_color` |
+| `grid` | `widget_color` | `widget_background_color` |
+| `label` | `text_color` | `color` |
+
+If both names are given, the new one wins.
+
 ### Authentication Schemes
 
 Widgets that make HTTP requests (e.g., `rest`, `restimage`, `httpflip`) often support an `auth` parameter. This is a dictionary specifying the authentication method:
@@ -386,10 +407,12 @@ It supports the following parameters:
 *   `rows`: The number of rows in the grid.
 *   `columns`: The number of columns in the grid.
 *   `padding` _(optional)_: The amount of padding around each child widget, in pixels. Defaults to `0`.
-*   `color` _(optional)_: A background color for the grid itself (the "empty" space between widgets or behind the entire grid), see [Colors](#colors).
-*   `widget_color` _(optional)_: A background color for each *child widget's cell*, see [Colors](#colors).
+*   `background_color` _(optional)_: A background color for the grid itself (the "empty" space between widgets or behind the entire grid), see [Colors](#colors). Was called `color`.
+*   `widget_background_color` _(optional)_: A background color for each *child widget's cell*, see [Colors](#colors). Was called `widget_color`.
+*   `widget_background_colors` _(optional)_: Per-cell background colors, overriding `widget_background_color` for the cells they name. See [Per-cell overrides](#per-cell-overrides).
 *   `corner_radius` _(optional)_: The corner radius for the overall grid background, in pixels. Defaults to `0`.
 *   `widget_corner_radius` _(optional)_: The corner radius for each child widget's background, in pixels. Defaults to `0`.
+*   `widget_corner_radii` _(optional)_: Per-cell corner radii, overriding `widget_corner_radius` for the cells they name. See [Per-cell overrides](#per-cell-overrides).
 *   `image_path` _(optional)_: The path to an image file to use as the background for the entire grid.
 *   `drop_shadow` _(optional)_: If `true`, a drop shadow effect will be applied to the child widgets within the grid. Defaults to `false`.
 *   `row_ratios` _(optional)_: A list representing the relative ratio of each row's height. E.g., `[1, 2]` means the second row will be twice as tall as the first. If not provided, rows have equal height.
@@ -402,13 +425,46 @@ Example:
     rows: 2
     columns: 2
     padding: 4
-    color: [50, 50, 50]
-    widget_color: [70, 70, 70, 180]
+    background_color: [50, 50, 50]
+    widget_background_color: [70, 70, 70, 180]
     corner_radius: 10
     widget_corner_radius: 5
     row_ratios: [1, 2]
     column_ratios: [1, 2]
 ```
+
+##### Per-cell overrides
+
+`widget_background_colors` and `widget_corner_radii` take either a mapping keyed
+on a child's `name`, or a list positional to the children. Cells they don't
+mention keep the grid-wide `widget_background_color` / `widget_corner_radius`.
+
+```yaml
+  - widget: grid
+    rows: 1
+    columns: 3
+    widget_background_color: "#2e3440"   # the default for every cell
+    widget_background_colors:
+      alert-tile: "#bf616a"              # ...except this one
+    children:
+      - widget: text
+        name: alert-tile
+        text: 'Alert'
+      - widget: text
+        text: 'Normal'
+      - widget: text
+        text: 'Normal'
+```
+
+The list form is positional, and `null` means "leave this one alone":
+
+```yaml
+    widget_background_colors: ["#bf616a", null, "#a3be8c"]
+```
+
+Keys in the mapping form match a child's `name`, so only children that set one
+can be targeted — a widget with no `name` is named after its class, which would
+match every other unnamed widget of the same type.
 
 #### label
 
@@ -420,7 +476,7 @@ It supports the following parameters:
 *   `font_path` _(optional)_: The path to a ttf file to use as font for the label text.
 *   `position` _(optional)_: `above` or `below` the child widget. Defaults to `above`.
 *   `text_size` _(optional)_: The size of the label text in pixels.
-*   `text_color` _(optional)_: The color of the label text, see [Colors](#colors). Defaults to `[255, 255, 255]` (white).
+*   `color` _(optional)_: The color of the label text, see [Colors](#colors). Defaults to `[255, 255, 255]` (white). Was called `text_color`.
 
 Example:
 
@@ -429,7 +485,7 @@ Example:
     text: 'Random person'
     position: below
     text_size: 30
-    text_color: [255, 255, 0]
+    color: [255, 255, 0]
     children:
       - widget: rest # ... some child widget
 ```
@@ -579,8 +635,17 @@ It supports the following parameters:
 *   `padding` _(optional)_: The amount of padding around the notification text in pixels. Defaults to `0`.
 *   `text_size` _(optional)_: The size of the notification text in pixels.
 *   `color` _(optional)_: The default color of the notification text, see [Colors](#colors). Defaults to `[255, 255, 255]` (white).
+*   `background_color` _(optional)_: The default background color behind the notification, see [Colors](#colors). Unset by default, so the notification text appears over whatever is behind it.
+*   `corner_radius` _(optional)_: The corner radius for `background_color`, in pixels. Defaults to `0`.
 
 To send a notification, send a POST HTTP request to the port configured in `conf.yaml`.
+
+The POST body takes `widget`, `text`, and optionally `duration`, `color`, and
+`background_color`. `color` and `background_color` override the widget's
+configured values for that one notification — leave them out and the
+notification uses the configured look, so an alert that asked for a red
+backdrop doesn't tint the next one. A colour the parser rejects is logged and
+ignored rather than being allowed to interrupt rendering.
 
 Example:
 
@@ -598,6 +663,15 @@ Example:
 curl -X POST \
      -H "Content-Type: application/json" \
      -d '{"widget": "fullscreen-notification", "text": "This is a test notification from curl!", "duration": 10}' \
+     http://192.168.1.1:5000/notify
+```
+
+An alert with its own colours:
+
+```bash
+curl -X POST \
+     -H "Content-Type: application/json" \
+     -d '{"widget": "fullscreen-notification", "text": "Doorbell", "color": "#ffffff", "background_color": "#bf616a", "duration": 15}' \
      http://192.168.1.1:5000/notify
 ```
 
@@ -641,6 +715,8 @@ It supports the following parameters:
 *   `text_size` _(optional)_: The size of the text in pixels. If not provided, it automatically adjusts to fit the widget's height.
 *   `font_path` _(optional)_: The path to a ttf file to use as font. If not provided, Pygame's default font is used.
 *   `color` _(optional)_: The color of the text, see [Colors](#colors). Defaults to `[255, 255, 255]` (white).
+*   `background_color` _(optional)_: A background color painted behind the text, see [Colors](#colors). Covers the whole widget — `padding` insets the text, not the backdrop. Unset by default, leaving the widget transparent.
+*   `corner_radius` _(optional)_: The corner radius for `background_color`, in pixels. Defaults to `0`.
 *   `padding` _(optional)_: The amount of padding around the text in pixels. Defaults to `0`.
 *   `align` _(optional)_: The horizontal alignment for the text. One of `left`, `center`, or `right`. Defaults to `left`.
 *   `vertical_align` _(optional)_: The vertical alignment for the text. One of `top`, `center`, or `bottom`. Defaults to `top`.
@@ -653,9 +729,15 @@ Example:
     text_size: 50
     font_path: 'OpenSans-Regular.ttf'
     color: [0, 255, 0]
+    background_color: "#2e3440"
+    corner_radius: 12
     align: center
     vertical_align: center
 ```
+
+Giving a text widget its own `background_color` is an alternative to wrapping it
+in a `grid` just to get `widget_background_color` — one fewer level of nesting
+for a single tile.
 
 #### dateclock
 
@@ -705,7 +787,9 @@ It supports the following parameters:
 *   `font_path` _(optional)_: The path to a ttf file to use as font. If not provided, Pygame's default font is used.
 *   `text_size` _(optional)_: The size of the text in pixels. If not provided, it automatically adjusts to fit the widget's height.
 *   `color` _(optional)_: The color of the text, see [Colors](#colors). Defaults to `[255, 255, 255]` (white).
-*   `padding` _(optional)_: The amount of padding around the text in pixels. Defaults to `0`.
+*   `background_color` _(optional)_: A background color painted behind the text, see [Colors](#colors). Covers the whole widget — `padding` insets the text, not the backdrop. Unset by default, leaving the widget transparent.
+*   `corner_radius` _(optional)_: The corner radius for `background_color`, in pixels. Defaults to `0`.
+*   `padding` _(optional)_: The amount of padding around the text in pixels. Defaults to `6`.
 *   `align` _(optional)_: The horizontal alignment for the text. One of `left`, `center`, or `right`. Defaults to `center`.
 *   `vertical_align` _(optional)_: The vertical alignment for the text. One of `top`, `center`, or `bottom`. Defaults to `center`.
 
@@ -738,7 +822,9 @@ It supports the following parameters:
 *   `font_path` _(optional)_: Path to a ttf font file.
 *   `text_size` _(optional)_: Text size in pixels.
 *   `color` _(optional)_: The color of the text, see [Colors](#colors). Defaults to `[255, 255, 255]` (white).
-*   `padding` _(optional)_: The amount of padding around the text in pixels. Defaults to `0`.
+*   `background_color` _(optional)_: A background color painted behind the text, see [Colors](#colors). Covers the whole widget — `padding` insets the text, not the backdrop. Unset by default, leaving the widget transparent.
+*   `corner_radius` _(optional)_: The corner radius for `background_color`, in pixels. Defaults to `0`.
+*   `padding` _(optional)_: The amount of padding around the text in pixels. Defaults to `6`.
 *   `align` _(optional)_: The horizontal alignment for the text. One of `left`, `center`, or `right`. Defaults to `center`.
 *   `vertical_align` _(optional)_: Vertical alignment (`top`, `center`, `bottom`). Defaults to `center`.
 
@@ -781,6 +867,10 @@ It supports the following parameters:
 *   `font_path` _(optional)_: Path to a ttf font file.
 *   `text_size` _(optional)_: Text size in pixels.
 *   `color` _(optional)_: The color of the text, see [Colors](#colors). Defaults to `[255, 255, 255]` (white).
+*   `background_color` _(optional)_: A background color painted behind the text, see [Colors](#colors). Covers the whole widget — `padding` insets the text, not the backdrop. Unset by default, leaving the widget transparent.
+*   `corner_radius` _(optional)_: The corner radius for `background_color`, in pixels. Defaults to `0`.
+*   `padding` _(optional)_: The amount of padding around the text in pixels. Defaults to `6`.
+*   `align` _(optional)_: The horizontal alignment for the text. One of `left`, `center`, or `right`. Defaults to `center`.
 *   `vertical_align` _(optional)_: Vertical alignment. Defaults to `center`.
 
 Example:
@@ -937,6 +1027,25 @@ It supports the following parameters:
 
 *   `image_data` _(optional)_: Binary contents of the image to display. (Typically set dynamically)
 *   `preserve_aspect_ratio` _(optional)_: If `true`, maintains the original image aspect ratio when scaling. If `false` (default), the image is scaled to fill the container.
+
+#### empty
+
+A widget that draws nothing but the space it occupies. Use it to leave a hole in
+a grid, or — with a `color` — as a divider, rule, or plain colour swatch without
+wrapping anything in a `grid` to get a background.
+
+It supports the following parameters:
+
+*   `color` _(optional)_: The color to fill the widget with, see [Colors](#colors). Unset by default, leaving the widget fully transparent.
+*   `corner_radius` _(optional)_: The corner radius for `color`, in pixels. Defaults to `0`.
+
+Example:
+
+```yaml
+  # A 2px rule between two rows
+  - widget: empty
+    color: [255, 255, 255, 40]
+```
 
 #### providerbarchart
 

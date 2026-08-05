@@ -8,8 +8,9 @@ import pygame
 
 from grydgets import rest_fetch
 from grydgets.colors import ColorInput, parse_color, parse_optional_color
-from grydgets.widgets.base import Widget, UpdaterWidget, ContainerWidget
+from grydgets.widgets.base import Widget, UpdaterWidget, ContainerWidget, renamed_parameter
 from grydgets.widgets.containers import GridWidget
+from grydgets.widgets.painting import paint_background
 from grydgets.fonts import FontCache
 
 font_cache = FontCache()
@@ -22,6 +23,8 @@ class TextWidget(Widget):
         text: str = "",
         text_size: int | None = None,
         color: ColorInput = (255, 255, 255),
+        background_color: ColorInput | None = None,
+        corner_radius: int = 0,
         padding: int = 0,
         align: str = "left",
         vertical_align: str = "top",
@@ -29,6 +32,10 @@ class TextWidget(Widget):
     ) -> None:
         super().__init__(**kwargs)
         self.color = parse_color(color, "color")
+        self.background_color = parse_optional_color(
+            background_color, "background_color"
+        )
+        self.corner_radius = corner_radius
         self.align = align
         self.vertical_align = vertical_align
         self.font_path = font_path
@@ -49,10 +56,21 @@ class TextWidget(Widget):
             self.color = parsed
             self.dirty = True
 
+    def set_background_color(self, background_color: ColorInput | None) -> None:
+        parsed = parse_optional_color(background_color, "background_color")
+        if parsed != self.background_color:
+            self.background_color = parsed
+            self.dirty = True
+
     def render(self, size: tuple[int, int]) -> pygame.Surface:
         super().render(size)
         if self.dirty:
             self.surface = pygame.Surface(self.size, pygame.SRCALPHA, 32)
+            # The backdrop covers the whole widget; padding only insets the
+            # text, so a padded label still gets a full-bleed panel.
+            paint_background(
+                self.surface, self.background_color, self.size, self.corner_radius
+            )
 
             real_size = (
                 self.size[0] - (self.padding * 2),
@@ -105,7 +123,9 @@ class DateClockWidget(Widget):
             rows=2,
             columns=1,
             row_ratios=[7, 3],
-            widget_color=parse_optional_color(background_color, "background_color"),
+            widget_background_color=parse_optional_color(
+                background_color, "background_color"
+            ),
             corner_radius=corner_radius,
             **kwargs
         )
@@ -157,9 +177,13 @@ class RESTWidget(UpdaterWidget):
         font_path: str | None = None,
         text_size: int | None = None,
         color: ColorInput = (255, 255, 255),
+        background_color: ColorInput | None = None,
+        corner_radius: int = 0,
         auth: dict[str, Any] | None = None,
         method: str | None = None,
         payload: dict[str, Any] | None = None,
+        padding: int = 6,
+        align: str = "center",
         vertical_align: str = "center",
         **kwargs: Any,
     ) -> None:
@@ -175,9 +199,11 @@ class RESTWidget(UpdaterWidget):
         self.text_widget = TextWidget(
             font_path=font_path,
             color=color,
-            padding=6,
+            background_color=background_color,
+            corner_radius=corner_radius,
+            padding=padding,
             text_size=text_size,
-            align="center",
+            align=align,
             vertical_align=vertical_align,
             **kwargs
         )
@@ -225,15 +251,17 @@ class LabelWidget(ContainerWidget):
         font_path: str | None = None,
         position: str = "above",
         text_size: int | None = None,
-        text_color: ColorInput = (255, 255, 255),
+        color: ColorInput | None = None,
+        text_color: ColorInput | None = None,
         **kwargs: Any,
     ) -> None:
         super().__init__(**kwargs)
+        color = renamed_parameter(self.logger, "color", color, "text_color", text_color)
         self.text_widget = TextWidget(
             font_path=font_path,
             text=text,
             text_size=text_size,
-            color=parse_color(text_color, "text_color"),
+            color=parse_color(color if color is not None else (255, 255, 255), "color"),
             align="center",
             vertical_align="top" if position == "below" else "center",
             **kwargs

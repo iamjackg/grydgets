@@ -30,6 +30,32 @@
         }
       ]
     },
+    "per_widget_color": {
+      "description": "Per-cell override: a mapping keyed on a child's `name`, or a list positional to the children (null falls back to the grid-wide value).",
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/definitions/color" }
+        },
+        {
+          "type": "array",
+          "items": { "oneOf": [{ "$ref": "#/definitions/color" }, { "type": "null" }] }
+        }
+      ]
+    },
+    "per_widget_integer": {
+      "description": "Per-cell override: a mapping keyed on a child's `name`, or a list positional to the children (null falls back to the grid-wide value).",
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": { "type": "integer", "minimum": 0 }
+        },
+        {
+          "type": "array",
+          "items": { "oneOf": [{ "type": "integer", "minimum": 0 }, { "type": "null" }] }
+        }
+      ]
+    },
     "auth_scheme": {
       "type": "object",
       "minProperties": 1,
@@ -71,6 +97,8 @@
               "padding": { "type": "integer", "minimum": 0 },
               "text_size": { "type": "integer", "minimum": 1 },
               "color": { "$ref": "#/definitions/color" },
+              "background_color": { "$ref": "#/definitions/color" },
+              "corner_radius": { "type": "integer", "minimum": 0 },
               "children": {
                 "type": "array",
                 "maxItems": 1,
@@ -118,10 +146,14 @@
                 "items": { "type": "number", "minimum": 0 }
               },
               "padding": { "type": "integer", "minimum": 0 },
-              "widget_color": { "$ref": "#/definitions/color" },
-              "color": { "$ref": "#/definitions/color" },
+              "background_color": { "$ref": "#/definitions/color" },
+              "widget_background_color": { "$ref": "#/definitions/color" },
+              "widget_background_colors": { "$ref": "#/definitions/per_widget_color" },
               "corner_radius": { "type": "integer", "minimum": 0 },
               "widget_corner_radius": { "type": "integer", "minimum": 0 },
+              "widget_corner_radii": { "$ref": "#/definitions/per_widget_integer" },
+              "color": { "$ref": "#/definitions/color" },
+              "widget_color": { "$ref": "#/definitions/color" },
               "image_path": { "type": "string" },
               "drop_shadow": { "type": "boolean" },
               "children": {
@@ -195,6 +227,8 @@
               "font_path": { "type": "string" },
               "text_size": { "type": "integer", "minimum": 1 },
               "color": { "$ref": "#/definitions/color" },
+              "background_color": { "$ref": "#/definitions/color" },
+              "corner_radius": { "type": "integer", "minimum": 0 },
               "padding": { "type": "integer", "minimum": 0 },
               "align": { "type": "string", "enum": ["left", "center", "right"] },
               "vertical_align": { "type": "string", "enum": ["top", "center", "bottom"] },
@@ -219,6 +253,7 @@
                 "enum": ["above", "below"]
               },
               "text_size": { "type": "integer", "minimum": 1 },
+              "color": { "$ref": "#/definitions/color" },
               "text_color": { "$ref": "#/definitions/color" },
               "children": {
                 "type": "array",
@@ -329,6 +364,8 @@
               "font_path": { "type": "string" },
               "text_size": { "type": "integer", "minimum": 1 },
               "color": { "$ref": "#/definitions/color" },
+              "background_color": { "$ref": "#/definitions/color" },
+              "corner_radius": { "type": "integer", "minimum": 0 },
               "padding": { "type": "integer", "minimum": 0 },
               "align": { "type": "string", "enum": ["left", "center", "right"] },
               "vertical_align": { "type": "string", "enum": ["top", "center", "bottom"] }
@@ -356,7 +393,9 @@
           "then": {
             "properties": {
               "widget": { "type": "string" },
-              "name": { "type": "string" }
+              "name": { "type": "string" },
+              "color": { "$ref": "#/definitions/color" },
+              "corner_radius": { "type": "integer", "minimum": 0 }
             },
             "additionalProperties": false
           }
@@ -383,6 +422,8 @@
               "font_path": { "type": "string" },
               "text_size": { "type": "integer", "minimum": 1 },
               "color": { "$ref": "#/definitions/color" },
+              "background_color": { "$ref": "#/definitions/color" },
+              "corner_radius": { "type": "integer", "minimum": 0 },
               "padding": { "type": "integer", "minimum": 0 },
               "align": { "type": "string", "enum": ["left", "center", "right"] },
               "vertical_align": { "type": "string", "enum": ["top", "center", "bottom"] },
@@ -475,6 +516,10 @@
               "font_path": { "type": "string" },
               "text_size": { "type": "integer", "minimum": 1 },
               "color": { "$ref": "#/definitions/color" },
+              "background_color": { "$ref": "#/definitions/color" },
+              "corner_radius": { "type": "integer", "minimum": 0 },
+              "padding": { "type": "integer", "minimum": 0 },
+              "align": { "type": "string", "enum": ["left", "center", "right"] },
               "vertical_align": { "type": "string", "enum": ["top", "center", "bottom"] }
             },
             "additionalProperties": false

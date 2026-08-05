@@ -15,11 +15,14 @@ os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
 import pygame
 import pytest
 
+from grydgets import rest_fetch
 from grydgets.colors import ColorError
 from grydgets.widgets.chart import ProviderBarChartWidget
 from grydgets.widgets.containers import GridWidget, PillWidget, ScreenWidget
+from grydgets.widgets.image import EmptyWidget
 from grydgets.widgets.notifiable import NotifiableTextWidget
-from grydgets.widgets.text import DateClockWidget, LabelWidget, TextWidget
+from grydgets.widgets.provider_widgets import ProviderTemplateWidget, ProviderWidget
+from grydgets.widgets.text import DateClockWidget, LabelWidget, RESTWidget, TextWidget
 from grydgets.widgets.widgets import WidgetManager
 
 pygame.init()
@@ -60,28 +63,38 @@ def test_dateclock_falls_back_to_color():
 
 def test_dateclock_background_hex():
     w = DateClockWidget(background_color="#00000080")
-    assert w.grid_widget.widget_color == (0, 0, 0, 128)
+    assert w.grid_widget.widget_background_color == (0, 0, 0, 128)
 
 
 def test_label_widget_hex():
-    w = LabelWidget(text="hi", text_color="#ff8800")
+    w = LabelWidget(text="hi", color="#ff8800")
     assert w.text_widget.color == (255, 136, 0, 255)
 
 
 def test_screen_widget_hex():
-    assert ScreenWidget((10, 10), color="#123456").color == (18, 52, 86, 255)
+    assert ScreenWidget((10, 10), background_color="#123456").background_color == (
+        18,
+        52,
+        86,
+        255,
+    )
 
 
 def test_grid_widget_hex():
-    w = GridWidget(rows=1, columns=1, color="#ff8800", widget_color="#00ff0040")
-    assert w.color == (255, 136, 0, 255)
-    assert w.widget_color == (0, 255, 0, 64)
+    w = GridWidget(
+        rows=1,
+        columns=1,
+        background_color="#ff8800",
+        widget_background_color="#00ff0040",
+    )
+    assert w.background_color == (255, 136, 0, 255)
+    assert w.widget_background_color == (0, 255, 0, 64)
 
 
 def test_grid_widget_colors_stay_none():
     w = GridWidget(rows=1, columns=1)
-    assert w.color is None
-    assert w.widget_color is None
+    assert w.background_color is None
+    assert w.widget_background_color is None
 
 
 def test_pill_widget_hex():
@@ -167,11 +180,11 @@ def test_hex_through_widget_manager():
         "widget": "grid",
         "rows": 1,
         "columns": 1,
-        "widget_color": "#ff8800",
-        "children": [{"widget": "label", "text": "hi", "text_color": "#00ff00"}],
+        "widget_background_color": "#ff8800",
+        "children": [{"widget": "label", "text": "hi", "color": "#00ff00"}],
     }
     widget = manager.create_widget_tree(tree)
-    assert widget.widget_color == (255, 136, 0, 255)
+    assert widget.widget_background_color == (255, 136, 0, 255)
     assert widget.widget_list[0].text_widget.color == (0, 255, 0, 255)
 
 
@@ -179,9 +192,14 @@ def test_bad_hex_through_widget_manager_raises():
     manager = WidgetManager()
     with pytest.raises(ColorError) as excinfo:
         manager.create_widget_tree(
-            {"widget": "grid", "rows": 1, "columns": 1, "widget_color": "#zzz"}
+            {
+                "widget": "grid",
+                "rows": 1,
+                "columns": 1,
+                "widget_background_color": "#zzz",
+            }
         )
-    assert "widget_color" in str(excinfo.value)
+    assert "widget_background_color" in str(excinfo.value)
 
 
 # --- editor colour control -------------------------------------------------
@@ -208,3 +226,250 @@ def test_editor_color_channels_tolerate_junk():
     # An unparseable value leaves the boxes empty rather than being guessed at.
     assert _color_channels_filter("not-a-colour") == []
     assert _color_channels_filter(None) == []
+
+
+# --- backgrounds -----------------------------------------------------------
+# Text and its wrappers can paint their own backdrop now, so these check the
+# pixels rather than just the parsed attribute: a background that parses but
+# never reaches the surface would pass an attribute-only test.
+
+
+def _pixel(surface, x, y):
+    return tuple(surface.get_at((x, y)))
+
+
+def test_text_background_paints_the_whole_widget():
+    w = TextWidget(text="hi", background_color="#ff8800", padding=8)
+    surface = w.render((40, 20))
+    # Padding insets the text, not the backdrop, so the corner is still filled.
+    assert _pixel(surface, 0, 0) == (255, 136, 0, 255)
+    assert _pixel(surface, 39, 19) == (255, 136, 0, 255)
+
+
+def test_text_without_background_stays_transparent():
+    w = TextWidget(text="hi")
+    surface = w.render((40, 20))
+    assert _pixel(surface, 0, 0)[3] == 0
+
+
+def test_text_corner_radius_clips_the_corner():
+    # No text, so every non-transparent pixel is backdrop.
+    w = TextWidget(text="", background_color="#ff8800", corner_radius=10)
+    surface = w.render((40, 40))
+    assert _pixel(surface, 0, 0)[3] == 0
+    assert _pixel(surface, 20, 20) == (255, 136, 0, 255)
+
+
+def test_text_background_alpha_survives():
+    w = TextWidget(text="hi", background_color="#00000096")
+    surface = w.render((20, 20))
+    assert _pixel(surface, 0, 0) == (0, 0, 0, 150)
+
+
+def test_text_rounded_and_square_backgrounds_agree_on_alpha():
+    square = TextWidget(text="hi", background_color="#00000096").render((40, 40))
+    rounded = TextWidget(
+        text="hi", background_color="#00000096", corner_radius=8
+    ).render((40, 40))
+    assert _pixel(square, 20, 20) == _pixel(rounded, 20, 20)
+
+
+def test_set_background_color_marks_dirty():
+    w = TextWidget(text="hi")
+    w.render((20, 20))
+    assert w.is_dirty() is False
+    w.set_background_color("#ff8800")
+    assert w.is_dirty() is True
+
+
+def test_set_background_color_to_same_value_stays_clean():
+    w = TextWidget(text="hi", background_color="#ff8800")
+    w.render((20, 20))
+    w.set_background_color([255, 136, 0])
+    assert w.is_dirty() is False
+
+
+def test_provider_forwards_background():
+    w = ProviderWidget(
+        providers={"p": FakeProvider()},
+        background_color="#ff8800",
+        corner_radius=12,
+    )
+    assert w.text_widget.background_color == (255, 136, 0, 255)
+    assert w.text_widget.corner_radius == 12
+
+
+def test_provider_template_forwards_background():
+    w = ProviderTemplateWidget(
+        providers={"p": FakeProvider()},
+        template="{{ 1 }}",
+        hass_url="http://localhost",
+        hass_token="t",
+        background_color="#ff8800",
+    )
+    assert w.text_widget.background_color == (255, 136, 0, 255)
+
+
+def test_rest_forwards_background(monkeypatch):
+    monkeypatch.setattr(
+        rest_fetch, "fetch_text", lambda *a, **kw: rest_fetch.RestTextResult(value="x")
+    )
+    w = RESTWidget(url="http://example.invalid", background_color="#ff8800", static=True)
+    assert w.text_widget.background_color == (255, 136, 0, 255)
+
+
+def test_provider_accepts_padding_and_align():
+    # Both are in the schema for this widget; before they were declared they
+    # collided with the values the wrapper passed positionally to TextWidget.
+    w = ProviderWidget(providers={"p": FakeProvider()}, padding=2, align="left")
+    assert w.text_widget.padding == 2
+    assert w.text_widget.align == "left"
+
+
+def test_empty_widget_paints_its_colour():
+    w = EmptyWidget(color="#ff8800")
+    surface = w.render((10, 10))
+    assert _pixel(surface, 5, 5) == (255, 136, 0, 255)
+
+
+def test_empty_widget_without_colour_stays_transparent():
+    surface = EmptyWidget().render((10, 10))
+    assert _pixel(surface, 5, 5)[3] == 0
+
+
+# --- per-cell grid colours -------------------------------------------------
+
+
+def _grid_with_children(**kwargs):
+    grid = GridWidget(rows=1, columns=2, **kwargs)
+    grid.add_widget(EmptyWidget(name="left"))
+    grid.add_widget(EmptyWidget(name="right"))
+    return grid
+
+
+def test_grid_per_cell_colors_by_name():
+    grid = _grid_with_children(
+        widget_background_colors={"left": "#ff8800", "right": "#0000ff"}
+    )
+    surface = grid.render((40, 20))
+    assert _pixel(surface, 5, 10) == (255, 136, 0, 255)
+    assert _pixel(surface, 35, 10) == (0, 0, 255, 255)
+
+
+def test_grid_per_cell_colors_by_index():
+    grid = _grid_with_children(widget_background_colors=["#ff8800", "#0000ff"])
+    surface = grid.render((40, 20))
+    assert _pixel(surface, 5, 10) == (255, 136, 0, 255)
+    assert _pixel(surface, 35, 10) == (0, 0, 255, 255)
+
+
+def test_grid_per_cell_falls_back_to_the_grid_wide_colour():
+    grid = _grid_with_children(
+        widget_background_color="#00ff00",
+        widget_background_colors=["#ff8800", None],
+    )
+    surface = grid.render((40, 20))
+    assert _pixel(surface, 5, 10) == (255, 136, 0, 255)
+    assert _pixel(surface, 35, 10) == (0, 255, 0, 255)
+
+
+def test_grid_unnamed_child_falls_back():
+    grid = GridWidget(
+        rows=1, columns=1, widget_background_color="#00ff00",
+        widget_background_colors={"nothing-matches-this": "#ff8800"},
+    )
+    grid.add_widget(EmptyWidget(name="left"))
+    surface = grid.render((20, 20))
+    assert _pixel(surface, 10, 10) == (0, 255, 0, 255)
+
+
+def test_grid_per_cell_corner_radii():
+    grid = _grid_with_children(
+        widget_background_color="#ff8800",
+        widget_corner_radii={"left": 9},
+    )
+    surface = grid.render((40, 40))
+    # The left cell is rounded away at its corner, the right one is not.
+    assert _pixel(surface, 0, 0)[3] == 0
+    assert _pixel(surface, 39, 0) == (255, 136, 0, 255)
+
+
+def test_grid_per_cell_colors_reject_a_bare_string():
+    with pytest.raises(ValueError) as excinfo:
+        GridWidget(rows=1, columns=1, widget_background_colors="#ff8800")
+    assert "widget_background_colors" in str(excinfo.value)
+
+
+def test_grid_per_cell_bad_colour_names_the_key():
+    with pytest.raises(ColorError) as excinfo:
+        GridWidget(rows=1, columns=1, widget_background_colors={"left": "nope"})
+    assert "widget_background_colors.left" in str(excinfo.value)
+
+
+# --- renamed parameters ----------------------------------------------------
+# The old names still load so existing widgets.yaml files keep working.
+
+
+def test_grid_old_names_still_work():
+    old = GridWidget(rows=1, columns=1, color="#ff8800", widget_color="#00ff0040")
+    assert old.background_color == (255, 136, 0, 255)
+    assert old.widget_background_color == (0, 255, 0, 64)
+
+
+def test_grid_new_name_wins_when_both_given():
+    w = GridWidget(rows=1, columns=1, color="#ff8800", background_color="#0000ff")
+    assert w.background_color == (0, 0, 255, 255)
+
+
+def test_label_old_text_color_still_works():
+    assert LabelWidget(text="hi", text_color="#ff8800").text_widget.color == (
+        255,
+        136,
+        0,
+        255,
+    )
+
+
+def test_label_defaults_to_white():
+    assert LabelWidget(text="hi").text_widget.color == (255, 255, 255, 255)
+
+
+# --- notification backgrounds ----------------------------------------------
+
+
+def test_notification_background_applies():
+    w = NotifiableTextWidget(color="#ffffff")
+    w.add_widget(TextWidget(text="x"))
+    w.notify({"text": "hello", "background_color": "#ff0000"})
+    w.tick()
+    assert w.text_widget.background_color == (255, 0, 0, 255)
+
+
+def test_notification_background_resets_between_notifications():
+    w = NotifiableTextWidget(color="#ffffff", background_color="#000000")
+    w.add_widget(TextWidget(text="x"))
+
+    w.notify({"text": "alert", "background_color": "#ff0000", "duration": 0})
+    w.tick()
+    assert w.text_widget.background_color == (255, 0, 0, 255)
+
+    # render() is what starts the display timer, so the notification only
+    # expires on the tick after a frame has been drawn.
+    w.render((10, 10))
+    w.tick()
+    assert w.showing_text is False
+
+    # Second notification says nothing about colour, so it must not inherit
+    # the red backdrop from the first.
+    w.notify({"text": "plain"})
+    w.tick()
+    assert w.text_widget.background_color == (0, 0, 0, 255)
+
+
+def test_notification_bad_background_is_ignored():
+    w = NotifiableTextWidget(color="#ffffff", background_color="#000000")
+    w.add_widget(TextWidget(text="x"))
+    w.notify({"text": "hello", "background_color": "not-a-colour"})
+    w.tick()
+    assert w.showing_text is True
+    assert w.text_widget.background_color == (0, 0, 0, 255)
