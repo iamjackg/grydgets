@@ -94,6 +94,25 @@ def _parse_list_value(raw, items_type):
     return items
 
 
+def _color_is_unchanged(current, submitted):
+    """True when `submitted` is the colour `current` already holds.
+
+    Saving a node re-applies every one of its fields, not just the edited
+    one, and the colour control only ever hands back four numeric channels.
+    Writing those blindly rewrote `'#ff8800'` as `[255, 136, 0, 255]` (and
+    `[255, 136, 0]` the same way) whenever anything else on the node
+    changed. Comparing the parsed values instead lets a colour nobody
+    touched keep whatever form it was written in.
+    """
+    if current is None:
+        return False
+    try:
+        return colors.parse_color(current) == colors.parse_color(submitted)
+    except colors.ColorError:
+        # An unparseable existing value is not worth preserving.
+        return False
+
+
 def _parse_color_value(form, field_name):
     parts = []
     for i in range(4):
@@ -114,9 +133,9 @@ def _parse_color_value(form, field_name):
 
 def _apply_field(node, field, form, errors):
     """Applies the submitted value for `field` to `node`. Returns True if the
-    node was actually written/removed, False if an error was recorded instead
-    (nothing changed) -- used by update_node() to decide whether to mark the
-    document dirty."""
+    node was actually written/removed, and False if it wasn't -- either an
+    error was recorded, or the submitted value is what the node already held.
+    Used by update_node() to decide whether to mark the document dirty."""
     name = field.name
     if field.control == "checkbox":
         node[name] = form.get(name) == "on"
@@ -136,6 +155,8 @@ def _apply_field(node, field, form, errors):
         color = _parse_color_value(form, name)
         if color is None:
             errors.append((name, "a color needs at least r, g, b"))
+            return False
+        if _color_is_unchanged(node.get(name), color):
             return False
         node[name] = color
         return True
@@ -387,10 +408,10 @@ def create_app(widgets_path):
                 node.pop("background_color", None)
             else:
                 color = _parse_color_value(form, "background_color")
-                if color is not None:
-                    node["background_color"] = color
-                else:
+                if color is None:
                     field_errors["background_color"] = "a color needs at least r, g, b"
+                elif not _color_is_unchanged(node.get("background_color"), color):
+                    node["background_color"] = color
 
             state.mark_dirty()
             return (

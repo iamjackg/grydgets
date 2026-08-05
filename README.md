@@ -1220,6 +1220,11 @@ Notes:
   this repo.
 - `!secret` values (and any field containing one, e.g. `auth.bearer`) are
   shown read-only and can't be edited or clobbered through the editor.
+- A colour you don't change keeps the form you wrote it in — `'#ff8800'`
+  stays a hex string, `[255, 136, 0]` doesn't grow an alpha channel. Saving
+  a widget re-applies every field on it, not just the one you edited, so
+  without this any edit would rewrite that widget's colours as RGBA lists.
+  A colour you *do* change is written as a list.
 - Schema violations are shown as non-blocking warnings on save -- the
   schema documents the current widget set but isn't treated as ground
   truth, so a save is never refused because of a schema mismatch.

@@ -473,3 +473,98 @@ def test_notification_bad_background_is_ignored():
     w.tick()
     assert w.showing_text is True
     assert w.text_widget.background_color == (0, 0, 0, 255)
+
+
+# --- the editor preserves colour formatting ---------------------------------
+# Saving a node re-applies every field on it, not just the edited one, so an
+# untouched colour must come back out of the editor written exactly as it
+# went in -- otherwise editing any field decays every hex colour on that node
+# into an RGBA list.
+
+
+def _editor_roundtrip(tmp_path, source, posts):
+    from grydgets.editor.app import create_app
+
+    path = tmp_path / "widgets.yaml"
+    path.write_text(source)
+    app = create_app(str(path))
+    client = app.test_client()
+    for node_path, data in posts:
+        response = client.post(f"/node/{node_path}", data=data)
+        assert response.status_code == 200, response.status_code
+    client.post("/save")
+    return path.read_text()
+
+
+GRID_SOURCE = """\
+background_color: '#101010'
+widgets:
+  - widget: grid
+    rows: 1
+    columns: 1
+    background_color: '#ff8800'
+    widget_background_color: [0, 255, 0]
+    corner_radius: 10
+    children:
+      - widget: text
+        text: a
+        color: orange
+"""
+
+GRID_FORM = {
+    "name": "",
+    "rows": "1",
+    "columns": "1",
+    "background_color__0": "255",
+    "background_color__1": "136",
+    "background_color__2": "0",
+    "background_color__3": "255",
+    "widget_background_color__0": "0",
+    "widget_background_color__1": "255",
+    "widget_background_color__2": "0",
+    "widget_background_color__3": "255",
+    "corner_radius": "20",
+}
+
+
+def test_editor_keeps_hex_when_another_field_changes(tmp_path):
+    out = _editor_roundtrip(tmp_path, GRID_SOURCE, [("widgets/0", GRID_FORM)])
+    assert "background_color: '#ff8800'" in out
+    assert "corner_radius: 20" in out
+
+
+def test_editor_does_not_append_alpha_to_an_untouched_list(tmp_path):
+    out = _editor_roundtrip(tmp_path, GRID_SOURCE, [("widgets/0", GRID_FORM)])
+    assert "widget_background_color: [0, 255, 0]" in out
+
+
+def test_editor_keeps_a_colour_name(tmp_path):
+    out = _editor_roundtrip(tmp_path, GRID_SOURCE, [("widgets/0", GRID_FORM)])
+    assert "color: orange" in out
+
+
+def test_editor_writes_a_colour_that_really_changed(tmp_path):
+    form = dict(GRID_FORM, background_color__0="0", background_color__1="0")
+    out = _editor_roundtrip(tmp_path, GRID_SOURCE, [("widgets/0", form)])
+    assert "'#ff8800'" not in out
+    assert "- 255" in out  # [0, 0, 0, 255]
+
+
+def test_editor_keeps_the_root_background_hex(tmp_path):
+    root_form = {
+        "background_image": "",
+        "background_color__0": "16",
+        "background_color__1": "16",
+        "background_color__2": "16",
+        "background_color__3": "255",
+    }
+    out = _editor_roundtrip(tmp_path, GRID_SOURCE, [("root", root_form)])
+    assert "background_color: '#101010'" in out
+
+
+def test_editor_replaces_an_unparseable_colour(tmp_path):
+    # Nothing worth preserving about a value that doesn't parse, so the
+    # submitted channels win.
+    source = GRID_SOURCE.replace("'#ff8800'", "'#zzz'")
+    out = _editor_roundtrip(tmp_path, source, [("widgets/0", GRID_FORM)])
+    assert "'#zzz'" not in out
