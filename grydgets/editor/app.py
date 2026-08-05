@@ -23,12 +23,17 @@ TESTABLE_WIDGETS = ("rest", "restimage")
 
 ROOT_PATH = "root"
 
-# The document's own background_color, which the root inspector renders by
-# hand rather than from a widget spec. Described as a field anyway so it can
-# reuse the colour control and the theme-token picker.
+# The screen's own parameters, which the root inspector renders by hand
+# rather than from a widget spec -- there is no `widget: screen` node to look
+# one up from. Described as fields anyway so they can reuse the ordinary
+# controls and the theme-token picker.
 BACKGROUND_COLOR_FIELD = schema_mod.FieldSpec(
     "background_color", "color", control="color"
 )
+BACKGROUND_IMAGE_FIELD = schema_mod.FieldSpec(
+    "background_image", "string", control="text"
+)
+ROOT_FIELDS = (BACKGROUND_IMAGE_FIELD, BACKGROUND_COLOR_FIELD)
 
 
 class EditorState:
@@ -240,6 +245,35 @@ def _plain_input_is_blank(form, field):
     if field.control == "color":
         return all(form.get(f"{field.name}__{i}", "").strip() == "" for i in range(4))
     return form.get(field.name, "").strip() == ""
+
+
+def _apply_root_token(node, field, form, field_errors):
+    """Handle the theme-token half of one of the screen's fields.
+
+    Returns True when the token half owns the value, so the caller leaves the
+    plain control below it alone. The root inspector applies its fields by
+    hand rather than through :func:`_apply_field` -- a blank text box there
+    means "no background image" and has to remove the key, where the generic
+    text branch would write an empty string -- so the token handling the two
+    share lives here.
+    """
+    name = field.name
+    current = node.get(name)
+
+    if theme_ui.wants_token(form, name):
+        token = theme_ui.parse_token_value(form, name)
+        if token is None:
+            field_errors[name] = "pick a theme value, or switch back to a plain value"
+        elif not theme_ui.same_token(current, token):
+            node[name] = token
+        return True
+
+    # The plain control renders empty for a token because it has no way to
+    # show one, so a blank submission means "left alone" and not "delete it".
+    # Checked whether or not the picker was rendered: a theme with no matching
+    # section offers no token to pick, but a token written by hand is still
+    # sitting in the document and must survive an Apply.
+    return yamlio.is_theme_token(current) and _plain_input_is_blank(form, field)
 
 
 def _apply_field(node, field, form, errors, token_capable=False):
@@ -487,7 +521,12 @@ def create_app(widgets_path):
             node=node,
             path=path,
             widgets_path=state.widgets_path,
-            token_options=theme_ui.token_options(state.doc, BACKGROUND_COLOR_FIELD),
+            # Keyed by field name, the same shape the widget inspector gets,
+            # so a field with no matching theme section simply has no picker.
+            token_options={
+                field.name: theme_ui.token_options(state.doc, field)
+                for field in ROOT_FIELDS
+            },
             field_errors=field_errors or {},
         )
 
@@ -598,39 +637,29 @@ def create_app(widgets_path):
         errors = []
 
         if path == ROOT_PATH:
-            bg = form.get("background_image", "").strip()
-            if bg:
-                node["background_image"] = bg
-            else:
-                node.pop("background_image", None)
+            field_errors = {}
+
+            if not _apply_root_token(node, BACKGROUND_IMAGE_FIELD, form, field_errors):
+                bg = form.get("background_image", "").strip()
+                if bg:
+                    node["background_image"] = bg
+                else:
+                    node.pop("background_image", None)
+
             node["drop_shadow"] = form.get("drop_shadow") == "on"
 
-            field_errors = {}
-            current_bg = node.get("background_color")
-            channels_blank = all(
-                form.get(f"background_color__{i}", "").strip() == "" for i in range(4)
-            )
-            if theme_ui.wants_token(form, "background_color"):
-                token = theme_ui.parse_token_value(form, "background_color")
-                if token is None:
-                    field_errors["background_color"] = (
-                        "pick a theme colour, or switch back to a plain value"
-                    )
-                elif not theme_ui.same_token(current_bg, token):
-                    node["background_color"] = token
-            elif yamlio.is_theme_token(current_bg) and channels_blank:
-                # The channel boxes render empty for a token because they
-                # can't show one, so a blank submission here means "left
-                # alone", not "delete the background colour".
-                pass
-            elif channels_blank:
-                node.pop("background_color", None)
-            else:
-                color = _parse_color_value(form, "background_color")
-                if color is None:
-                    field_errors["background_color"] = "a color needs at least r, g, b"
-                elif not _color_is_unchanged(current_bg, color):
-                    node["background_color"] = color
+            if not _apply_root_token(node, BACKGROUND_COLOR_FIELD, form, field_errors):
+                current_bg = node.get("background_color")
+                if _plain_input_is_blank(form, BACKGROUND_COLOR_FIELD):
+                    node.pop("background_color", None)
+                else:
+                    color = _parse_color_value(form, "background_color")
+                    if color is None:
+                        field_errors["background_color"] = (
+                            "a color needs at least r, g, b"
+                        )
+                    elif not _color_is_unchanged(current_bg, color):
+                        node["background_color"] = color
 
             state.mark_dirty()
             return (

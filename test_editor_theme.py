@@ -24,6 +24,8 @@ theme:
   fonts:
     regular: OpenSans-Regular.ttf
     bold: OpenSans-ExtraBold.ttf
+  images:
+    screen: bgcolorlight.jpg
   sizes:
     radius: 25
 
@@ -139,6 +141,8 @@ def test_section_for_tag_accepts_both_spellings():
         ("widget_background_color", "color", "color"),
         ("font_path", "text", "font"),
         ("label_font_path", "text", "font"),
+        ("image_path", "text", "image"),
+        ("background_image", "text", "image"),
         ("corner_radius", "number", "size"),
         ("text", "text", None),
         ("align", "select", None),
@@ -561,3 +565,105 @@ def test_root_background_colour_token_is_not_dropped(client, editor):
         ]),
     )
     assert is_token(doc["background_color"], "color", "panel")
+
+
+# --------------------------------------------------------------------------
+# The document's own background_image
+# --------------------------------------------------------------------------
+
+
+def root_form(**overrides):
+    """What the root inspector's form posts, with the fields a browser always
+    sends filled in blank so a test only has to name what it's exercising."""
+    fields = {
+        "background_image": "",
+        "background_image_kind": "plain",
+        "background_image_token": "",
+        "background_color_kind": "plain",
+        "background_color_token": "",
+        "background_color__0": "",
+        "background_color__1": "",
+        "background_color__2": "",
+        "background_color__3": "",
+    }
+    fields.update(overrides)
+    return MultiDict(list(fields.items()))
+
+
+def test_root_background_image_offers_the_theme_images(client, editor):
+    options = theme_ui.token_options(doc_of(editor), FieldSpec("background_image"))
+    assert [(o.tag, o.name) for o in options] == [("image", "screen")]
+
+
+def test_root_background_image_token_is_applied(client, editor):
+    doc = doc_of(editor)
+    client.post(
+        "/node/root",
+        data=root_form(
+            background_image_kind="theme", background_image_token="image screen"
+        ),
+    )
+    assert is_token(doc["background_image"], "image", "screen")
+
+
+def test_root_background_image_token_renders_as_an_empty_box(client, editor):
+    """The text control has no way to show a tag, and whatever it shows is
+    what Apply posts back -- so it must not show the entry name."""
+    doc_of(editor)["background_image"] = yamlio.make_token("image", "screen")
+
+    html = client.get("/node/root/inspect").get_data(as_text=True)
+    assert 'name="background_image" value=""' in html
+    assert 'value="screen"' not in html
+
+
+def test_root_background_image_token_survives_an_unrelated_apply(client, editor):
+    """Toggling drop_shadow posts the whole form, including a background_image
+    box that renders empty for a token. That must not clear the token."""
+    doc = doc_of(editor)
+    doc["background_image"] = yamlio.make_token("image", "screen")
+
+    client.post("/node/root", data=root_form(drop_shadow="on"))
+
+    assert is_token(doc["background_image"], "image", "screen")
+    assert doc["drop_shadow"] is True
+
+
+def test_root_background_image_token_survives_with_no_picker(tmp_path):
+    """A theme with no images: section offers nothing to pick, so the picker
+    never renders -- but a token written by hand is still in the document."""
+    path = tmp_path / "widgets.yaml"
+    path.write_text(SAMPLE.replace("  images:\n    screen: bgcolorlight.jpg\n", ""))
+    app = create_app(str(path))
+    app.config["TESTING"] = True
+    doc = app.config["STATE"].doc
+    doc["background_image"] = yamlio.make_token("image", "screen")
+
+    html = app.test_client().get("/node/root/inspect").get_data(as_text=True)
+    assert "background_image_token" not in html
+
+    app.test_client().post("/node/root", data=root_form())
+    assert is_token(doc["background_image"], "image", "screen")
+
+
+def test_root_background_image_plain_value_still_round_trips(client, editor):
+    doc = doc_of(editor)
+
+    client.post("/node/root", data=root_form(background_image="niagara.jpg"))
+    assert doc["background_image"] == "niagara.jpg"
+
+    client.post("/node/root", data=root_form())
+    assert "background_image" not in doc
+
+
+def test_root_background_image_token_replaced_by_a_plain_path(client, editor):
+    doc = doc_of(editor)
+    doc["background_image"] = yamlio.make_token("image", "screen")
+
+    client.post("/node/root", data=root_form(background_image="niagara.jpg"))
+    assert doc["background_image"] == "niagara.jpg"
+
+
+def test_root_background_image_token_is_saved_as_a_tag(client, editor, tmp_path):
+    doc_of(editor)["background_image"] = yamlio.make_token("image", "screen")
+    client.post("/save")
+    assert "background_image: !image screen" in (tmp_path / "widgets.yaml").read_text()

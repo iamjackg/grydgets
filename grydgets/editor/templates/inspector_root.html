@@ -4,15 +4,23 @@
 
 <form class="inspector-form" hx-post="/node/{{ path }}" hx-target="#inspector" hx-swap="innerHTML">
   <label>background_image</label>
-  <input type="text" name="background_image" value="{{ node.get('background_image') or '' }}">
+  {% set bg_image = node.get('background_image') %}
+  {% if token_options.get('background_image') %}
+    {{ macros.token_mode_row("background_image", bg_image, token_options.get('background_image')) }}
+  {% endif %}
+  {# Blank for a token: a text box can't show a tag, and whatever it shows is
+     what Apply posts back -- rendering the entry name would save it as a
+     literal path and lose the token. #}
+  <input type="text" name="background_image" value="{{ '' if is_theme_token(bg_image) else (bg_image or '') }}">
+  {% if field_errors and field_errors.get('background_image') %}<div class="field-error">{{ field_errors.get('background_image') }}</div>{% endif %}
 
   <label>drop_shadow</label>
   <input type="checkbox" name="drop_shadow" {% if node.get('drop_shadow') %}checked{% endif %}>
 
   <label>background_color</label>
   {% set bg = node.get('background_color') %}
-  {% if token_options %}
-    {{ macros.token_mode_row("background_color", bg, token_options) }}
+  {% if token_options.get('background_color') %}
+    {{ macros.token_mode_row("background_color", bg, token_options.get('background_color')) }}
   {% endif %}
   {{ macros.color_field("background_color", none if is_theme_token(bg) else bg) }}
   {% if field_errors and field_errors.get('background_color') %}<div class="field-error">{{ field_errors.get('background_color') }}</div>{% endif %}

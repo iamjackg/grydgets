@@ -295,8 +295,8 @@ sample file is included in the repository.
 
 The top-level of your `widgets.yaml` defines options for the implicit main screen, which acts as a `ScreenWidget` container for your entire dashboard.
 
-*   `background_image` _(optional)_: The path to an image file to use as the background for the entire screen.
-*   `background_color` _(optional)_: A color for the screen background, see [Colors](#colors). Defaults to `[0, 0, 0]` (black).
+*   `background_image` _(optional)_: The path to an image file to use as the background for the entire screen. Takes precedence over `background_color`. Can be a theme token, see [Theming](#theming).
+*   `background_color` _(optional)_: A color for the screen background, see [Colors](#colors). Used when there is no `background_image`. Defaults to `[0, 0, 0]` (black).
 *   `drop_shadow` _(optional)_: If `true`, a drop shadow effect will be applied to the main content of the screen. Defaults to `false`.
 *   `widgets`: A list containing the root widget(s) of your dashboard. Note that the `ScreenWidget` currently only supports a single child widget.
 *   `theme` _(optional)_: Named values and per-widget defaults, see [Theming](#theming).
@@ -359,6 +359,37 @@ parameter such as a grid's per-cell overrides:
 A theme entry may itself be a token (`panel-raised: !color panel`). Referring to
 a name that isn't defined is an error at load time that names the section and
 lists what it does define; so is a loop between entries.
+
+The screen's own top-level keys take tokens too, which is how a theme changes
+the background of the whole dashboard. `theme.defaults` can't reach them — the
+screen isn't a node under `widgets:`, so there's nothing there to apply a
+default to — which means the widgets file has to hand the keys over to the
+theme by writing tokens on them:
+
+```yaml
+theme:
+  colors:
+    screen: '#1b1b1b'
+  images:
+    screen: bgcolorlight.jpg
+
+background_image: !image screen
+background_color: !color screen
+```
+
+A theme that wants a flat colour instead of wallpaper defines its `images.screen`
+as `null`: the screen falls back to `background_color` whenever there's no image.
+Since a [theme file](#theme-files) has to define everything the base theme does,
+every theme has to say which of the two it wants — none of them can inherit the
+wrong wallpaper by leaving the entry out.
+
+```yaml
+# themes/flat.yaml
+colors:
+  screen: '#f5f5f5'
+images:
+  screen: null
+```
 
 Tags rather than a `$panel`-style string because `widgets.yaml` is full of
 scalars where a `$` is real content — jq expressions, Jinja templates, format
@@ -1376,10 +1407,13 @@ Notes:
   this repo.
 - `!secret` values (and any field containing one, e.g. `auth.bearer`) are
   shown read-only and can't be edited or clobbered through the editor.
-- Theme tokens survive editing. Colour, font-path and numeric fields get a
-  **value / theme** switch: pick an entry from the matching theme section
-  (`!color panel`, `!font bold`, `!size radius`) or type a plain value. A
-  token on any other kind of field is shown as written and left alone.
+- Theme tokens survive editing. Colour, font-path, image-path and numeric
+  fields get a **value / theme** switch: pick an entry from the matching theme
+  section (`!color panel`, `!font bold`, `!image screen`, `!size radius`) or
+  type a plain value. A token on any other kind of field is shown as written
+  and left alone. This covers the document's own `background_image` and
+  `background_color` in the root inspector, so a themed screen background
+  isn't flattened to a literal by an unrelated edit.
 - A field supplied by [`theme.defaults`](#theming) is shown greyed out, with
   the entry it came from (`from theme: text-like`) and what it resolves to,
   so the inspector says what the widget will actually render as. **Override**

@@ -52,14 +52,19 @@ class TokenOption:
 def tag_for_field(field):
     """The token tag a field can be filled from, or None if none fits.
 
-    Font paths go by name rather than by control because a font path is just
-    a string as far as the schema is concerned -- there is nothing else to
-    tell ``font_path`` apart from ``url``.
+    Font and image paths go by name rather than by control because a path is
+    just a string as far as the schema is concerned -- there is nothing else
+    to tell ``font_path`` apart from ``url``.
     """
     if field.control == "color":
         return "color"
     if field.name == "font_path" or field.name.endswith("_font_path"):
         return "font"
+    if (
+        field.name in ("image_path", "background_image")
+        or field.name.endswith("_image_path")
+    ):
+        return "image"
     if field.control == "number":
         return "size"
     return None
