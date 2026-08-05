@@ -20,17 +20,101 @@
 </div>
 {% endmacro %}
 
-{% macro color_field(name, value) %}
+{# Mode row for a field the theme can fill: pick a token, or fall through to
+   the plain control rendered underneath. Same shape as secret_capable_field
+   -- both halves stay on screen, and the radio says which one is applied. #}
+{% macro token_mode_row(name, value, options) %}
+<div class="token-capable">
+  <label class="inline">
+    <input type="radio" name="{{ name }}_kind" value="plain" {% if not is_theme_token(value) %}checked{% endif %}>
+    value
+  </label>
+  <label class="inline">
+    <input type="radio" name="{{ name }}_kind" value="theme" {% if is_theme_token(value) %}checked{% endif %}>
+    theme
+  </label>
+  <select name="{{ name }}_token">
+    <option value="">-- choose --</option>
+    {% for opt in options %}
+      <option value="{{ opt.form_value }}" {% if is_theme_token(value) and value.value == opt.name %}selected{% endif %}>{{ opt.display }} &nbsp;=&nbsp; {{ opt.preview }}</option>
+    {% endfor %}
+  </select>
+</div>
+{% endmacro %}
+
+{# A token on a field with no picker: nothing on this form can hand the tag
+   back, so it is shown as written and left untouched on Apply. #}
+{% macro token_chip(value) %}
+<pre class="token-chip">{{ token_display(value) if is_theme_token(value) else dump_value(value) }}</pre>
+{% endmacro %}
+
+{% macro color_field(name, value, disabled=false) %}
 {# Colours may be written as a hex string or a name; color_channels turns any
    accepted form into r/g/b/a numbers so this control never indexes a string. #}
 {% set channels = value | color_channels %}
-<div class="color-row" data-color-field="{{ name }}">
-  <span class="color-swatch" data-role="swatch"></span>
-  <input type="color" data-role="picker">
+<div class="color-row {{ 'inherited' if disabled }}" {% if not disabled %}data-color-field="{{ name }}"{% endif %}>
+  <span class="color-swatch" data-role="swatch" {% if disabled and channels|length >= 3 %}style="background-color: rgba({{ channels[0] }},{{ channels[1] }},{{ channels[2] }},{{ ((channels[3] if channels|length > 3 else 255) / 255)|round(2) }})"{% endif %}></span>
+  {% if not disabled %}<input type="color" data-role="picker">{% endif %}
   {% for i in range(4) %}
     <input type="number" min="0" max="255" name="{{ name }}__{{ i }}"
            value="{{ channels[i] if channels|length > i else '' }}"
-           placeholder="{{ ['r', 'g', 'b', 'a'][i] }}" data-role="channel">
+           placeholder="{{ ['r', 'g', 'b', 'a'][i] }}" data-role="channel"
+           {% if disabled %}disabled{% endif %}>
   {% endfor %}
 </div>
+{% endmacro %}
+
+{# The ordinary control for a field. Shared by the editable rows and the
+   disabled copies an inherited row shows: a disabled control posts nothing,
+   which is what keeps a theme default from being written onto the node just
+   because someone pressed Apply. (update_node skips inherited rows too --
+   this is the display half of the same rule.) #}
+{% macro plain_control(field, value, disabled=false) %}
+  {% if field.control == "checkbox" %}
+    <input type="checkbox" name="{{ field.name }}" {% if value %}checked{% endif %} {% if disabled %}disabled{% endif %}>
+
+  {% elif field.control == "select" %}
+    <select name="{{ field.name }}" {% if disabled %}disabled{% endif %}>
+      {% for opt in field.enum %}
+        <option value="{{ opt }}" {% if opt == value %}selected{% endif %}>{{ opt }}</option>
+      {% endfor %}
+    </select>
+
+  {% elif field.control == "color" %}
+    {{ color_field(field.name, value, disabled) }}
+
+  {% elif field.control == "number" %}
+    <input type="number" name="{{ field.name }}" value="{{ value if value is not none else '' }}" {% if field.minimum is not none %}min="{{ field.minimum }}"{% endif %} {% if field.maximum is not none %}max="{{ field.maximum }}"{% endif %} step="{{ '1' if field.json_type == 'integer' else 'any' }}" {% if disabled %}disabled{% endif %}>
+
+  {% elif field.control == "list" %}
+    <textarea name="{{ field.name }}" rows="4" placeholder="one item per line" {% if disabled %}disabled{% endif %}>{{ (value or [])|join('\n') }}</textarea>
+
+  {% elif field.control == "textarea" %}
+    <textarea name="{{ field.name }}" rows="6" {% if disabled %}disabled{% endif %}>{{ value or '' }}</textarea>
+
+  {% elif field.control == "raw" %}
+    <textarea name="{{ field.name }}" rows="6" {% if disabled %}disabled{% endif %}>{{ value|to_yaml }}</textarea>
+
+  {% else %}
+    <input type="text" name="{{ field.name }}" value="{{ value or '' }}" {% if disabled %}disabled{% endif %}>
+  {% endif %}
+{% endmacro %}
+
+{# A field the theme supplies and the node doesn't: shown so the inspector
+   says what the widget will render as, with the entry it came from named,
+   and an [override] that copies the value onto the node to edit it. #}
+{% macro inherited_field(row, path) %}
+<div class="field-label-row">
+  <label class="inherited">{{ row.field.name }}</label>
+  <span class="from-theme">from theme: {{ row.source }}{% if row.token_text %} <code>{{ row.token_text }}</code>{% endif %}</span>
+  <button type="button" class="small"
+          hx-post="/node/{{ path }}/override-field"
+          hx-vals='{"field_name": "{{ row.field.name }}"}'
+          hx-target="#inspector" hx-swap="innerHTML">override</button>
+</div>
+{% if row.resolved is none and row.token_text %}
+  <div class="placeholder">{{ row.token_text }} isn't defined in the theme -- see the warnings above</div>
+{% else %}
+  {{ plain_control(row.field, row.resolved, true) }}
+{% endif %}
 {% endmacro %}

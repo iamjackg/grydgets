@@ -129,7 +129,7 @@ def parse_widget_specs(schema=None):
         schema = load_schema()
 
     widget_def = schema["definitions"]["widget"]
-    widget_types = list(widget_def["properties"]["widget"]["enum"])
+    widget_types = list(schema["definitions"]["widget_type"]["enum"])
     specs = {}
 
     for branch in widget_def["allOf"]:

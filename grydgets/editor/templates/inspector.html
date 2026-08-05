@@ -10,13 +10,21 @@
   <label>name</label>
   <input type="text" name="name" value="{{ node.name or '' }}">
 
-  {% for field in visible_fields(spec, node) %}
-    {% set value = node.get(field.name) %}
+  {% for row in field_rows %}
+    {% set field = row.field %}
+    {% set value = row.value %}
+    {% set token_opts = token_options.get(field.name) or [] %}
     {% set error = field_errors.get(field.name) if field_errors else none %}
+
+    {% if row.inherited %}
+      {{ macros.inherited_field(row, path) }}
+    {% else %}
+    {% set fallback = default_sources.get(field.name) %}
     <div class="field-label-row">
       <label>{{ field.name }}{% if field.required %}<span class="required-star"> *</span>{% endif %}</label>
+      {% if fallback %}<span class="from-theme">overrides theme: {{ fallback }}</span>{% endif %}
       {% if not field.required %}
-        <button type="button" class="small danger" hx-delete="/node/{{ path }}/field/{{ field.name }}" hx-target="#inspector" hx-swap="innerHTML" hx-confirm="Remove '{{ field.name }}' from this node?">remove</button>
+        <button type="button" class="small danger" hx-delete="/node/{{ path }}/field/{{ field.name }}" hx-target="#inspector" hx-swap="innerHTML" hx-confirm="{% if fallback %}Remove '{{ field.name }}' and fall back to the theme default from '{{ fallback }}'?{% else %}Remove '{{ field.name }}' from this node?{% endif %}">remove</button>
       {% endif %}
     </div>
 
@@ -39,6 +47,10 @@
     {% elif contains_secret(value) %}
       <pre class="secret-chip">&#128274; {{ dump_value(value) }}</pre>
       <div class="placeholder">contains a !secret value nested somewhere other than auth.bearer/username/password -- read-only in the editor, edit widgets.yaml by hand if needed</div>
+
+    {% elif token_is_read_only(field, value, token_opts|length > 0) %}
+      {{ macros.token_chip(value) }}
+      <div class="placeholder">a theme token, and this field has no picker to carry it (the theme defines no section it could draw from) -- shown as written and left alone on Apply; edit widgets.yaml by hand to change it</div>
 
     {% elif field.name in name_ref_fields %}
       {% set ref_kind = name_ref_fields[field.name] %}
@@ -79,36 +91,19 @@
         <div class="placeholder">{{ unnamed_count }} child{{ '' if unnamed_count == 1 else 'ren' }} without a name can't be targeted here -- give {{ 'it' if unnamed_count == 1 else 'them' }} a name first.</div>
       {% endif %}
 
-    {% elif field.control == "checkbox" %}
-      <input type="checkbox" name="{{ field.name }}" {% if value %}checked{% endif %}>
-
-    {% elif field.control == "select" %}
-      <select name="{{ field.name }}">
-        {% for opt in field.enum %}
-          <option value="{{ opt }}" {% if opt == value %}selected{% endif %}>{{ opt }}</option>
-        {% endfor %}
-      </select>
-
-    {% elif field.control == "color" %}
-      {{ macros.color_field(field.name, value) }}
-
-    {% elif field.control == "number" %}
-      <input type="number" name="{{ field.name }}" value="{{ value if value is not none else '' }}" {% if field.minimum is not none %}min="{{ field.minimum }}"{% endif %} {% if field.maximum is not none %}max="{{ field.maximum }}"{% endif %} step="{{ '1' if field.json_type == 'integer' else 'any' }}">
-
-    {% elif field.control == "list" %}
-      <textarea name="{{ field.name }}" rows="4" placeholder="one item per line">{{ (value or [])|join('\n') }}</textarea>
-
-    {% elif field.control == "textarea" %}
-      <textarea name="{{ field.name }}" rows="6">{{ value or '' }}</textarea>
-
-    {% elif field.control == "raw" %}
-      <textarea name="{{ field.name }}" rows="6">{{ value|to_yaml }}</textarea>
-
     {% else %}
-      <input type="text" name="{{ field.name }}" value="{{ value or '' }}">
+      {% if token_opts %}
+        {{ macros.token_mode_row(field.name, value, token_opts) }}
+      {% endif %}
+      {# The plain control can't display a token, so it renders empty while
+         the theme radio above is the one that's checked -- same as the plain
+         box of a !secret field. #}
+      {% set value = none if is_theme_token(value) else value %}
+      {{ macros.plain_control(field, value) }}
     {% endif %}
 
     {% if error %}<div class="field-error">{{ error }}</div>{% endif %}
+    {% endif %}
   {% endfor %}
 
   {% set unknown_keys = node.keys()|list|reject('in', ['widget', 'name', 'children'])|reject('in', spec.fields.keys()|list if spec else [])|list %}
@@ -155,7 +150,9 @@
 {% endif %}
 
 {% if spec %}
-{% set unset_optional = spec.optional_fields()|rejectattr('name', 'in', node.keys()|list)|list %}
+{# Fields the theme supplies are already on screen as inherited rows, with
+   their own [override] button, so they aren't "unset" and don't belong here. #}
+{% set unset_optional = spec.optional_fields()|rejectattr('name', 'in', node.keys()|list)|rejectattr('name', 'in', inherited_names)|list %}
 {% if unset_optional %}
 <form hx-post="/node/{{ path }}/add-field" hx-target="#inspector" hx-swap="innerHTML" style="margin-top:16px;">
   <label>add property</label>

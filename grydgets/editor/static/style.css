@@ -254,11 +254,36 @@ form.inspector-form .secret-capable { display: flex; gap: 6px; align-items: cent
 form.inspector-form .secret-capable input[type=text] { width: 220px; }
 form.inspector-form .secret-capable select { width: 160px; }
 form.inspector-form .secret-capable label.inline { display: inline-flex; align-items: center; gap: 3px; margin: 0; text-transform: none; font-size: 13px; color: var(--text); }
+form.inspector-form .token-capable { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-bottom: 4px; }
+form.inspector-form .token-capable select { width: auto; min-width: 220px; max-width: 100%; }
+form.inspector-form .token-capable label.inline { display: inline-flex; align-items: center; gap: 3px; margin: 0; text-transform: none; font-size: 13px; color: var(--text); }
 form.inspector-form .field-error { color: var(--danger); font-size: 12px; margin-top: 2px; }
 form.inspector-form .secret-chip {
   display: inline-block;
   background: #3a3320;
   color: var(--warn);
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-family: monospace;
+  font-size: 12px;
+}
+form.inspector-form label.inherited { color: var(--dim); }
+form.inspector-form .from-theme {
+  font-size: 11.5px;
+  color: var(--dim);
+  font-style: italic;
+  margin-right: auto;
+}
+form.inspector-form .from-theme code { font-style: normal; font-size: 11px; }
+form.inspector-form :disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+form.inspector-form .color-row.inherited .color-swatch { opacity: 0.55; }
+form.inspector-form .token-chip {
+  display: inline-block;
+  background: #1e2b33;
+  color: #7fd1e0;
   padding: 3px 8px;
   border-radius: 4px;
   font-family: monospace;

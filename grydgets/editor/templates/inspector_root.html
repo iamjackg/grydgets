@@ -10,7 +10,11 @@
   <input type="checkbox" name="drop_shadow" {% if node.get('drop_shadow') %}checked{% endif %}>
 
   <label>background_color</label>
-  {{ macros.color_field("background_color", node.get('background_color')) }}
+  {% set bg = node.get('background_color') %}
+  {% if token_options %}
+    {{ macros.token_mode_row("background_color", bg, token_options) }}
+  {% endif %}
+  {{ macros.color_field("background_color", none if is_theme_token(bg) else bg) }}
   {% if field_errors and field_errors.get('background_color') %}<div class="field-error">{{ field_errors.get('background_color') }}</div>{% endif %}
 
   <p><button type="submit" class="primary">Apply</button></p>

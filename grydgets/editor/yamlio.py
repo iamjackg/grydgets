@@ -75,13 +75,35 @@ def save_doc(doc, path):
     return backup
 
 
+def tag_of(value):
+    """The tag string of a preserved tagged scalar, or None if it isn't one."""
+    if not isinstance(value, TaggedScalar):
+        return None
+    tag = value.tag
+    return tag.value if hasattr(tag, "value") else tag
+
+
 def is_secret(value):
     """True if value is a preserved tagged scalar with the !secret tag."""
-    if not isinstance(value, TaggedScalar):
-        return False
-    tag = value.tag
-    tag_str = tag.value if hasattr(tag, "value") else tag
-    return tag_str == "!secret"
+    return tag_of(value) == "!secret"
+
+
+def is_theme_token(value):
+    """True if value is a theme token such as ``!color panel``.
+
+    Every tag other than !secret is a theme token: the section names in the
+    theme block are what the tags are named after, so the set isn't fixed and
+    can't be enumerated here. Tokens are ordinary editable values, unlike
+    secrets, so they must not be routed through is_secret/contains_secret.
+    """
+    tag = tag_of(value)
+    return tag is not None and tag != "!secret"
+
+
+def token_parts(value):
+    """``(section, name)`` for a theme-token scalar: ``!color panel`` gives
+    ``("color", "panel")``."""
+    return tag_of(value).lstrip("!"), value.value
 
 
 def secret_display(value):
@@ -91,9 +113,53 @@ def secret_display(value):
     return f"!{tag_str.lstrip('!')} {value.value}"
 
 
+def token_display(value):
+    """A read-only display string for a theme token, e.g. '!color panel'."""
+    return secret_display(value)
+
+
 def make_secret(key):
     """Build a !secret tagged scalar referencing `key` in secrets.yaml."""
     return TaggedScalar(value=key, tag="!secret")
+
+
+def make_token(section, name):
+    """Build a theme-token scalar: make_token('color', 'panel') is '!color panel'.
+
+    The scalar is what round-trips back to the file, so this is the only way
+    the editor may write a token -- assigning the string '!color panel' would
+    dump as a quoted string and stop resolving.
+    """
+    return TaggedScalar(value=name, tag="!" + str(section).lstrip("!"))
+
+
+def contains_theme_token(value):
+    """True if value is, or holds anywhere inside it, a theme token.
+
+    A token nested in a mapping (a bar chart's `bar_colors`, a grid's
+    per-cell overrides) is edited through the raw-YAML box, which has to
+    parse its contents back with the round-trip loader for the tag to
+    survive -- see parse_value.
+    """
+    if is_theme_token(value):
+        return True
+    if isinstance(value, dict):
+        return any(contains_theme_token(v) for v in value.values())
+    if isinstance(value, list):
+        return any(contains_theme_token(v) for v in value)
+    return False
+
+
+def parse_value(text):
+    """Parse the contents of a raw-YAML box back into a value.
+
+    ruamel's round-trip loader rather than pyyaml's safe_load: safe_load has
+    no constructor for `!color panel` or `!secret hass_token` and refuses the
+    whole document, so a raw field holding a token or a secret anywhere
+    inside it could never be applied. Round-trip loading keeps both as
+    tagged scalars, and quote/block style with them.
+    """
+    return _yaml.load(text)
 
 
 def contains_secret(value):

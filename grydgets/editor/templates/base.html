@@ -232,6 +232,48 @@
       initColorFields();
     })();
 
+    // Theme-token fields: keep the value/theme radio in step with whichever
+    // half of the field is actually being used. Without this, picking a
+    // colour while "theme" is still selected looks like it worked and then
+    // applies the token instead -- the radio, not the control you touched,
+    // is what the server reads. Same init-once-per-element dance as the
+    // colour rows above, for the same htmx reason.
+    (function () {
+      function initTokenFields() {
+        document.querySelectorAll(".token-capable:not([data-token-init])").forEach(function (row) {
+          row.setAttribute("data-token-init", "true");
+          var radios = Array.prototype.slice.call(row.querySelectorAll('input[type=radio]'));
+          if (!radios.length) return;
+          var field = radios[0].name.replace(/_kind$/, "");
+          var form = row.closest("form");
+          if (!form) return;
+
+          function setKind(value) {
+            radios.forEach(function (radio) { radio.checked = (radio.value === value); });
+          }
+
+          var select = row.querySelector('select[name="' + field + '_token"]');
+          if (select) select.addEventListener("change", function () { setKind("theme"); });
+
+          // The plain half: a single input named after the field, or the
+          // four channel boxes of a colour, plus the colour picker that
+          // writes into them.
+          var plain = form.querySelectorAll(
+            '[name="' + field + '"], [name^="' + field + '__"]'
+          );
+          Array.prototype.slice.call(plain).forEach(function (input) {
+            input.addEventListener("input", function () { setKind("plain"); });
+          });
+          var colorRow = form.querySelector('.color-row[data-color-field="' + field + '"]');
+          var picker = colorRow && colorRow.querySelector('[data-role="picker"]');
+          if (picker) picker.addEventListener("input", function () { setKind("plain"); });
+        });
+      }
+
+      document.body.addEventListener("htmx:afterSettle", initTokenFields);
+      initTokenFields();
+    })();
+
     // Two-click confirmation in place of a browser confirm() dialog: the first
     // click on any hx-confirm control arms it (its label becomes "Sure?"); a
     // second click within a few seconds issues the request. Clicking anything

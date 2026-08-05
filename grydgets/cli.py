@@ -44,7 +44,7 @@ def main():
         os.chdir(args.config_dir)
 
     def load_widget_tree():
-        return config.load_yaml(args.widgets)
+        return config.load_widget_config(args.widgets)
 
     widget_tree = load_widget_tree()
     conf = config.load_config("conf.yaml")

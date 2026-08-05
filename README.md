@@ -298,6 +298,109 @@ The top-level of your `widgets.yaml` defines options for the implicit main scree
 *   `background_color` _(optional)_: A color for the screen background, see [Colors](#colors). Defaults to `[0, 0, 0]` (black).
 *   `drop_shadow` _(optional)_: If `true`, a drop shadow effect will be applied to the main content of the screen. Defaults to `false`.
 *   `widgets`: A list containing the root widget(s) of your dashboard. Note that the `ScreenWidget` currently only supports a single child widget.
+*   `theme` _(optional)_: Named values and per-widget defaults, see [Theming](#theming).
+
+### Theming
+
+A `theme:` block names values once so the rest of the file can refer to them,
+and sets defaults so most widgets don't have to mention them at all.
+
+```yaml
+theme:
+  colors:
+    panel: '#3b4252'
+    text: '#eceff4'
+    text-muted: '#a3afc2'
+  fonts:
+    regular: fonts/Inter-400.ttf
+    bold: fonts/Inter-800.ttf
+  sizes:
+    radius: 25
+
+  groups:
+    text-like: [text, rest, provider, providertemplate, notifiabletext, label]
+  defaults:
+    text-like:
+      font_path: !font regular
+      color: !color text
+    grid:
+      widget_background_color: !color panel
+      widget_corner_radius: !size radius
+
+widgets:
+  - widget: grid
+    children:
+      - widget: text
+        text: Kitchen              # font_path and color come from the theme
+      - widget: text
+        text: 21.4°
+        color: !color text-muted   # a widget's own value always wins
+```
+
+#### Tokens
+
+Every key of `theme` except `groups` and `defaults` is a **token section**, and
+the section name is the YAML tag that reads from it: `!color panel` means
+`theme.colors.panel`, `!font regular` means `theme.fonts.regular`. Sections are
+yours to name — add a `spacings:` section and `!spacing tight` works. A tag
+matches a section named either exactly (`color:`) or with a trailing `s`
+(`colors:`).
+
+A token can go anywhere a literal value can, including inside a mapping or list
+parameter such as a grid's per-cell overrides:
+
+```yaml
+  - widget: grid
+    widget_background_colors:
+      alert-cell: !color danger
+```
+
+A theme entry may itself be a token (`panel-raised: !color panel`). Referring to
+a name that isn't defined is an error at load time that names the section and
+lists what it does define; so is a loop between entries.
+
+Tags rather than a `$panel`-style string because `widgets.yaml` is full of
+scalars where a `$` is real content — jq expressions, Jinja templates, format
+strings — and a tag can't collide with any of them.
+
+#### Defaults
+
+`theme.defaults` is keyed by widget type. Every widget of that type that doesn't
+set the parameter itself gets it:
+
+```yaml
+  defaults:
+    grid:
+      widget_corner_radius: 25
+```
+
+Several widget types draw text without being a `text` widget — `rest`,
+`provider` and the rest build one internally — so `theme.groups` lets you name a
+set of types and give the whole set the same defaults:
+
+```yaml
+  groups:
+    text-like: [text, rest, provider, providertemplate, notifiabletext, label]
+  defaults:
+    text-like:
+      font_path: !font regular
+```
+
+Naming a widget type outright always beats a group it belongs to, whichever
+order the two are written in. Note that `dateclock` (`time_font_path`,
+`date_font_path`) and `providerbarchart` (`label_font_path`, `label_color`) use
+their own parameter names and so need their own entries.
+
+Defaults are resolved when the file is loaded and are never written back to it,
+so `widgets.yaml` keeps saying only what you wrote. Two consequences worth
+knowing: a widget that should *not* pick up a default has to override it
+explicitly (`widget_corner_radius: 0`), and the same parameter name can mean
+different things on different widgets — `color` is the text colour on `text`,
+but the panel fill on `grid` and `empty` — which is why defaults are keyed by
+type rather than applied to everything.
+
+Tokens are only resolved in the widgets file. Using one in `conf.yaml` or
+`providers.yaml` is an error.
 
 ## Widgets
 
@@ -339,7 +442,8 @@ color: [255, 136, 0, 204]   # with alpha
 | `#rgba` | `'#f80c'` | shorthand for `#ff8800cc` |
 | color name | `'orange'` | any [CSS color name](https://www.w3.org/TR/css-color-3/#svg-color) |
 
-Quote hex strings in YAML — an unquoted `#` starts a comment.
+Quote hex strings in YAML — an unquoted `#` starts a comment. A color parameter
+also accepts a theme token (`color: !color accent`), see [Theming](#theming).
 
 ```yaml
   - widget: dateclock
@@ -1220,6 +1324,16 @@ Notes:
   this repo.
 - `!secret` values (and any field containing one, e.g. `auth.bearer`) are
   shown read-only and can't be edited or clobbered through the editor.
+- Theme tokens survive editing. Colour, font-path and numeric fields get a
+  **value / theme** switch: pick an entry from the matching theme section
+  (`!color panel`, `!font bold`, `!size radius`) or type a plain value. A
+  token on any other kind of field is shown as written and left alone.
+- A field supplied by [`theme.defaults`](#theming) is shown greyed out, with
+  the entry it came from (`from theme: text-like`) and what it resolves to,
+  so the inspector says what the widget will actually render as. **Override**
+  copies that value onto the widget to edit it there; **remove** drops the
+  override and falls back to the theme. Defaults are never written to the
+  file by an edit -- a widget keeps saying only what you wrote on it.
 - A colour you don't change keeps the form you wrote it in — `'#ff8800'`
   stays a hex string, `[255, 136, 0]` doesn't grow an alpha channel. Saving
   a widget re-applies every field on it, not just the one you edited, so
@@ -1230,7 +1344,8 @@ Notes:
   truth, so a save is never refused because of a schema mismatch.
 - `rest` and `restimage` widgets have a **Test request** button in their
   inspector. It runs the widget's actual request (resolving `!secret`
-  auth server-side, shown redacted in the panel) and displays the status,
+  auth server-side, shown redacted in the panel, plus any theme tokens and
+  defaults, so it tests what the widget is built with) and shows the status,
   raw response, extracted value, and final value -- so you can get
   `json_path`/`jq_expression`/`format_string` right against live data. For
   a `rest` widget you can tweak the extraction and re-run it against the

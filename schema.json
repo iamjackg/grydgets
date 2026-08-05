@@ -2,6 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "type": "object",
   "properties": {
+    "theme": { "$ref": "#/definitions/theme" },
     "background_image": { "type": "string" },
     "drop_shadow": { "type": "boolean" },
     "background_color": { "$ref": "#/definitions/color" },
@@ -74,14 +75,38 @@
       },
       "additionalProperties": false
     },
+    "widget_type": {
+      "type": "string",
+      "enum": ["text", "image", "empty", "dateclock", "restimage", "rest", "label", "flip", "httpflip", "scheduleflip", "provider", "providerimage", "providerflip", "providertemplate", "pill", "notifiabletext", "notifiableimage", "grid", "providerbarchart"]
+    },
+    "theme": {
+      "description": "Named values referenced from the widget tree by tag (!color panel is theme.colors.panel), plus per-widget-type defaults.",
+      "type": "object",
+      "properties": {
+        "groups": {
+          "description": "Named sets of widget types, usable as a key in `defaults`.",
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "items": { "$ref": "#/definitions/widget_type" }
+          }
+        },
+        "defaults": {
+          "description": "Parameters applied to every widget of a type (or of a group) that doesn't set them itself.",
+          "type": "object",
+          "additionalProperties": { "type": "object" }
+        }
+      },
+      "additionalProperties": {
+        "description": "A token section. Its name is the tag that reads from it.",
+        "type": "object"
+      }
+    },
     "widget": {
       "type": "object",
       "required": ["widget"],
       "properties": {
-        "widget": {
-          "type": "string",
-          "enum": ["text", "image", "empty", "dateclock", "restimage", "rest", "label", "flip", "httpflip", "scheduleflip", "provider", "providerimage", "providerflip", "providertemplate", "pill", "notifiabletext", "notifiableimage", "grid", "providerbarchart"]
-        }
+        "widget": { "$ref": "#/definitions/widget_type" }
       },
       "allOf": [
         {

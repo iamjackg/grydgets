@@ -1,6 +1,8 @@
 import voluptuous
 import yaml
 
+from grydgets import theme
+
 __SECRETS = {"main_secrets": {}}
 
 
@@ -14,12 +16,22 @@ def secret_loader(_, node):
 
 
 yaml.add_constructor("!secret", secret_loader)
+theme.register_constructors()
 
 
 def load_yaml(filename):
     with open(filename) as conf_f:
         parsed_yaml = yaml.load(conf_f, Loader=yaml.FullLoader)
     return parsed_yaml
+
+
+def load_widget_config(filename):
+    """Load the widgets file and resolve its theme block.
+
+    Kept separate from :func:`load_yaml` so that conf.yaml and providers.yaml,
+    which share the loader, don't pick up theme semantics.
+    """
+    return theme.apply_theme(load_yaml(filename))
 
 
 # Output sub-schemas
@@ -235,6 +247,7 @@ provider_schema = voluptuous.Schema(
 
 def load_config(filename):
     conf_data = load_yaml(filename)
+    theme.reject_tokens(conf_data, filename)
     config_schema(conf_data)
 
     return conf_data
@@ -250,6 +263,7 @@ def load_providers_config(filename):
         Validated provider configuration dict
     """
     conf_data = load_yaml(filename)
+    theme.reject_tokens(conf_data, filename)
     provider_schema(conf_data)
 
     return conf_data

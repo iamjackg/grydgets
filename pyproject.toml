@@ -23,3 +23,9 @@ dependencies = [
 [project.scripts]
 grydgets = "grydgets.cli:main"
 grydgets-editor = "grydgets.editor.app:main"
+
+[tool.pytest.ini_options]
+# Only test_*.py. Pytest's other default pattern, *_test.py, matches
+# grydgets/editor/rest_test.py -- a module, not a test file -- and collects
+# its test_rest/test_image helpers as broken tests.
+python_files = ["test_*.py"]
