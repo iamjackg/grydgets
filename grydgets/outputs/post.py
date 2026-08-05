@@ -1,5 +1,7 @@
 """HTTP POST output — push rendered frames to an endpoint."""
 
+from __future__ import annotations
+
 import io
 import threading
 import time

@@ -3,6 +3,8 @@
 Outputs receive rendered surfaces and present them via display, file, or network.
 """
 
+from __future__ import annotations
+
 import logging
 from typing import Any
 
