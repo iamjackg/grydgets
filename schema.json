@@ -4,16 +4,7 @@
   "properties": {
     "background_image": { "type": "string" },
     "drop_shadow": { "type": "boolean" },
-    "background_color": {
-      "type": "array",
-      "items": {
-        "type": "integer",
-        "minimum": 0,
-        "maximum": 255
-      },
-      "minItems": 3,
-      "maxItems": 4
-    },
+    "background_color": { "$ref": "#/definitions/color" },
     "widgets": {
       "type": "array",
       "items": { "$ref": "#/definitions/widget" }
@@ -21,14 +12,23 @@
   },
   "definitions": {
     "color": {
-      "type": "array",
-      "items": {
-        "type": "integer",
-        "minimum": 0,
-        "maximum": 255
-      },
-      "minItems": 3,
-      "maxItems": 4
+      "oneOf": [
+        {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255
+          },
+          "minItems": 3,
+          "maxItems": 4
+        },
+        {
+          "description": "A CSS-style hex string (#rgb, #rgba, #rrggbb, #rrggbbaa) or a colour name. Names are validated at load time, not here.",
+          "type": "string",
+          "pattern": "^(#([0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})|[a-zA-Z]+[0-9]*)$"
+        }
+      ]
     },
     "auth_scheme": {
       "type": "object",
@@ -145,7 +145,9 @@
               "time_font_path": { "type": "string" },
               "background_color": { "$ref": "#/definitions/color" },
               "corner_radius": { "type": "integer", "minimum": 0 },
-              "color": { "$ref": "#/definitions/color" }
+              "color": { "$ref": "#/definitions/color" },
+              "time_color": { "$ref": "#/definitions/color" },
+              "date_color": { "$ref": "#/definitions/color" }
             },
             "additionalProperties": false
           }
@@ -472,6 +474,7 @@
               "fallback_text": { "type": "string" },
               "font_path": { "type": "string" },
               "text_size": { "type": "integer", "minimum": 1 },
+              "color": { "$ref": "#/definitions/color" },
               "vertical_align": { "type": "string", "enum": ["top", "center", "bottom"] }
             },
             "additionalProperties": false

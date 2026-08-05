@@ -11,6 +11,7 @@ from typing import Any
 import pygame
 import requests
 
+from grydgets.colors import ColorInput, parse_color
 from grydgets.json_utils import extract_data
 from grydgets.providers.base import DataProvider
 from grydgets.widgets.base import Widget, ContainerWidget
@@ -32,6 +33,7 @@ class ProviderWidget(Widget):
         show_errors: bool = False,
         font_path: str | None = None,
         text_size: int | None = None,
+        color: ColorInput = (255, 255, 255),
         vertical_align: str = "center",
         **kwargs: Any,
     ) -> None:
@@ -52,7 +54,7 @@ class ProviderWidget(Widget):
 
         self.text_widget = TextWidget(
             font_path=font_path,
-            color=(255, 255, 255),
+            color=parse_color(color, "color"),
             padding=6,
             text_size=text_size,
             align="center",
@@ -117,6 +119,7 @@ class ProviderTemplateWidget(Widget):
         fallback_text: str = "--",
         font_path: str | None = None,
         text_size: int | None = None,
+        color: ColorInput = (255, 255, 255),
         vertical_align: str = "center",
         **kwargs: Any,
     ) -> None:
@@ -135,7 +138,7 @@ class ProviderTemplateWidget(Widget):
 
         self.text_widget = TextWidget(
             font_path=font_path,
-            color=(255, 255, 255),
+            color=parse_color(color, "color"),
             padding=6,
             text_size=text_size,
             align="center",

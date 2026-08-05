@@ -7,6 +7,7 @@ from typing import Any
 
 import requests
 
+from grydgets.colors import ColorError, ColorInput
 from grydgets.widgets.base import ContainerWidget
 from grydgets.widgets.image import ImageWidget
 from grydgets.widgets.text import TextWidget
@@ -18,7 +19,7 @@ class NotifiableTextWidget(ContainerWidget):
         font_path: str | None = None,
         text_size: int | None = None,
         padding: int = 0,
-        color: tuple[int, ...] = (255, 255, 255),
+        color: ColorInput = (255, 255, 255),
         **kwargs: Any,
     ) -> None:
         super().__init__(**kwargs)
@@ -87,7 +88,16 @@ class NotifiableTextWidget(ContainerWidget):
                     self.showing_text = True
                     self.text_widget.set_text(data["text"])
                     if "color" in data:
-                        self.text_widget.set_color(data["color"])
+                        # Comes straight off the /notify payload, so a bad
+                        # value is a caller error, not a config error -- warn
+                        # and keep the current colour rather than taking the
+                        # whole render loop down with it.
+                        try:
+                            self.text_widget.set_color(data["color"])
+                        except ColorError as e:
+                            self.logger.warning(
+                                "Ignoring colour in notification: {}".format(e)
+                            )
                     self.notification_duration = data.get("duration", 5)
                     self.dirty = True
 

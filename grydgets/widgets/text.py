@@ -7,6 +7,7 @@ from typing import Any
 import pygame
 
 from grydgets import rest_fetch
+from grydgets.colors import ColorInput, parse_color, parse_optional_color
 from grydgets.widgets.base import Widget, UpdaterWidget, ContainerWidget
 from grydgets.widgets.containers import GridWidget
 from grydgets.fonts import FontCache
@@ -20,14 +21,14 @@ class TextWidget(Widget):
         font_path: str | None = None,
         text: str = "",
         text_size: int | None = None,
-        color: tuple[int, ...] = (255, 255, 255),
+        color: ColorInput = (255, 255, 255),
         padding: int = 0,
         align: str = "left",
         vertical_align: str = "top",
         **kwargs: Any,
     ) -> None:
         super().__init__(**kwargs)
-        self.color = color
+        self.color = parse_color(color, "color")
         self.align = align
         self.vertical_align = vertical_align
         self.font_path = font_path
@@ -42,9 +43,10 @@ class TextWidget(Widget):
             self.text = text
             self.dirty = True
 
-    def set_color(self, color: tuple[int, ...]) -> None:
-        if color != self.color:
-            self.color = color
+    def set_color(self, color: ColorInput) -> None:
+        parsed = parse_color(color, "color")
+        if parsed != self.color:
+            self.color = parsed
             self.dirty = True
 
     def render(self, size: tuple[int, int]) -> pygame.Surface:
@@ -88,23 +90,28 @@ class DateClockWidget(Widget):
         self,
         time_font_path: str | None = None,
         date_font_path: str | None = None,
-        color: tuple[int, ...] = (255, 255, 255),
-        background_color: tuple[int, ...] | None = None,
+        color: ColorInput = (255, 255, 255),
+        time_color: ColorInput | None = None,
+        date_color: ColorInput | None = None,
+        background_color: ColorInput | None = None,
         corner_radius: int = 0,
         **kwargs: Any,
     ) -> None:
         super().__init__(**kwargs)
+        color = parse_color(color, "color")
+        time_color = parse_optional_color(time_color, "time_color") or color
+        date_color = parse_optional_color(date_color, "date_color") or color
         self.grid_widget = GridWidget(
             rows=2,
             columns=1,
             row_ratios=[7, 3],
-            widget_color=background_color,
+            widget_color=parse_optional_color(background_color, "background_color"),
             corner_radius=corner_radius,
             **kwargs
         )
         self.hour_widget = TextWidget(
             font_path=time_font_path,
-            color=color,
+            color=time_color,
             padding=2,
             align="center",
             vertical_align="center",
@@ -112,7 +119,7 @@ class DateClockWidget(Widget):
         )
         self.date_widget = TextWidget(
             font_path=date_font_path,
-            color=color,
+            color=date_color,
             padding=2,
             align="center",
             vertical_align="top",
@@ -149,6 +156,7 @@ class RESTWidget(UpdaterWidget):
         format_string: str | None = None,
         font_path: str | None = None,
         text_size: int | None = None,
+        color: ColorInput = (255, 255, 255),
         auth: dict[str, Any] | None = None,
         method: str | None = None,
         payload: dict[str, Any] | None = None,
@@ -166,7 +174,7 @@ class RESTWidget(UpdaterWidget):
         self.payload = payload
         self.text_widget = TextWidget(
             font_path=font_path,
-            color=(255, 255, 255),
+            color=color,
             padding=6,
             text_size=text_size,
             align="center",
@@ -217,7 +225,7 @@ class LabelWidget(ContainerWidget):
         font_path: str | None = None,
         position: str = "above",
         text_size: int | None = None,
-        text_color: tuple[int, ...] = (255, 255, 255),
+        text_color: ColorInput = (255, 255, 255),
         **kwargs: Any,
     ) -> None:
         super().__init__(**kwargs)
@@ -225,7 +233,7 @@ class LabelWidget(ContainerWidget):
             font_path=font_path,
             text=text,
             text_size=text_size,
-            color=text_color,
+            color=parse_color(text_color, "text_color"),
             align="center",
             vertical_align="top" if position == "below" else "center",
             **kwargs

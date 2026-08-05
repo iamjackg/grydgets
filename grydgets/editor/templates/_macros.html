@@ -21,12 +21,15 @@
 {% endmacro %}
 
 {% macro color_field(name, value) %}
+{# Colours may be written as a hex string or a name; color_channels turns any
+   accepted form into r/g/b/a numbers so this control never indexes a string. #}
+{% set channels = value | color_channels %}
 <div class="color-row" data-color-field="{{ name }}">
   <span class="color-swatch" data-role="swatch"></span>
   <input type="color" data-role="picker">
   {% for i in range(4) %}
     <input type="number" min="0" max="255" name="{{ name }}__{{ i }}"
-           value="{{ value[i] if value and value|length > i else '' }}"
+           value="{{ channels[i] if channels|length > i else '' }}"
            placeholder="{{ ['r', 'g', 'b', 'a'][i] }}" data-role="channel">
   {% endfor %}
 </div>

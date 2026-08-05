@@ -13,7 +13,7 @@ import yaml as pyyaml
 from flask import Flask, render_template, request
 from ruamel.yaml import YAMLError
 
-from grydgets import rest_fetch
+from grydgets import colors, rest_fetch
 from grydgets.editor import rest_test, schema as schema_mod
 from grydgets.editor import secrets_util, tree, validation, yamlio
 
@@ -233,6 +233,27 @@ def _apply_auth_field(node, form):
         node.pop("auth", None)
 
 
+def _color_channels_filter(value):
+    """Expand a colour value into the four r/g/b/a numbers the colour control
+    shows.
+
+    Colours may be written as a hex string in widgets.yaml. The control edits
+    them as four numeric channels, and indexing a string yields its characters
+    -- '#ff8800' would fill the boxes with '#', 'f', 'f', '8' and write that
+    back on the next Apply. Parsing here keeps the control on numbers whatever
+    form the file uses. Note the editor still *saves* a list, so applying this
+    field to a hex colour rewrites it as [r, g, b, a].
+    """
+    if value is None:
+        return []
+    try:
+        return list(colors.parse_color(value))
+    except colors.ColorError:
+        # Not a colour we understand: leave the boxes empty rather than
+        # guessing, so a bad value stays visible instead of being overwritten.
+        return []
+
+
 def _to_yaml_filter(value):
     if value is None:
         return ""
@@ -248,6 +269,7 @@ def create_app(widgets_path):
     app.config["STATE"] = state
 
     app.jinja_env.filters["to_yaml"] = _to_yaml_filter
+    app.jinja_env.filters["color_channels"] = _color_channels_filter
     app.jinja_env.globals.update(
         get_widget_spec=schema_mod.get_widget_spec,
         get_widget_types=schema_mod.get_widget_types,

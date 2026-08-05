@@ -4,6 +4,7 @@ from typing import Any
 
 import pygame
 
+from grydgets.colors import ColorInput, parse_color
 from grydgets.fonts import FontCache
 from grydgets.json_utils import extract_data
 from grydgets.providers.base import DataProvider
@@ -18,24 +19,24 @@ class ProviderBarChartWidget(Widget):
         providers: dict[str, DataProvider],
         data_path: str | None = None,
         jq_expression: str | None = None,
-        bar_color: tuple[int, ...] = (100, 149, 237),
-        bar_colors: dict[str, list[int]] | None = None,
+        bar_color: ColorInput = (100, 149, 237),
+        bar_colors: dict[str, ColorInput] | None = None,
         bar_color_thresholds: list[dict] | None = None,
-        bar_background_colors: dict[str, list[int]] | None = None,
+        bar_background_colors: dict[str, ColorInput] | None = None,
         bar_gap: int = 2,
         max_value: float | None = None,
         min_value: float = 0,
         midline: bool = False,
         midline_thickness: int = 1,
-        midline_color: tuple[int, ...] = (255, 255, 255),
+        midline_color: ColorInput = (255, 255, 255),
         quartline: bool = False,
         quartline_thickness: int = 1,
-        quartline_color: tuple[int, ...] = (255, 255, 255),
+        quartline_color: ColorInput = (255, 255, 255),
         labels_jq_expression: str | None = None,
         labels_data_path: str | None = None,
         label_font_path: str | None = None,
         label_size: int = 12,
-        label_color: tuple[int, ...] = (200, 200, 200),
+        label_color: ColorInput = (200, 200, 200),
         **kwargs: Any,
     ) -> None:
         super().__init__(**kwargs)
@@ -47,18 +48,33 @@ class ProviderBarChartWidget(Widget):
         self.provider = list(providers.values())[0]
         self.data_path = data_path
         self.jq_expression = jq_expression
-        self.bar_color = tuple(bar_color)
+        self.bar_color = parse_color(bar_color, "bar_color")
         self.bar_colors: dict[str, tuple[int, ...]] = (
-            {k: tuple(v) for k, v in bar_colors.items()} if bar_colors else {}
+            {
+                k: parse_color(v, f"bar_colors.{k}")
+                for k, v in bar_colors.items()
+            }
+            if bar_colors
+            else {}
         )
         self.bar_background_colors: dict[str, tuple[int, ...]] = (
-            {k: tuple(v) for k, v in bar_background_colors.items()} if bar_background_colors else {}
+            {
+                k: parse_color(v, f"bar_background_colors.{k}")
+                for k, v in bar_background_colors.items()
+            }
+            if bar_background_colors
+            else {}
         )
         # Sort thresholds descending so we check highest first
         self.bar_color_thresholds: list[dict] = sorted(
             [
-                {"above": float(t["above"]), "color": tuple(t["color"])}
-                for t in (bar_color_thresholds or [])
+                {
+                    "above": float(t["above"]),
+                    "color": parse_color(
+                        t["color"], f"bar_color_thresholds[{i}].color"
+                    ),
+                }
+                for i, t in enumerate(bar_color_thresholds or [])
             ],
             key=lambda t: t["above"],
             reverse=True,
@@ -68,15 +84,15 @@ class ProviderBarChartWidget(Widget):
         self.min_value = min_value
         self.midline = midline
         self.midline_thickness = midline_thickness
-        self.midline_color = tuple(midline_color)
+        self.midline_color = parse_color(midline_color, "midline_color")
         self.quartline = quartline
         self.quartline_thickness = quartline_thickness
-        self.quartline_color = tuple(quartline_color)
+        self.quartline_color = parse_color(quartline_color, "quartline_color")
         self.labels_jq_expression = labels_jq_expression
         self.labels_data_path = labels_data_path
         self.label_font_path = label_font_path
         self.label_size = label_size
-        self.label_color = tuple(label_color)
+        self.label_color = parse_color(label_color, "label_color")
 
         self.last_seen_timestamp: float = 0
         self.surface: pygame.Surface | None = None

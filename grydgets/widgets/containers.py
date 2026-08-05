@@ -13,6 +13,7 @@ import pygame
 import requests
 
 from grydgets.benchmark import benchmark
+from grydgets.colors import ColorInput, parse_color, parse_optional_color
 from grydgets.json_utils import extract_data
 from grydgets.widgets.base import ContainerWidget, WidgetUpdaterThread, UpdaterWidget, Widget
 
@@ -40,13 +41,13 @@ class ScreenWidget(ContainerWidget):
     def __init__(
         self,
         size: tuple[int, int],
-        color: tuple[int, ...] = (0, 0, 0),
+        color: ColorInput = (0, 0, 0),
         image_path: str | None = None,
         drop_shadow: bool = False,
         **kwargs: Any,
     ) -> None:
         super().__init__(size, **kwargs)
-        self.color = color
+        self.color = parse_color(color, "background_color")
         self.size = size
         self.image_path = image_path
         self.image: pygame.Surface | None = None
@@ -106,8 +107,8 @@ class GridWidget(ContainerWidget):
         row_ratios: Sequence[float] | None = None,
         column_ratios: Sequence[float] | None = None,
         padding: int = 0,
-        color: tuple[int, ...] | None = None,
-        widget_color: tuple[int, ...] | None = None,
+        color: ColorInput | None = None,
+        widget_color: ColorInput | None = None,
         corner_radius: int = 0,
         widget_corner_radius: int = 0,
         image_path: str | None = None,
@@ -118,8 +119,8 @@ class GridWidget(ContainerWidget):
         self.rows = rows
         self.columns = columns
         self.padding = padding
-        self.color = color
-        self.widget_color = widget_color
+        self.color = parse_optional_color(color, "color")
+        self.widget_color = parse_optional_color(widget_color, "widget_color")
         self.corner_radius = corner_radius
         self.widget_corner_radius = widget_corner_radius
         self.drop_shadow = drop_shadow
@@ -445,8 +446,8 @@ class PillWidget(ContainerWidget):
     def __init__(
         self,
         circular_mask: bool = False,
-        widget_background_color: tuple[int, ...] | None = None,
-        pill_background_color: tuple[int, ...] | None = None,
+        widget_background_color: ColorInput | None = None,
+        pill_background_color: ColorInput | None = None,
         pill_width_percent: float = 0.8,
         pill_height_percent: float = 0.2,
         pill_position_x: float = 0.5,
@@ -457,8 +458,12 @@ class PillWidget(ContainerWidget):
     ) -> None:
         super().__init__(**kwargs)
         self.circular_mask = circular_mask
-        self.widget_background_color = widget_background_color
-        self.pill_background_color = pill_background_color
+        self.widget_background_color = parse_optional_color(
+            widget_background_color, "widget_background_color"
+        )
+        self.pill_background_color = parse_optional_color(
+            pill_background_color, "pill_background_color"
+        )
         self.pill_width_percent = pill_width_percent
         self.pill_height_percent = pill_height_percent
         self.pill_position_x = pill_position_x

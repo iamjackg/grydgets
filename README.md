@@ -295,7 +295,7 @@ sample file is included in the repository.
 The top-level of your `widgets.yaml` defines options for the implicit main screen, which acts as a `ScreenWidget` container for your entire dashboard.
 
 *   `background_image` _(optional)_: The path to an image file to use as the background for the entire screen.
-*   `background_color` _(optional)_: A color for the screen background, as a list of RGB or RGBA components. Defaults to `[0, 0, 0]` (black).
+*   `background_color` _(optional)_: A color for the screen background, see [Colors](#colors). Defaults to `[0, 0, 0]` (black).
 *   `drop_shadow` _(optional)_: If `true`, a drop shadow effect will be applied to the main content of the screen. Defaults to `false`.
 *   `widgets`: A list containing the root widget(s) of your dashboard. Note that the `ScreenWidget` currently only supports a single child widget.
 
@@ -315,6 +315,44 @@ widget.
 Most widgets support the following optional parameters:
 
 *   `name` _(optional)_: A unique name for the widget instance. This is used for logging and for identifying notifiable widgets. If not provided, the widget type name is used.
+
+### Colors
+
+Every parameter documented below as a color accepts either of two forms, and
+they're interchangeable everywhere — including the top-level `background_color`
+and the nested chart parameters such as `bar_colors` and `bar_color_thresholds`.
+
+**A list of RGB or RGBA components**, each `0`-`255`:
+
+```yaml
+color: [255, 136, 0]
+color: [255, 136, 0, 204]   # with alpha
+```
+
+**A CSS-style string**:
+
+| Form | Example | Meaning |
+|---|---|---|
+| `#rrggbb` | `'#ff8800'` | opaque |
+| `#rrggbbaa` | `'#ff8800cc'` | with alpha |
+| `#rgb` | `'#f80'` | shorthand for `#ff8800` |
+| `#rgba` | `'#f80c'` | shorthand for `#ff8800cc` |
+| color name | `'orange'` | any [CSS color name](https://www.w3.org/TR/css-color-3/#svg-color) |
+
+Quote hex strings in YAML — an unquoted `#` starts a comment.
+
+```yaml
+  - widget: dateclock
+    time_color: '#eceff4'
+    date_color: '#8fbcbb'
+    background_color: '#000000a0'
+```
+
+A color that can't be parsed is an error at load time, naming the parameter it
+came from, rather than a silent fallback. The one exception is a color sent to
+a `notifiabletext` widget over the [notification server](#http-notification-server):
+that arrives at runtime from an outside caller, so a bad value is logged and
+ignored instead of interrupting the dashboard.
 
 ### Authentication Schemes
 
@@ -348,8 +386,8 @@ It supports the following parameters:
 *   `rows`: The number of rows in the grid.
 *   `columns`: The number of columns in the grid.
 *   `padding` _(optional)_: The amount of padding around each child widget, in pixels. Defaults to `0`.
-*   `color` _(optional)_: A background color for the grid itself (the "empty" space between widgets or behind the entire grid), as a list of RGB or RGBA components.
-*   `widget_color` _(optional)_: A background color for each *child widget's cell*, as a list of RGB or RGBA components.
+*   `color` _(optional)_: A background color for the grid itself (the "empty" space between widgets or behind the entire grid), see [Colors](#colors).
+*   `widget_color` _(optional)_: A background color for each *child widget's cell*, see [Colors](#colors).
 *   `corner_radius` _(optional)_: The corner radius for the overall grid background, in pixels. Defaults to `0`.
 *   `widget_corner_radius` _(optional)_: The corner radius for each child widget's background, in pixels. Defaults to `0`.
 *   `image_path` _(optional)_: The path to an image file to use as the background for the entire grid.
@@ -382,7 +420,7 @@ It supports the following parameters:
 *   `font_path` _(optional)_: The path to a ttf file to use as font for the label text.
 *   `position` _(optional)_: `above` or `below` the child widget. Defaults to `above`.
 *   `text_size` _(optional)_: The size of the label text in pixels.
-*   `text_color` _(optional)_: The color of the label text, as a list of RGB or RGBA components. Defaults to `[255, 255, 255]` (white).
+*   `text_color` _(optional)_: The color of the label text, see [Colors](#colors). Defaults to `[255, 255, 255]` (white).
 
 Example:
 
@@ -499,8 +537,8 @@ A specialized container widget that superimposes a pill-shaped overlay on top of
 It supports the following parameters:
 
 *   `circular_mask` _(optional)_: If `true`, applies a circular mask to the base (first) widget. Defaults to `false`.
-*   `widget_background_color` _(optional)_: Background color for the masked widget when using circular mask. As RGB or RGBA.
-*   `pill_background_color` _(optional)_: Background color for the pill overlay. As RGB or RGBA. Defaults to transparent.
+*   `widget_background_color` _(optional)_: Background color for the masked widget when using circular mask. See [Colors](#colors).
+*   `pill_background_color` _(optional)_: Background color for the pill overlay. See [Colors](#colors). Defaults to transparent.
 *   `pill_width_percent` _(optional)_: Width of the pill as a percentage of container width (0.0-1.0). Defaults to `0.8`.
 *   `pill_height_percent` _(optional)_: Height of the pill as a percentage of container height (0.0-1.0). Defaults to `0.2`.
 *   `pill_position_x` _(optional)_: Horizontal center position of the pill (0.0-1.0). Defaults to `0.5` (centered).
@@ -540,7 +578,7 @@ It supports the following parameters:
 *   `font_path`: The path to a ttf file to use as font for the notification text.
 *   `padding` _(optional)_: The amount of padding around the notification text in pixels. Defaults to `0`.
 *   `text_size` _(optional)_: The size of the notification text in pixels.
-*   `color` _(optional)_: The default color of the notification text, as a list of RGB or RGBA components. Defaults to `[255, 255, 255]` (white).
+*   `color` _(optional)_: The default color of the notification text, see [Colors](#colors). Defaults to `[255, 255, 255]` (white).
 
 To send a notification, send a POST HTTP request to the port configured in `conf.yaml`.
 
@@ -602,7 +640,7 @@ It supports the following parameters:
 *   `text` _(optional)_: The text to display. Defaults to an empty string `''`.
 *   `text_size` _(optional)_: The size of the text in pixels. If not provided, it automatically adjusts to fit the widget's height.
 *   `font_path` _(optional)_: The path to a ttf file to use as font. If not provided, Pygame's default font is used.
-*   `color` _(optional)_: The color of the text, as a list of RGB or RGBA components. Defaults to `[255, 255, 255]` (white).
+*   `color` _(optional)_: The color of the text, see [Colors](#colors). Defaults to `[255, 255, 255]` (white).
 *   `padding` _(optional)_: The amount of padding around the text in pixels. Defaults to `0`.
 *   `align` _(optional)_: The horizontal alignment for the text. One of `left`, `center`, or `right`. Defaults to `left`.
 *   `vertical_align` _(optional)_: The vertical alignment for the text. One of `top`, `center`, or `bottom`. Defaults to `top`.
@@ -627,17 +665,24 @@ It supports the following parameters:
 
 *   `time_font_path`: The path to a ttf file to use as font for the time.
 *   `date_font_path`: The path to a ttf file to use as font for the date.
-*   `color` _(optional)_: The color of the time and date text, as a list of RGB or RGBA components. Defaults to `[255, 255, 255]` (white).
-*   `background_color` _(optional)_: The background color for the clock widget, as a list of RGB or RGBA components.
+*   `color` _(optional)_: The color of the time and date text, see [Colors](#colors). Defaults to `[255, 255, 255]` (white).
+*   `time_color` _(optional)_: The color of the time only. Overrides `color` for the time line.
+*   `date_color` _(optional)_: The color of the date only. Overrides `color` for the date line.
+*   `background_color` _(optional)_: The background color for the clock widget, see [Colors](#colors).
 *   `corner_radius` _(optional)_: The corner radius for the clock widget's background, in pixels. Defaults to `0`.
+
+The time and date are separate lines, so they can each take their own font and
+their own color — useful for pairing a display face on the time with a plainer
+one on the date.
 
 Example:
 
 ```yaml
   - widget: dateclock
-    time_font_path: 'OpenSans-ExtraBold.ttf'
-    date_font_path: 'OpenSans-Regular.ttf'
-    color: [255, 255, 255]
+    time_font_path: 'fonts/Fraunces-700.ttf'
+    date_font_path: 'fonts/Inter-400.ttf'
+    time_color: [236, 239, 244]
+    date_color: [143, 188, 187]
     background_color: [0, 0, 0, 160]
     corner_radius: 25
 ```
@@ -659,7 +704,7 @@ It supports the following parameters:
 *   `static` _(optional)_: If `true`, the HTTP request is made only once on startup and never repeated. Useful when displaying a fixed value. Defaults to `false`.
 *   `font_path` _(optional)_: The path to a ttf file to use as font. If not provided, Pygame's default font is used.
 *   `text_size` _(optional)_: The size of the text in pixels. If not provided, it automatically adjusts to fit the widget's height.
-*   `color` _(optional)_: The color of the text, as a list of RGB or RGBA components. Defaults to `[255, 255, 255]` (white).
+*   `color` _(optional)_: The color of the text, see [Colors](#colors). Defaults to `[255, 255, 255]` (white).
 *   `padding` _(optional)_: The amount of padding around the text in pixels. Defaults to `0`.
 *   `align` _(optional)_: The horizontal alignment for the text. One of `left`, `center`, or `right`. Defaults to `center`.
 *   `vertical_align` _(optional)_: The vertical alignment for the text. One of `top`, `center`, or `bottom`. Defaults to `center`.
@@ -692,7 +737,7 @@ It supports the following parameters:
 *   `show_errors` _(optional)_: If `true`, displays error messages instead of fallback text. Defaults to `false`.
 *   `font_path` _(optional)_: Path to a ttf font file.
 *   `text_size` _(optional)_: Text size in pixels.
-*   `color` _(optional)_: The color of the text, as a list of RGB or RGBA components. Defaults to `[255, 255, 255]` (white).
+*   `color` _(optional)_: The color of the text, see [Colors](#colors). Defaults to `[255, 255, 255]` (white).
 *   `padding` _(optional)_: The amount of padding around the text in pixels. Defaults to `0`.
 *   `align` _(optional)_: The horizontal alignment for the text. One of `left`, `center`, or `right`. Defaults to `center`.
 *   `vertical_align` _(optional)_: Vertical alignment (`top`, `center`, `bottom`). Defaults to `center`.
@@ -735,6 +780,7 @@ It supports the following parameters:
 *   `fallback_text` _(optional)_: Text to show on error. Defaults to `"--"`.
 *   `font_path` _(optional)_: Path to a ttf font file.
 *   `text_size` _(optional)_: Text size in pixels.
+*   `color` _(optional)_: The color of the text, see [Colors](#colors). Defaults to `[255, 255, 255]` (white).
 *   `vertical_align` _(optional)_: Vertical alignment. Defaults to `center`.
 
 Example:
@@ -901,24 +947,24 @@ It supports the following parameters:
 *   `providers`: A list containing exactly one provider name.
 *   `data_path` _(optional)_: JSON path to extract the list of values from provider data.
 *   `jq_expression` _(optional)_: jq expression that must return a JSON array of numbers.
-*   `bar_color` _(optional)_: Default color of the bars, as a list of RGB or RGBA components. Defaults to `[100, 149, 237]` (cornflower blue).
-*   `bar_colors` _(optional)_: A mapping of label strings to RGB or RGBA colors. Bars whose label matches a key are drawn in the corresponding color, taking priority over `bar_color_thresholds` and `bar_color`.
-*   `bar_color_thresholds` _(optional)_: A list of `{above: <value>, color: <RGB/RGBA>}` entries. Each bar is colored by the first threshold whose `above` value is less than or equal to the bar's value. Checked in descending order. Falls back to `bar_color` if no threshold matches.
-*   `bar_background_colors` _(optional)_: A mapping of label strings to RGB or RGBA colors. Draws a full-height background rectangle behind the matching bar. Useful as a visual demarcator — visible even when the bar value is zero.
+*   `bar_color` _(optional)_: Default color of the bars, see [Colors](#colors). Defaults to `[100, 149, 237]` (cornflower blue).
+*   `bar_colors` _(optional)_: A mapping of label strings to colors (see [Colors](#colors)). Bars whose label matches a key are drawn in the corresponding color, taking priority over `bar_color_thresholds` and `bar_color`.
+*   `bar_color_thresholds` _(optional)_: A list of `{above: <value>, color: <color>}` entries (see [Colors](#colors)). Each bar is colored by the first threshold whose `above` value is less than or equal to the bar's value. Checked in descending order. Falls back to `bar_color` if no threshold matches.
+*   `bar_background_colors` _(optional)_: A mapping of label strings to colors (see [Colors](#colors)). Draws a full-height background rectangle behind the matching bar. Useful as a visual demarcator — visible even when the bar value is zero.
 *   `bar_gap` _(optional)_: Gap between bars in pixels. Defaults to `2`.
 *   `max_value` _(optional)_: Fixed maximum value for the chart. If not provided, auto-scales to the maximum value in the data.
 *   `min_value` _(optional)_: Minimum value for the chart. Defaults to `0`.
 *   `midline` _(optional)_: If `true`, draws a horizontal marker line at the 50% point behind the bars. Defaults to `false`.
 *   `midline_thickness` _(optional)_: Thickness of the midline in pixels. Defaults to `1`.
-*   `midline_color` _(optional)_: Color of the midline, as RGB or RGBA. Defaults to `[255, 255, 255]` (white).
+*   `midline_color` _(optional)_: Color of the midline, see [Colors](#colors). Defaults to `[255, 255, 255]` (white).
 *   `quartline` _(optional)_: If `true`, draws horizontal marker lines at the 25% and 75% points behind the bars. Defaults to `false`.
 *   `quartline_thickness` _(optional)_: Thickness of the quartlines in pixels. Defaults to `1`.
-*   `quartline_color` _(optional)_: Color of the quartlines, as RGB or RGBA. Defaults to `[255, 255, 255]` (white).
+*   `quartline_color` _(optional)_: Color of the quartlines, see [Colors](#colors). Defaults to `[255, 255, 255]` (white).
 *   `labels_jq_expression` _(optional)_: jq expression that returns a JSON array of strings to use as bar labels.
 *   `labels_data_path` _(optional)_: JSON path alternative to `labels_jq_expression`.
 *   `label_font_path` _(optional)_: Path to a ttf font file for the labels.
 *   `label_size` _(optional)_: Font size for the labels in pixels. Defaults to `12`.
-*   `label_color` _(optional)_: Color of the label text, as RGB or RGBA. Defaults to `[200, 200, 200]`.
+*   `label_color` _(optional)_: Color of the label text, see [Colors](#colors). Defaults to `[200, 200, 200]`.
 
 Example (hourly rain probability for the next 24 hours):
 
