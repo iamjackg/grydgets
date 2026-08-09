@@ -8,6 +8,19 @@ logging:
 server:
   port: 5000
 
+# Day/night themes. Without this block there is one theme, all day.
+# appearance:
+#   themes:
+#     day: themes/flexoki-paper.yaml
+#     night: themes/carbon-press.yaml
+#   # Leave the coordinates out to switch only via POST /theme.
+#   latitude: 45.12
+#   longitude: -75.34
+#   offsets:      # minutes, per boundary; negative is earlier
+#     sunrise: 0
+#     sunset: -30
+#   default: day  # theme at startup, and on days the sun doesn't set
+
 # Output configuration — at least one output is required.
 # You can combine multiple outputs (e.g. window + post).
 outputs:

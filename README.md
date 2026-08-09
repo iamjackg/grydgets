@@ -69,7 +69,7 @@ grydgets [--widgets FILE] [--theme FILE] [--config-dir DIR]
 ```
 
 *   `--widgets` — Widget configuration file (default: `widgets.yaml`)
-*   `--theme` — Theme file replacing the widgets file's `theme:` block, see [Theme files](#theme-files). Without it, the theme in the widgets file is used.
+*   `--theme` — Theme file replacing the widgets file's `theme:` block, see [Theme files](#theme-files). Without it, the theme in the widgets file is used. Naming one theme for the whole run turns off [day/night switching](#day-and-night-themes) if `conf.yaml` configures it.
 *   `--config-dir` — Directory containing config files, fonts, and images. All relative paths are resolved from this directory. Defaults to the current working directory.
 
 ## Configuration
@@ -96,6 +96,59 @@ server:
 *   `resolution`: Screen resolution as `[width, height]`.
 *   `smooth-scaling` _(optional)_: Use bilinear filtering for image scaling (`true`, default) or faster nearest-neighbor (`false`). Set to `false` on low-power hardware like a Raspberry Pi 2.
 *   `flip` _(optional)_: Rotate the output 180 degrees. Defaults to `false`.
+
+#### Day and night themes
+
+An `appearance:` block names two [theme files](#theme-files) and the location
+whose sunrise and sunset switch between them. Without it there is one theme, all
+day.
+
+```yaml
+appearance:
+  latitude: 45.12
+  longitude: -75.34
+  themes:
+    day: themes/nord-editorial.yaml
+    night: themes/carbon-press.yaml
+  offsets:
+    sunrise: 0
+    sunset: -30
+```
+
+*   `themes.day`, `themes.night`: Theme files, resolved from `--config-dir` like every other path. Both are loaded and checked at startup, so a mistake in the night theme is reported when you start the dashboard rather than at dusk.
+*   `latitude`, `longitude` _(optional, but both or neither)_: Decimal degrees, north and east positive. Sunrise and sunset are worked out locally — nothing is fetched, and the dashboard switches on time with no network. Leave them out to switch only over [HTTP](#setting-the-theme).
+*   `offsets` _(optional)_: Minutes to move each boundary, negative for earlier. Each applies to its own boundary only, so the example goes dark half an hour before sunset without also delaying the morning. Defaults to `0`.
+*   `default` _(optional)_: Which theme a fresh start puts up, `day` or `night`. It stands until something changes it, and is also what gets used on a day the sun neither rises nor sets. Defaults to `day`.
+
+Without coordinates the sun is never consulted and the
+[`/theme` endpoint](#setting-the-theme) is the only thing that changes the
+theme — for when something else should be deciding, such as a Home Assistant
+automation watching a light sensor, or a presence rule:
+
+```yaml
+appearance:
+  default: night
+  themes:
+    day: themes/paper.yaml
+    night: themes/carbon-press.yaml
+```
+
+The coordinates only need to be roughly right — a degree is about four minutes
+of sunset. At startup and on every switch the log says what the sun is doing,
+which is the quickest way to check them:
+
+```
+Sun at 45.12,-75.34: day from 05:57 to 19:45 local (offsets +0/-30 min); night theme at 19:45
+```
+
+Switching rebuilds the widget tree with the other theme and leaves the
+[providers](#providers) running, so widgets keep the data they already have
+instead of blanking while they fetch it again. Above the polar circles, on a day
+with no sunrise or sunset, whichever theme is up stays up.
+
+The theme in use can be pinned or handed back to the sun at runtime over the
+[notification server](#setting-the-theme), which is how to look at both themes
+without waiting for dusk.
 
 ### Outputs
 
@@ -371,7 +424,7 @@ theme:
   colors:
     screen: '#1b1b1b'
   images:
-    screen: bgcolorlight.jpg
+    screen: images/background.jpg
 
 background_image: !image screen
 background_color: !color screen
@@ -480,6 +533,10 @@ entries it's missing, rather than a failure later on inside a widget. Defining
 Relative paths inside a theme file are resolved like any other, from
 `--config-dir`. The file is re-read on [reload](#hot-reload), so editing a theme
 and sending `SIGUSR1` shows it without a restart.
+
+Two theme files can be named in `conf.yaml` instead of one on the command line,
+and the dashboard moves between them at sunrise and sunset — see
+[Day and night themes](#day-and-night-themes).
 
 The [widget editor](#widget-editor) knows nothing about `--theme`: it reads and
 writes the base theme in the widgets file, and a document edited while an
@@ -1355,6 +1412,38 @@ curl -X POST -H "Content-Type: application/json" \
   -d '{"widget": "image-notification", "url": "https://example.com/image.jpg", "duration": 5}' \
   http://localhost:5000/notify
 ```
+
+#### Setting the theme
+
+When `conf.yaml` configures [day and night themes](#day-and-night-themes),
+`/theme` holds one of them regardless of the sun, or hands control back:
+
+```bash
+curl -X POST -H "Content-Type: application/json" \
+  -d '{"mode": "night"}' http://localhost:5000/theme
+# {"success": true, "mode": "night", "following_sun": false,
+#  "held_until": "2026-08-09T23:56:59+00:00"}
+```
+
+*   `mode`: `day`, `night`, or `auto` to follow the sun again from now.
+*   `hold` _(optional)_: How long a `day` or `night` choice lasts. `next` (the default) holds it until the sun's next sunrise or sunset, and then goes back to following the sun. `forever` holds it until `auto` is sent or the dashboard restarts.
+
+The default matters: asking for night once at three in the afternoon should not
+stop a dashboard following the sun for good, silently, and leave it dark at
+breakfast. So an override lapses at the next boundary unless you say otherwise.
+Where there are no coordinates there is no boundary to lapse at, so every
+choice holds until the next one.
+
+A `GET` on the same URL reports the state without changing it:
+
+```bash
+curl http://localhost:5000/theme
+# {"success": true, "mode": "day", "following_sun": true, "held_until": null,
+#  "next_change": "2026-08-09T23:56:59+00:00", "next_mode": "night"}
+```
+
+Asking when there is only one theme, or while `--theme` is in force, is a 400
+saying so; so is `auto` when no coordinates are configured.
 
 ### Secrets Management
 

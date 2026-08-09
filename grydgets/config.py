@@ -184,6 +184,63 @@ post_output_schema = {
 }
 
 
+# Day/night appearance. The two theme files are named here rather than in the
+# widgets file because the coordinates have to live in conf.yaml regardless --
+# they are a property of where the screen is, not of what it draws -- and
+# splitting one feature across two files would be worse than either.
+#
+# The coordinates are optional: without them nothing switches on its own and
+# the POST /theme endpoint is the only thing that changes the theme, which is
+# what you want if something else (a presence sensor, a light sensor, an
+# automation) should be making the decision instead of the sun.
+appearance_schema = {
+    voluptuous.Optional("latitude"): voluptuous.All(
+        voluptuous.Coerce(float), voluptuous.Range(min=-90, max=90)
+    ),
+    voluptuous.Optional("longitude"): voluptuous.All(
+        voluptuous.Coerce(float), voluptuous.Range(min=-180, max=180)
+    ),
+    # Which theme a fresh start puts up: the one used until the endpoint says
+    # otherwise, and the one the sun's answer is replaced by on a day it has
+    # none (inside a polar circle).
+    voluptuous.Optional("default", default="day"): voluptuous.In(["day", "night"]),
+    voluptuous.Required("themes"): {
+        voluptuous.Required("day"): str,
+        voluptuous.Required("night"): str,
+    },
+    # Minutes, per boundary, so dusk can be brought forward without also
+    # delaying the morning. Capped at half a day, past which an offset has
+    # stopped meaning "a bit before sunset" and is a typo.
+    voluptuous.Optional("offsets"): {
+        voluptuous.Optional("sunrise", default=0): voluptuous.All(
+            int, voluptuous.Range(min=-720, max=720)
+        ),
+        voluptuous.Optional("sunset", default=0): voluptuous.All(
+            int, voluptuous.Range(min=-720, max=720)
+        ),
+    },
+}
+
+
+def _validate_appearance(value):
+    """Validate ``appearance:``, rejecting half a location.
+
+    One coordinate on its own is always a mistake -- an unfinished edit, or a
+    typo in a key name -- and taken at face value it would silently mean
+    "manual switching only", which is not what someone who wrote a latitude
+    wanted.
+    """
+    validated = voluptuous.Schema(appearance_schema)(value)
+    has = [k for k in ("latitude", "longitude") if k in validated]
+    if len(has) == 1:
+        missing = "longitude" if has[0] == "latitude" else "latitude"
+        raise voluptuous.Invalid(
+            f"appearance has a {has[0]} but no {missing}: give both to switch "
+            f"themes by the sun, or neither to switch them only over HTTP"
+        )
+    return validated
+
+
 def _validate_output(value):
     """Validate a single output entry by dispatching to the right sub-schema."""
     if not isinstance(value, dict) or "type" not in value:
@@ -249,6 +306,8 @@ config_schema = voluptuous.Schema(
         },
         # New outputs config
         voluptuous.Optional("outputs"): [_validate_output],
+        # Day/night theme switching. Absent means one theme, all day.
+        voluptuous.Optional("appearance"): _validate_appearance,
     }
 )
 
