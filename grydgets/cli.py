@@ -49,11 +49,9 @@ def parse_args():
 def fail(error, config_dir):
     """Report a bad config file and stop.
 
-    Nothing about these is a bug in grydgets, so they exit with the message
-    on its own rather than a traceback. ``config_dir`` is the absolute
-    directory relative paths were resolved against, or None if the process
-    never moved: worth saying when --config-dir was given, because then the
-    file that wasn't found is not the one in the directory you ran from.
+    A config error isn't a bug in grydgets, so it exits with a message rather
+    than a traceback. ``config_dir`` is the directory relative paths were
+    resolved against, or None if the process never moved.
     """
     message = f"grydgets: {error}"
     if config_dir is not None:
@@ -62,11 +60,7 @@ def fail(error, config_dir):
 
 
 def apply_text_scale(render_config):
-    """Hand ``graphics.text-scale`` to the font layer.
-
-    Logged when it isn't 1, because a dashboard whose text is all the wrong
-    size looks identical whether the scale is wrong or the widgets are.
-    """
+    """Hand ``graphics.text-scale`` to the font layer."""
     scale = render_config.get("text-scale", 1.0)
     fonts.set_text_scale(scale)
     if scale != 1.0:
@@ -98,12 +92,9 @@ def main():
         Read on every call, not once, so SIGUSR1 picks up an edited theme file
         the same way it picks up an edited widgets file.
 
-        Both themes are loaded up front rather than at the moment one is first
-        needed. A theme file missing an entry the base theme defines is a load
-        error (``theme.check_replacement``), and finding that out at sunset
-        means finding it inside ``reload_configuration``'s except branch, which
-        logs and leaves the old theme up. Finding it at startup means the
-        message is on the terminal of whoever just edited the file.
+        Both themes are loaded up front so that a theme file missing an entry
+        the base theme defines (``theme.check_replacement``) is reported at
+        startup rather than at sunset.
         """
         if theme_files is None:
             return {
@@ -178,7 +169,6 @@ def main():
 
     logging.getLogger().setLevel(logging.getLevelName(conf["logging"]["level"].upper()))
 
-    # Create outputs
     outputs = create_outputs(conf["outputs"], render_config)
     any_needs_display = any(o.needs_display for o in outputs)
     fps_limit = max(o.preferred_fps for o in outputs)
@@ -196,11 +186,9 @@ def main():
     pygame.init()
     pygame.mixer.quit()
 
-    # Setup outputs (creates display surface if needed)
     for output in outputs:
         output.setup(screen_size)
 
-    # Initialize and start providers
     try:
         provider_manager = ProviderManager('providers.yaml')
     except (config.ConfigError, theme.ThemeError) as e:
@@ -243,7 +231,6 @@ def main():
         active_mode = mode
         last_surface = None
 
-    # Flask app for notifications
     app = Flask(__name__)
 
     @app.route("/notify", methods=["POST"])
@@ -324,12 +311,8 @@ def main():
                 forced_mode, forced_until = None, None
             else:
                 forced_mode = requested
-                # A hold that lapses at the next sunrise or sunset is the
-                # default because the alternative is worse: one "go dark now"
-                # at three in the afternoon would otherwise stop the dashboard
-                # following the sun for good, silently, and it would still be
-                # dark at breakfast. Nothing about asking for night once says
-                # you want to stop the sun being in charge.
+                # Holds lapse at the next boundary by default, so a one-off
+                # request doesn't silently stop the dashboard following the sun.
                 upcoming = schedule.next_change() if schedule is not None else None
                 forced_until = upcoming[0] if (hold == "next" and upcoming) else None
             wanted = forced_mode or schedule.mode_at() or active_mode
@@ -359,7 +342,6 @@ def main():
                 new_conf = config.load_config("conf.yaml")
                 new_conf = config.migrate_config(new_conf)
 
-                # Check if display requirements changed (requires restart)
                 new_outputs = create_outputs(new_conf["outputs"], new_conf["graphics"])
                 new_needs_display = any(o.needs_display for o in new_outputs)
                 if new_needs_display != any_needs_display:
@@ -369,15 +351,13 @@ def main():
                     )
                     return
 
-                # Nothing here is stored on a widget, so the rebuilt tree
-                # below picks the new scale up on its first render.
+                # Read at render time, so the tree rebuilt below picks up a
+                # changed scale without anything being reset on the widgets.
                 apply_text_scale(new_conf["graphics"])
 
-                # Stop old outputs
                 for output in outputs:
                     output.stop()
 
-                # Setup new outputs
                 outputs = new_outputs
                 for output in outputs:
                     output.setup(screen_size)
@@ -385,8 +365,6 @@ def main():
                 any_needs_display = new_needs_display
                 last_surface = None
 
-                # A reload can add, remove or repoint the day/night themes, so
-                # the schedule is rebuilt from the file that was just read.
                 # Everything is loaded before anything is swapped in, so a bad
                 # edit leaves the running dashboard as it was.
                 new_appearance = new_conf.get("appearance")
@@ -420,8 +398,7 @@ def main():
 
                 # Whichever theme was up stays up, so a reload doesn't put the
                 # day theme on a dark screen at midnight. A mode that no longer
-                # exists -- switching was just turned on, or off -- falls back
-                # to what the sun says now.
+                # exists falls back to what the sun says now.
                 if active_mode not in widget_trees:
                     active_mode = None
                     if theme_files is not None:

@@ -101,14 +101,11 @@ server:
 
 ##### Reading the same widgets file on two screens
 
-A `text_size` is a number of pixels, so the same value looks smaller on a screen
-with more pixels in the same physical space: `text_size: 50` that reads well on a
-1366x768 panel is cramped on a 1080p one of the same size. `text-scale` fixes that
-in `conf.yaml` — the file that is already per-machine — so one `widgets.yaml` and
-one set of theme files can serve both.
-
-Pick it by dividing the height of this screen by the height you sized the widgets
-for. Widgets written against 768 need `text-scale: 1.4` on a 1080p screen:
+Because `text_size` is a pixel count, the same value looks smaller on a denser
+screen. `text-scale` lives in `conf.yaml`, which is already per-machine, so one
+`widgets.yaml` can serve both. Set it to this screen's height divided by the
+height the widgets were sized for — widgets written against 768 need `1.4` on a
+1080p screen:
 
 ```yaml
 graphics:
@@ -116,10 +113,9 @@ graphics:
   text-scale: 1.4
 ```
 
-Only sizes you wrote down are scaled — `text_size`, and a bar chart's `label_size`.
-A widget with no `text_size` sizes its text from the height of its own cell, which
-already grew with the resolution, so it is left alone. Nothing else moves either:
-`padding` and `corner_radius` are unaffected.
+Only `text_size` and a bar chart's `label_size` are scaled. A widget with no
+`text_size` fits its text to its own cell, which already grew with the
+resolution. `padding` and `corner_radius` are unaffected.
 
 #### Day and night themes
 
@@ -132,8 +128,8 @@ appearance:
   latitude: 45.12
   longitude: -75.34
   themes:
-    day: themes/nord-editorial.yaml
-    night: themes/carbon-press.yaml
+    day: themes/day.yaml
+    night: themes/night.yaml
   offsets:
     sunrise: 0
     sunset: -30
@@ -153,8 +149,8 @@ automation watching a light sensor, or a presence rule:
 appearance:
   default: night
   themes:
-    day: themes/paper.yaml
-    night: themes/carbon-press.yaml
+    day: themes/day.yaml
+    night: themes/night.yaml
 ```
 
 The coordinates only need to be roughly right — a degree is about four minutes

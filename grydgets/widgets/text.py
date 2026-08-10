@@ -77,10 +77,8 @@ class TextWidget(Widget):
                 self.size[1] - (self.padding * 2),
             )
 
-            # A cap that was written down is in the pixels of whichever screen
-            # it was written for, so graphics.text-scale converts it. Falling
-            # back to the cell height needs no conversion: the cell is already
-            # this screen's size.
+            # Only a configured cap is scaled; the cell height fallback is
+            # already in this screen's pixels.
             text_size = (
                 scale_text_size(self.text_size) if self.text_size else real_size[1]
             )

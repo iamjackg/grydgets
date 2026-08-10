@@ -1,8 +1,4 @@
-"""Tests for graphics.text-scale, which converts the text sizes in
-widgets.yaml into the pixels of whichever screen is showing them.
-
-The interesting part is what does *not* scale: a widget with no text_size
-fits its text to its own cell, and that cell is already this screen's size.
+"""Tests for graphics.text-scale.
 
 Run with: uv run --with pytest python -m pytest tests/test_text_scale.py
 """
@@ -32,7 +28,6 @@ server:
 
 @pytest.fixture(autouse=True)
 def reset_scale():
-    """Every test gets 1.0, and leaves it that way for the next one."""
     fonts.set_text_scale(1.0)
     yield
     fonts.set_text_scale(1.0)
@@ -45,7 +40,6 @@ def load(tmp_path, extra=""):
 
 
 def apply(tmp_path, extra=""):
-    """The scale a conf.yaml ends up with, through the path startup takes."""
     cli.apply_text_scale(load(tmp_path, extra)["graphics"])
     return fonts.get_text_scale()
 
@@ -81,12 +75,8 @@ def test_scaling_never_reaches_zero():
 
 
 def rendered_glyph_height(text_size, scale, cell=(400, 200)):
-    """The height of the ink a TextWidget puts on its surface.
-
-    Measured off the pixels rather than by reading back a font size, because
-    the size the widget picked is exactly what the test shouldn't have to
-    trust.
-    """
+    """Height of the drawn glyph, measured off the rendered pixels rather
+    than read back from the font size the widget chose."""
     pygame.font.init()
     fonts.set_text_scale(scale)
     widget = TextWidget(text="8", text_size=text_size, align="center")
@@ -100,10 +90,9 @@ def test_a_capped_size_grows_with_the_scale():
     plain = rendered_glyph_height(40, 1.0)
     scaled = rendered_glyph_height(40, 2.0)
     # Not exactly double: a glyph is shorter than its font size, and both
-    # ends round. Close enough to show the cap was doubled and not ignored.
+    # ends round.
     assert scaled > plain * 1.8
 
 
 def test_an_uncapped_size_ignores_the_scale():
-    """The cell is this screen's size already, so fitting to it is right."""
     assert rendered_glyph_height(None, 1.0) == rendered_glyph_height(None, 2.0)

@@ -6,28 +6,22 @@
       latitude: 45.12
       longitude: -75.34
       themes:
-        day: themes/nord-editorial.yaml
-        night: themes/carbon-press.yaml
+        day: themes/day.yaml
+        night: themes/night.yaml
       offsets:
         sunrise: 0
         sunset: -30
 
-Each offset is in minutes and moves that boundary only, so the screen can go
-dark half an hour before the sun actually sets without also waiting half an
-hour to come back in the morning.
+Each offset is in minutes and moves that boundary only.
 
-Everything here works in UTC. The decision never needs a local timezone: a
-boundary is an instant, and comparing instants doesn't care what they are
-called. Local time appears only in :meth:`SunSchedule.describe`, which formats
-for a person reading a log line.
+Everything here works in UTC; local time appears only in
+:meth:`SunSchedule.describe`, for the log line.
 
 The mode is read off a list of transitions rather than by asking "is now
-between today's sunrise and today's sunset". That question has no good answer
-when the two fall either side of a UTC midnight -- true for most of the
-Americas -- and offsets can push a boundary across the date line too. Building
-the transitions for yesterday, today and tomorrow and taking the most recent
-one that has already happened sidesteps the ordering problem at every
-longitude.
+between today's sunrise and today's sunset". Those two can fall either side of
+a UTC midnight, and an offset can push a boundary across the date line, so
+taking the most recent transition from yesterday, today and tomorrow avoids
+the ordering problem at every longitude.
 """
 
 from __future__ import annotations

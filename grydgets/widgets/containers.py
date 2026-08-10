@@ -83,22 +83,14 @@ def _per_widget_value(
 
 
 def load_and_scale_image(image_path: str, size: tuple[int, int]) -> pygame.Surface:
-    # Load the image
     image = pygame.image.load(image_path)
-
-    # Get image dimensions
     image_width, image_height = image.get_size()
 
-    # Determine scale factor to fit the image to the longest side of the surface
+    # max() covers the surface, cropping the shorter side rather than letterboxing.
     scale_factor = max(size[0] / image_width, size[1] / image_height)
-
-    # Calculate new image dimensions
     new_dimensions = (int(image_width * scale_factor), int(image_height * scale_factor))
 
-    # Resize the image
-    scaled_image = pygame.transform.scale(image, new_dimensions)
-
-    return scaled_image
+    return pygame.transform.scale(image, new_dimensions)
 
 
 class ScreenWidget(ContainerWidget):
@@ -454,26 +446,22 @@ class ScheduleFlipWidget(FlipWidget):
         self.destination_widget: int | None = None
 
     def get_current_widget(self, current_time: datetime_time) -> int | None:
-        # Convert schedule to sorted list of (time, widget) tuples
         time_widgets = []
         for time_str, widget in self.schedule.items():
             hour, minute = map(int, time_str.split(":"))
             time_widgets.append((datetime_time(hour, minute), widget))
 
-        # Sort by time
         time_widgets.sort(key=lambda x: x[0])
 
-        # Find the active widget
         for i, (sched_time, widget) in enumerate(time_widgets):
+            # Wraps around, so the last entry's period runs until the first.
             next_time = time_widgets[(i + 1) % len(time_widgets)][0]
 
-            # Handle overnight periods (when next_time < sched_time)
             if next_time <= sched_time:
-                # This period spans midnight
+                # Spans midnight.
                 if current_time >= sched_time or current_time < next_time:
                     return list(map(lambda x: x.name, self.widget_list)).index(widget)
             else:
-                # Normal period within same day
                 if sched_time <= current_time < next_time:
                     return list(map(lambda x: x.name, self.widget_list)).index(widget)
 

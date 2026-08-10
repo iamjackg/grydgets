@@ -51,20 +51,17 @@ class ImageWidget(Widget):
             original_size = loaded_image_surface.get_size()
 
             if self.preserve_aspect_ratio:
-                # Calculate scaling ratios for both dimensions
                 width_ratio = self.size[0] / original_size[0]
                 height_ratio = self.size[1] / original_size[1]
 
-                # Use the smaller ratio to ensure image fits within container
+                # min() fits the image inside the container, leaving margin on
+                # the other axis rather than cropping.
                 scale_ratio = min(width_ratio, height_ratio)
-
-                # Scale both dimensions using the same ratio
                 final_size = (
                     int(original_size[0] * scale_ratio),
                     int(original_size[1] * scale_ratio),
                 )
             else:
-                # Original behavior: fit image to container
                 adjusted_sizes = list()
 
                 for picture_axis, container_axis in zip(original_size, self.size):

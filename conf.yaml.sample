@@ -11,8 +11,8 @@ server:
 # Day/night themes. Without this block there is one theme, all day.
 # appearance:
 #   themes:
-#     day: themes/flexoki-paper.yaml
-#     night: themes/carbon-press.yaml
+#     day: themes/day.yaml
+#     night: themes/night.yaml
 #   # Leave the coordinates out to switch only via POST /theme.
 #   latitude: 45.12
 #   longitude: -75.34
