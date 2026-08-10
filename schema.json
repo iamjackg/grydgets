@@ -451,8 +451,7 @@
               "corner_radius": { "type": "integer", "minimum": 0 },
               "padding": { "type": "integer", "minimum": 0 },
               "align": { "type": "string", "enum": ["left", "center", "right"] },
-              "vertical_align": { "type": "string", "enum": ["top", "center", "bottom"] },
-              "auth": { "$ref": "#/definitions/auth_scheme" }
+              "vertical_align": { "type": "string", "enum": ["top", "center", "bottom"] }
             },
             "additionalProperties": false
           }

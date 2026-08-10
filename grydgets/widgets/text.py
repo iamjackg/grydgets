@@ -11,7 +11,7 @@ from grydgets.colors import ColorInput, parse_color, parse_optional_color
 from grydgets.widgets.base import Widget, UpdaterWidget, ContainerWidget, renamed_parameter
 from grydgets.widgets.containers import GridWidget
 from grydgets.widgets.painting import paint_background
-from grydgets.fonts import FontCache
+from grydgets.fonts import FontCache, scale_text_size
 
 font_cache = FontCache()
 
@@ -77,7 +77,13 @@ class TextWidget(Widget):
                 self.size[1] - (self.padding * 2),
             )
 
-            text_size = self.text_size or real_size[1]
+            # A cap that was written down is in the pixels of whichever screen
+            # it was written for, so graphics.text-scale converts it. Falling
+            # back to the cell height needs no conversion: the cell is already
+            # this screen's size.
+            text_size = (
+                scale_text_size(self.text_size) if self.text_size else real_size[1]
+            )
             font = font_cache.get_font(self.font_path, text_size)
             while font.size(self.text)[0] > real_size[0] and text_size > 1:
                 text_size -= 1

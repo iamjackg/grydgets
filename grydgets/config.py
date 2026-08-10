@@ -277,6 +277,9 @@ config_schema = voluptuous.Schema(
             voluptuous.Optional("x-display"): str,
             voluptuous.Optional("flip", default=False): bool,
             voluptuous.Optional("smooth-scaling", default=True): bool,
+            voluptuous.Optional("text-scale", default=1.0): voluptuous.All(
+                voluptuous.Coerce(float), voluptuous.Range(min=0.1, max=10)
+            ),
         },
         voluptuous.Required("logging"): {
             voluptuous.Required("level", default="info"): voluptuous.In(

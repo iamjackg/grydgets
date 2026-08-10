@@ -86,6 +86,7 @@ graphics:
   resolution: [480, 320]
   smooth-scaling: true
   flip: false
+  text-scale: 1.0
 logging:
   level: info
 server:
@@ -96,6 +97,29 @@ server:
 *   `resolution`: Screen resolution as `[width, height]`.
 *   `smooth-scaling` _(optional)_: Use bilinear filtering for image scaling (`true`, default) or faster nearest-neighbor (`false`). Set to `false` on low-power hardware like a Raspberry Pi 2.
 *   `flip` _(optional)_: Rotate the output 180 degrees. Defaults to `false`.
+*   `text-scale` _(optional)_: Multiplier applied to every text size written in `widgets.yaml`. Defaults to `1.0`, which changes nothing.
+
+##### Reading the same widgets file on two screens
+
+A `text_size` is a number of pixels, so the same value looks smaller on a screen
+with more pixels in the same physical space: `text_size: 50` that reads well on a
+1366x768 panel is cramped on a 1080p one of the same size. `text-scale` fixes that
+in `conf.yaml` — the file that is already per-machine — so one `widgets.yaml` and
+one set of theme files can serve both.
+
+Pick it by dividing the height of this screen by the height you sized the widgets
+for. Widgets written against 768 need `text-scale: 1.4` on a 1080p screen:
+
+```yaml
+graphics:
+  resolution: [1920, 1080]
+  text-scale: 1.4
+```
+
+Only sizes you wrote down are scaled — `text_size`, and a bar chart's `label_size`.
+A widget with no `text_size` sizes its text from the height of its own cell, which
+already grew with the resolution, so it is left alone. Nothing else moves either:
+`padding` and `corner_radius` are unaffected.
 
 #### Day and night themes
 

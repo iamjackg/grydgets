@@ -5,7 +5,7 @@ from typing import Any
 import pygame
 
 from grydgets.colors import ColorInput, parse_color
-from grydgets.fonts import FontCache
+from grydgets.fonts import FontCache, scale_text_size
 from grydgets.json_utils import extract_data
 from grydgets.providers.base import DataProvider
 from grydgets.widgets.base import Widget
@@ -175,7 +175,9 @@ class ProviderBarChartWidget(Widget):
 
         has_labels = labels is not None and len(labels) > 0
         if has_labels:
-            font = font_cache.get_font(self.label_font_path, self.label_size)
+            font = font_cache.get_font(
+                self.label_font_path, scale_text_size(self.label_size)
+            )
             label_height = font.get_height() + 2
         else:
             font = None

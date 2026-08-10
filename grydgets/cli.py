@@ -10,7 +10,7 @@ import time
 import threading
 from flask import Flask, request, jsonify
 
-from grydgets import appearance, config, theme
+from grydgets import appearance, config, fonts, theme
 from grydgets.outputs import create_outputs
 from grydgets.widgets import image as image_module
 from grydgets.widgets.containers import ScreenWidget
@@ -59,6 +59,18 @@ def fail(error, config_dir):
     if config_dir is not None:
         message += f"\ngrydgets: config paths are relative to {config_dir}"
     sys.exit(message)
+
+
+def apply_text_scale(render_config):
+    """Hand ``graphics.text-scale`` to the font layer.
+
+    Logged when it isn't 1, because a dashboard whose text is all the wrong
+    size looks identical whether the scale is wrong or the widgets are.
+    """
+    scale = render_config.get("text-scale", 1.0)
+    fonts.set_text_scale(scale)
+    if scale != 1.0:
+        logging.info("Configured text sizes are multiplied by %g", scale)
 
 
 # How often the sun is asked whether it's still the same time of day. The
@@ -162,6 +174,7 @@ def main():
     render_config = conf["graphics"]
     screen_size = tuple(render_config["resolution"])
     image_module.smooth_scaling = render_config.get("smooth-scaling", True)
+    apply_text_scale(render_config)
 
     logging.getLogger().setLevel(logging.getLevelName(conf["logging"]["level"].upper()))
 
@@ -355,6 +368,10 @@ def main():
                         "Ignoring configuration reload."
                     )
                     return
+
+                # Nothing here is stored on a widget, so the rebuilt tree
+                # below picks the new scale up on its first render.
+                apply_text_scale(new_conf["graphics"])
 
                 # Stop old outputs
                 for output in outputs:

@@ -114,3 +114,9 @@ venv.bak/
 # mypy
 .mypy_cache/
 
+
+# yamltool.py checkpoint (single pre-change snapshot, transient)
+*.checkpoint
+
+# personal theme experiments, not part of the project
+/themes/
