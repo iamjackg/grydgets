@@ -99,6 +99,31 @@ def is_loopback(host):
         return False
 
 
+# Displays name their own resolution on /frame. The ceiling is only here so a
+# typo cannot ask the render host to scale a frame up to something enormous.
+MAX_FRAME_DIMENSION = 7680
+
+
+class BadSize(Exception):
+    """A caller asked for a frame size that cannot be served."""
+
+
+def requested_size(args):
+    """The size a display asked its frame to be encoded at, or None.
+
+    None means "as rendered", which is what a caller that names no size gets.
+    """
+    if "width" not in args and "height" not in args:
+        return None
+    try:
+        size = (int(args["width"]), int(args["height"]))
+    except (KeyError, ValueError):
+        raise BadSize("width and height must both be given, as integers")
+    if not all(1 <= side <= MAX_FRAME_DIMENSION for side in size):
+        raise BadSize(f"width and height must be between 1 and {MAX_FRAME_DIMENSION}")
+    return size
+
+
 def etag_matches(header, etag):
     """Whether an If-None-Match header names ``etag``."""
     if not header or etag is None:
@@ -364,12 +389,22 @@ def main():
     @app.route("/frame", methods=["GET"])
     @require_token("stream")
     def frame():
-        """The latest published frame, or 304 if the caller already has it."""
+        """The latest published frame, or 304 if the caller already has it.
+
+        ``?width=&height=`` asks for it at the caller's own resolution, so a
+        display never scales what it receives.
+        """
         output = active_stream_output()
         if output is None:
             return feature_off("no stream output is configured")
-        data, etag, published_at = output.current_frame()
-        if data is None:
+        try:
+            size = requested_size(request.args)
+        except BadSize as e:
+            return jsonify({"success": False, "error": str(e)}), 400
+        # Ask for the tag before the bytes: a display that is already showing
+        # this frame is answered without anything being encoded for it.
+        etag, published_at = output.current_etag(size)
+        if etag is None:
             return jsonify({
                 "success": False,
                 "error": "no frame has been published yet",
@@ -377,6 +412,7 @@ def main():
         if etag_matches(request.headers.get("If-None-Match"), etag):
             response = app.response_class(status=304)
         else:
+            data, etag, published_at = output.current_frame(size)
             response = app.response_class(data, mimetype=output.content_type)
         response.headers["ETag"] = f'"{etag}"'
         response.headers["Cache-Control"] = "no-store"
@@ -392,6 +428,18 @@ def main():
         output = active_stream_output()
         if output is None:
             return feature_off("no stream output is configured")
+        # Displays send their size here too. Nothing is served from it -- the
+        # size that matters is the one on /frame -- but it is the only place
+        # the log can say what is connected and how big it is.
+        try:
+            size = requested_size(request.args)
+        except BadSize as e:
+            return jsonify({"success": False, "error": str(e)}), 400
+        logging.info(
+            "Display at %s connected%s",
+            request.remote_addr,
+            "" if size is None else f", showing {size[0]}x{size[1]}",
+        )
 
         def generate(output):
             # Capture the output instead of looking it up per event. A reload
@@ -399,7 +447,9 @@ def main():
             # the client reconnects to the new one.
             subscriber = output.subscribe()
             try:
-                _, etag, published_at = output.current_frame()
+                # The etag here only says which frame is current. Displays
+                # compare the one from /frame, which names a size as well.
+                etag, published_at = output.current_etag()
                 if etag is not None:
                     yield f"data: {json.dumps({'etag': etag, 'published_at': published_at})}\n\n"
                 while True:

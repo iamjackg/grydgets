@@ -1,7 +1,7 @@
 # Configuration for grydgets-client, the remote display.
 #
 # This machine renders nothing. It connects to a Grydgets instance with a
-# `stream` output, fetches each new frame, scales it and displays it. No
+# `stream` output and fetches each new frame at this screen's resolution. No
 # widgets.yaml, no providers.yaml, no fonts.
 
 server:
@@ -18,8 +18,9 @@ server:
   stale_after: 30
 
 graphics:
-  # This screen's resolution. Frames arrive at whatever size the server renders
-  # and are scaled to fit, so the two do not have to match.
+  # This screen's resolution. Sent to the server, which encodes frames at this
+  # size so this machine never has to scale one. A frame that arrives at some
+  # other size is scaled to fit here instead.
   resolution: [1366, 768]
 
 logging:

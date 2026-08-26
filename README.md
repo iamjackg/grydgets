@@ -363,14 +363,28 @@ Two endpoints:
 
 ```
 GET /frame                        # the current frame, with an ETag
-  If-None-Match: "a1b2c3"         # -> 304 if you already have that one
+  ?width=1366&height=768          # optional: encode it at this size
+  If-None-Match: "a1b2c3-1366x768"  # -> 304 if you already have that one
   X-Frame-Published-At: 1712...   # response header: when this frame was published
 GET /events                       # text/event-stream, held open
+  ?width=1366&height=768          # optional: logged, so you can see who is connected
   data: {"etag": "d4e5f6", "published_at": 1712...}   # one per published frame
   : ping                          # every 20 seconds
 ```
 
-The ETag is a hash of the frame's bytes. A re-render that produces identical
+`width` and `height` are how a display asks for frames at its own resolution,
+and `grydgets-client` sends its `graphics.resolution` on every request. Give
+both or neither; a size outside 1-7680 or a missing half is a `400`. Without
+them the frame comes back at the size the dashboard renders at.
+
+Each size is scaled and encoded on first request and then held until the next
+frame is published, so several screens sharing a resolution cost one encode
+between them, and at most eight sizes are kept. The ETag names the frame and
+the size together — the same frame at two sizes is two different downloads.
+Asking for a frame you already have costs nothing: the `304` is answered from
+the ETag without encoding anything. On `/events` the size is only logged.
+
+The ETag is a hash of the frame's pixels. A re-render that produces identical
 pixels keeps the same ETag, so clients get a `304` and do not repaint. `/frame`
 returns `503` until the first frame is published, and `404` if no `stream`
 output is configured.
@@ -473,8 +487,8 @@ outputs:
 ```
 
 The rendering host needs no screen of its own; with no display output, SDL runs
-in dummy mode. One process feeds every screen, and each client scales what it
-receives.
+in dummy mode. One process feeds every screen, at whatever size each one asks
+for.
 
 #### On each screen
 
@@ -507,7 +521,7 @@ outputs:
 *   `server.token` _(optional)_: Must match the host's `server.auth.stream_token`.
 *   `server.reconnect_delay` _(optional)_: Seconds before reconnecting after a dropped connection. Defaults to `2`.
 *   `server.stale_after` _(optional)_: Seconds the connection must stay down before the warning triangle appears. Defaults to `30`.
-*   `graphics.resolution`: This screen's resolution. Frames arriving at a different size are scaled to it.
+*   `graphics.resolution`: This screen's resolution. Sent to the host with every request, so frames arrive already this size; anything that arrives at a different size is scaled to it here.
 *   `logging.level` _(optional)_: `debug`, `info`, or `warning`. Defaults to `info`. `debug` also turns on the [latency overlay](#latency-logginglevel-debug).
 *   `indicator.corner` _(optional)_: Where the warning triangle sits — `top-left`, `top-right`, `bottom-left`, `bottom-right`. Defaults to `bottom-right`.
 *   `outputs`: Exactly one display output, `window` or `framebuffer`, configured the same way as [on the server](#window).
@@ -519,9 +533,24 @@ down. Rendering natively at a smaller resolution gives you a different layout,
 not a smaller one: widgets auto-fit text to their own cell, so a dense widget
 that reads fine at 1080p can turn into an unreadable run of digits at 768.
 
-The client always scales with `smoothscale`, whatever the server's
+The scaling itself happens on the rendering host. Each client sends its
+`graphics.resolution` with every request for a frame, and gets one encoded at
+that size, so screens of different sizes can share one stream and none of them
+scales anything. A client only falls back to scaling locally if the frame
+arrives at some other size, which means the host is too old to understand the
+request.
+
+Both ends scale with `smoothscale`, whatever the server's
 `graphics.smooth-scaling` says. That setting applies to `ImageWidget`, and
 nearest-neighbour scaling breaks digit strokes at these ratios.
+
+Scaling is where a weak screen spends its time, which is why it is worth moving.
+A Raspberry Pi 1 taking a 1920x1080 JPEG down to 1366x768 spends roughly 420 ms
+decoding, 140 ms converting and 570 ms scaling; receiving it at 1366x768 drops
+all of that to about 290 ms, and the download with it. pygame only has a
+vectorised `smoothscale` on x86 and on ARM with NEON -- an ARMv6 Pi runs the
+plain C one, which `pygame.transform.get_smoothscale_backend()` reports as
+`GENERIC`.
 
 #### Latency (`logging.level: debug`)
 

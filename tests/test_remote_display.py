@@ -4,6 +4,7 @@ the frame endpoints are built from.
 Run with: uv run --with pytest python -m pytest tests/test_remote_display.py
 """
 
+import io
 import os
 import queue
 
@@ -18,6 +19,7 @@ import pygame
 from grydgets import config
 from grydgets.config import ConfigError
 from grydgets.outputs import create_outputs
+from grydgets.outputs import stream
 from grydgets.outputs.stream import SHUTDOWN, StreamOutput, offer
 
 
@@ -143,6 +145,106 @@ def test_nothing_is_published_until_the_tree_stops_changing(surfaces):
     assert data is not None and etag is not None and published_at is not None
 
 
+def publish(output, surface):
+    output.on_frame(surface, freshly_rendered=True)
+    output.on_frame(surface, freshly_rendered=False)
+
+
+def test_a_frame_is_encoded_at_the_size_the_display_asked_for(surfaces):
+    """The display should never have to scale what it receives."""
+    red, _ = surfaces
+    output = StreamOutput(debounce_ms=0, image_format="bmp")
+    publish(output, red)
+
+    data, _, _ = output.current_frame((40, 10))
+    assert pygame.image.load(io.BytesIO(data), "frame.bmp").get_size() == (40, 10)
+
+    # Asking for no size in particular gets the frame as it was rendered.
+    data, _, _ = output.current_frame()
+    assert pygame.image.load(io.BytesIO(data), "frame.bmp").get_size() == red.get_size()
+
+
+def test_sizes_are_encoded_once_and_then_served_from_the_cache(surfaces):
+    red, blue = surfaces
+    output = StreamOutput(debounce_ms=0)
+    publish(output, red)
+
+    encodes = []
+    real_encode = output._encode
+    output._encode = lambda surface, size: encodes.append(size) or real_encode(
+        surface, size
+    )
+
+    output.current_frame((40, 10))
+    output.current_frame((40, 10))
+    output.current_frame((20, 5))
+    assert encodes == [(40, 10), (20, 5)]
+
+    # A new frame invalidates every size, not just the one asked for next.
+    publish(output, blue)
+    output.current_frame((40, 10))
+    assert encodes == [(40, 10), (20, 5), (40, 10)]
+
+
+def test_only_so_many_sizes_are_cached(surfaces):
+    """A caller naming size after size must not grow the cache forever."""
+    red, _ = surfaces
+    output = StreamOutput(debounce_ms=0)
+    publish(output, red)
+
+    for width in range(1, stream.MAX_VARIANTS + 5):
+        output.current_frame((width, 10))
+    assert len(output._variants) == stream.MAX_VARIANTS
+
+
+def test_the_etag_covers_the_size_as_well_as_the_pixels(surfaces):
+    """Two screens holding one frame at two sizes hold different bytes."""
+    red, blue = surfaces
+    output = StreamOutput(debounce_ms=0)
+    publish(output, red)
+
+    _, small, _ = output.current_frame((40, 10))
+    _, large, _ = output.current_frame((80, 20))
+    assert small != large
+
+    publish(output, blue)
+    _, changed, _ = output.current_frame((40, 10))
+    assert changed != small
+
+
+def test_the_etag_is_available_without_encoding_anything(surfaces):
+    """So a display that already has the frame is 304ed for free."""
+    red, _ = surfaces
+    output = StreamOutput(debounce_ms=0)
+    assert output.current_etag((40, 10)) == (None, None)
+
+    publish(output, red)
+    etag, published_at = output.current_etag((40, 10))
+    assert output._variants == {}
+
+    data, encoded_etag, encoded_at = output.current_frame((40, 10))
+    assert (encoded_etag, encoded_at) == (etag, published_at)
+
+
+def test_a_frame_encoded_after_a_newer_one_arrives_is_not_cached(surfaces):
+    """Its bytes are already stale; caching them would serve them again."""
+    red, blue = surfaces
+    output = StreamOutput(debounce_ms=0)
+    publish(output, red)
+
+    real_encode = output._encode
+
+    def encode_then_publish(surface, size):
+        data = real_encode(surface, size)
+        output._encode = real_encode
+        publish(output, blue)
+        return data
+
+    output._encode = encode_then_publish
+    output.current_frame((40, 10))
+    assert output._variants == {}
+
+
 def test_identical_pixels_keep_their_etag(surfaces):
     """A re-render that changes nothing must not make clients repaint."""
     red, blue = surfaces
@@ -223,6 +325,22 @@ def test_etag_matches():
     assert not etag_matches("abc", "abc")  # unquoted isn't an ETag
     assert not etag_matches(None, "abc")
     assert not etag_matches('"abc"', None)
+
+
+def test_requested_size():
+    from grydgets.cli import BadSize, requested_size
+
+    assert requested_size({}) is None
+    assert requested_size({"width": "1366", "height": "768"}) == (1366, 768)
+    for args in (
+        {"width": "1366"},                    # half a size is not a size
+        {"height": "768"},
+        {"width": "1366", "height": "hd"},
+        {"width": "0", "height": "768"},
+        {"width": "99999", "height": "768"},
+    ):
+        with pytest.raises(BadSize):
+            requested_size(args)
 
 
 # --- client.yaml ----------------------------------------------------------

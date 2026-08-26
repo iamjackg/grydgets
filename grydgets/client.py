@@ -1,8 +1,8 @@
 """Frame viewer for a dashboard rendered on another machine.
 
-Holds an SSE connection to a grydgets instance running a ``stream`` output,
-fetches each new frame, scales it to this screen and displays it. No widget
-tree, no providers, no compositing.
+Holds an SSE connection to a grydgets instance running a ``stream`` output and
+fetches each new frame at this screen's resolution, scaling one only if it
+arrives at some other size. No widget tree, no providers, no compositing.
 
 Nothing here imports ``grydgets.widgets``, ``grydgets.providers`` or flask, and
 it must stay that way -- a small footprint is the reason to run a viewer at
@@ -86,7 +86,12 @@ class FrameSource(threading.Thread):
     sits idle.
     """
 
-    def __init__(self, server: dict, stop_event: threading.Event) -> None:
+    def __init__(
+        self,
+        server: dict,
+        resolution: tuple[int, int],
+        stop_event: threading.Event,
+    ) -> None:
         super().__init__(daemon=True)
         self.logger = logging.getLogger("FrameSource")
         base = server["url"]
@@ -96,6 +101,10 @@ class FrameSource(threading.Thread):
         self.events_url = urljoin(base, "events")
         self.reconnect_delay = server["reconnect_delay"]
         self.stale_after = server["stale_after"]
+        # Asking for this screen's size gets frames already scaled to it. A
+        # server too old to understand it sends them as rendered, and decode()
+        # scales them here instead.
+        self.params = {"width": resolution[0], "height": resolution[1]}
         self.headers = {}
         if server.get("token"):
             self.headers["Authorization"] = f"Bearer {server['token']}"
@@ -161,7 +170,7 @@ class FrameSource(threading.Thread):
             headers["If-None-Match"] = self._etag
         fetch_start = time.time()
         response = self.session.get(
-            self.frame_url, headers=headers, timeout=FETCH_TIMEOUT
+            self.frame_url, params=self.params, headers=headers, timeout=FETCH_TIMEOUT
         )
         if response.status_code == 401:
             raise AuthRejected(f"{self.frame_url} rejected the token")
@@ -193,7 +202,11 @@ class FrameSource(threading.Thread):
     def stream_events(self) -> None:
         """Fetch a frame for every event, until the connection drops."""
         response = self.session.get(
-            self.events_url, headers=self.headers, stream=True, timeout=EVENTS_TIMEOUT
+            self.events_url,
+            params=self.params,
+            headers=self.headers,
+            stream=True,
+            timeout=EVENTS_TIMEOUT,
         )
         if response.status_code == 401:
             raise AuthRejected(f"{self.events_url} rejected the token")
@@ -342,7 +355,7 @@ def run(conf: dict) -> None:
     output: Output = outputs[0]
 
     stop_event = threading.Event()
-    source = FrameSource(conf["server"], stop_event)
+    source = FrameSource(conf["server"], resolution, stop_event)
 
     output.pre_init()
     pygame.init()
@@ -460,6 +473,9 @@ def main():
         sys.exit(message)
 
     logging.getLogger().setLevel(logging.getLevelName(conf["logging"]["level"].upper()))
+    # urllib3 logs a line per request and per reconnect. At debug level that
+    # buries the frame timings, which are the reason to be at debug level.
+    logging.getLogger("urllib3").setLevel(logging.INFO)
     run(conf)
 
 

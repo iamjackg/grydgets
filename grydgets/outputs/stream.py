@@ -1,9 +1,13 @@
 """In-memory frame stream for remote displays.
 
-Keeps the latest encoded frame and the set of subscribers waiting to be told
-it changed. The HTTP endpoints that serve them live in ``cli.py``, because
-Flask routes cannot be unregistered and SIGUSR1 recreates every output -- an
-output that registered its own routes would fail on the second reload.
+Keeps the latest frame and the set of subscribers waiting to be told it
+changed. Displays ask for it at their own resolution and each size is encoded
+once, so a screen never scales what it receives and never downloads pixels it
+is about to throw away.
+
+The HTTP endpoints that serve them live in ``cli.py``, because Flask routes
+cannot be unregistered and SIGUSR1 recreates every output -- an output that
+registered its own routes would fail on the second reload.
 """
 
 from __future__ import annotations
@@ -24,12 +28,26 @@ from grydgets.outputs import Output, register_output
 # clients would never reconnect to the new one.
 SHUTDOWN = object()
 
+# Encoded sizes kept per published frame. Every publish clears them, so this
+# only has to cover the distinct display sizes asking within one frame's life.
+MAX_VARIANTS = 8
+
 CONTENT_TYPES = {
     "jpeg": "image/jpeg",
     "jpg": "image/jpeg",
     "png": "image/png",
     "bmp": "image/bmp",
 }
+
+
+def _variant_etag(etag: str, size: tuple[int, int]) -> str:
+    """Tag the frame identity with the size it was encoded at.
+
+    Two displays holding the same frame at different sizes hold different
+    bytes, so an ETag that named only the frame would 304 one of them into
+    keeping the wrong size.
+    """
+    return f"{etag}-{size[0]}x{size[1]}"
 
 
 def offer(subscriber: queue.Queue, item: Any) -> None:
@@ -67,13 +85,14 @@ class StreamOutput(Output):
         self.content_type = CONTENT_TYPES.get(image_format, "application/octet-stream")
 
         # Everything below is read from Flask threads and written from the
-        # render thread.
+        # render thread, except _variants, which request threads also fill in.
         self._lock = threading.Lock()
-        self._frame: bytes | None = None
+        self._frame: pygame.Surface | None = None
         self._etag: str | None = None
         # Wall-clock time.time(), not time.monotonic() -- clients compare it
         # against their own wall clock to measure end-to-end latency.
         self._published_at: float | None = None
+        self._variants: dict[tuple[int, int], bytes] = {}
         self._subscribers: set[queue.Queue] = set()
 
         # Render thread only.
@@ -102,9 +121,54 @@ class StreamOutput(Output):
         self._publish(self._pending)
         self._pending = None
 
-    def current_frame(self) -> tuple[bytes | None, str | None, float | None]:
+    def current_etag(
+        self, size: tuple[int, int] | None = None
+    ) -> tuple[str | None, float | None]:
+        """The ETag a frame at ``size`` would carry, encoding nothing.
+
+        Lets a caller that already holds this frame be answered with a 304
+        without the server encoding a copy to compare it against. With no
+        size the tag names the frame alone, which is what the event stream
+        announces.
+        """
         with self._lock:
-            return self._frame, self._etag, self._published_at
+            if self._frame is None:
+                return None, None
+            if size is None:
+                return self._etag, self._published_at
+            return _variant_etag(self._etag, tuple(size)), self._published_at
+
+    def current_frame(
+        self, size: tuple[int, int] | None = None
+    ) -> tuple[bytes | None, str | None, float | None]:
+        """The current frame encoded at ``size``, defaulting to as rendered.
+
+        The first caller to ask for a size pays for the scale and the encode;
+        the rest of the displays on that size get the cached bytes.
+        """
+        with self._lock:
+            surface, source, published_at = self._frame, self._etag, self._published_at
+            if surface is None:
+                return None, None, None
+            key = tuple(size) if size else surface.get_size()
+            etag = source if size is None else _variant_etag(source, key)
+            data = self._variants.get(key)
+
+        if data is None:
+            data = self._encode(surface, key)
+            self.logger.debug(
+                "Encoded frame %s at %dx%d (%d bytes)",
+                source, key[0], key[1], len(data),
+            )
+            with self._lock:
+                # A publish while this was encoding cleared the cache, and
+                # these bytes are no longer what a display should be given.
+                if source == self._etag:
+                    if len(self._variants) >= MAX_VARIANTS:
+                        self._variants.pop(next(iter(self._variants)))
+                    self._variants[key] = data
+
+        return data, etag, published_at
 
     def subscribe(self) -> queue.Queue:
         subscriber: queue.Queue = queue.Queue(maxsize=1)
@@ -124,23 +188,32 @@ class StreamOutput(Output):
             offer(subscriber, SHUTDOWN)
 
     def _publish(self, surface: pygame.Surface) -> None:
-        data = self._encode(surface)
-        # Hash the encoded bytes to deduplicate. A re-render that produces
-        # identical pixels keeps its ETag, so clients get a 304 and do not
-        # repaint.
-        etag = hashlib.blake2b(data, digest_size=8).hexdigest()
+        # Hash the pixels rather than an encoding of them: nothing is encoded
+        # until a display asks, and each one asks at its own size. A re-render
+        # that produces identical pixels keeps its ETag, so displays get a 304
+        # and do not repaint.
+        etag = hashlib.blake2b(
+            pygame.image.tobytes(surface, "RGB"), digest_size=8
+        ).hexdigest()
         with self._lock:
             if etag == self._etag:
                 return
             published_at = time.time()
-            self._frame, self._etag, self._published_at = data, etag, published_at
+            # Copy, because the render thread goes on drawing into the surface
+            # it handed over and the encoding now happens later, elsewhere.
+            self._frame = surface.copy()
+            self._etag = etag
+            self._published_at = published_at
+            self._variants.clear()
             subscribers = list(self._subscribers)
-        self.logger.debug("Published frame %s (%d bytes)", etag, len(data))
+        self.logger.debug("Published frame %s", etag)
         for subscriber in subscribers:
             offer(subscriber, (etag, published_at))
 
-    def _encode(self, surface: pygame.Surface) -> bytes:
+    def _encode(self, surface: pygame.Surface, size: tuple[int, int]) -> bytes:
         buf = io.BytesIO()
+        if surface.get_size() != size:
+            surface = pygame.transform.smoothscale(surface, size)
         if self.image_format in ("jpg", "jpeg"):
             # JPEG has no alpha channel, so flatten the tree's SRCALPHA
             # surface onto an opaque one first.
