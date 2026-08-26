@@ -6,7 +6,6 @@ import logging
 import time
 from collections.abc import Sequence
 from datetime import datetime, time as datetime_time
-from functools import lru_cache
 from typing import Any, Callable, Dict, Optional, TypeVar, Union
 
 import pygame
@@ -647,6 +646,8 @@ class PillWidget(ContainerWidget):
 
 
 class HTTPFlipWidget(FlipWidget, UpdaterWidget):
+    WIDGET_INDEX_CACHE_LIMIT = 64
+
     def __init__(
         self,
         url: str,
@@ -688,6 +689,7 @@ class HTTPFlipWidget(FlipWidget, UpdaterWidget):
                 ] = f"Basic {encoded_auth}"
         if self.method in ("POST", "PUT", "PATCH") and self.payload:
             self.requests_kwargs["json"] = self.payload
+        self._widget_index_cache: dict[str, int] = {}
         # This needs to happen at the end because it actually starts the update thread
         super().__init__(**kwargs)
         self.current_widget = None
@@ -696,9 +698,32 @@ class HTTPFlipWidget(FlipWidget, UpdaterWidget):
         super().add_widget(widget)
         if widget.name == self.default_widget_name:
             self.default_widget = len(self.widget_list) - 1
+        # Indexes cached below are positions in widget_list, so a new child
+        # invalidates them.
+        self._widget_index_cache.clear()
 
-    @lru_cache
     def get_current_widget(self, response_value: str) -> int:
+        """Index in ``widget_list`` of the widget this response value selects.
+
+        ``tick`` asks on every frame and the answer only changes when a child
+        is added, so it is memoised. The cache is per instance rather than a
+        ``functools.lru_cache`` on the method: that one lives on the class and
+        keys on ``self``, so it would keep every torn-down widget -- and the
+        rendered surfaces of its whole subtree -- alive across theme switches
+        and config reloads.
+        """
+        cached = self._widget_index_cache.get(response_value)
+        if cached is not None:
+            return cached
+        index = self._lookup_current_widget(response_value)
+        # A mapping has a handful of entries, so the cap only bites when the
+        # endpoint answers with something unbounded -- a timestamp, say.
+        if len(self._widget_index_cache) >= self.WIDGET_INDEX_CACHE_LIMIT:
+            self._widget_index_cache.clear()
+        self._widget_index_cache[response_value] = index
+        return index
+
+    def _lookup_current_widget(self, response_value: str) -> int:
         if response_value in self.mapping:
             self.logger.debug(
                 f"Mapped {response_value} to {self.mapping[response_value]}, or {list(map(lambda x: x.name, self.widget_list)).index(self.mapping[response_value])}"
