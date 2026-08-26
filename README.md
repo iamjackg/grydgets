@@ -364,8 +364,9 @@ Two endpoints:
 ```
 GET /frame                        # the current frame, with an ETag
   If-None-Match: "a1b2c3"         # -> 304 if you already have that one
+  X-Frame-Published-At: 1712...   # response header: when this frame was published
 GET /events                       # text/event-stream, held open
-  data: {"etag": "d4e5f6"}        # one per published frame
+  data: {"etag": "d4e5f6", "published_at": 1712...}   # one per published frame
   : ping                          # every 20 seconds
 ```
 
@@ -373,6 +374,12 @@ The ETag is a hash of the frame's bytes. A re-render that produces identical
 pixels keeps the same ETag, so clients get a `304` and do not repaint. `/frame`
 returns `503` until the first frame is published, and `404` if no `stream`
 output is configured.
+
+`published_at` and `X-Frame-Published-At` are the same `time.time()`, taken
+when the frame was published. `grydgets-client` uses it to measure how long it
+took to notice, download, and display a frame -- see
+[Latency](#latency-logging.level-debug). This only makes sense if the two
+machines' clocks agree; nothing here synchronizes them.
 
 ```bash
 curl -o frame.jpg http://dashboard-host:5000/frame
@@ -501,6 +508,7 @@ outputs:
 *   `server.reconnect_delay` _(optional)_: Seconds before reconnecting after a dropped connection. Defaults to `2`.
 *   `server.stale_after` _(optional)_: Seconds the connection must stay down before the warning triangle appears. Defaults to `30`.
 *   `graphics.resolution`: This screen's resolution. Frames arriving at a different size are scaled to it.
+*   `logging.level` _(optional)_: `debug`, `info`, or `warning`. Defaults to `info`. `debug` also turns on the [latency overlay](#latency-logginglevel-debug).
 *   `indicator.corner` _(optional)_: Where the warning triangle sits — `top-left`, `top-right`, `bottom-left`, `bottom-right`. Defaults to `bottom-right`.
 *   `outputs`: Exactly one display output, `window` or `framebuffer`, configured the same way as [on the server](#window).
 
@@ -514,6 +522,31 @@ that reads fine at 1080p can turn into an unreadable run of digits at 768.
 The client always scales with `smoothscale`, whatever the server's
 `graphics.smooth-scaling` says. That setting applies to `ImageWidget`, and
 nearest-neighbour scaling breaks digit strokes at these ratios.
+
+#### Latency (`logging.level: debug`)
+
+Set `logging.level: debug` in `client.yaml` and every displayed frame gets a
+small translucent panel in the top-left corner, plus a matching log line:
+
+```
+notice    42 ms
+download  18 ms
+display    6 ms
+total     66 ms
+```
+
+*   **notice** — from the server publishing the frame to this client reading
+    the `/events` line that announced it. Absent on the one frame fetched
+    unconditionally at startup, since that fetch isn't a response to an event.
+*   **download** — the `GET /frame` request itself.
+*   **display** — from finishing the download to finishing the decode and
+    scale, just before the frame is handed to the display output.
+*   **total** — notice + download + display, i.e. wall clock from the server
+    publishing to this client showing it.
+
+All four come from comparing this client's clock to the `published_at`
+timestamp the server put on the frame (see [`stream`](#stream)), so they are
+only meaningful if the two machines' clocks agree.
 
 #### When the connection drops
 

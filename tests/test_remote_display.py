@@ -131,16 +131,16 @@ def test_nothing_is_published_until_the_tree_stops_changing(surfaces):
 
     for _ in range(5):
         output.on_frame(red, freshly_rendered=True)
-    assert output.current_frame() == (None, None)
+    assert output.current_frame() == (None, None, None)
 
     # Still inside the debounce window.
     output.on_frame(red, freshly_rendered=False)
-    assert output.current_frame() == (None, None)
+    assert output.current_frame() == (None, None, None)
 
     output.debounce = 0
     output.on_frame(red, freshly_rendered=False)
-    data, etag = output.current_frame()
-    assert data is not None and etag is not None
+    data, etag, published_at = output.current_frame()
+    assert data is not None and etag is not None and published_at is not None
 
 
 def test_identical_pixels_keep_their_etag(surfaces):
@@ -150,28 +150,28 @@ def test_identical_pixels_keep_their_etag(surfaces):
 
     output.on_frame(red, freshly_rendered=True)
     output.on_frame(red, freshly_rendered=False)
-    _, first = output.current_frame()
+    _, first, _ = output.current_frame()
 
     output.on_frame(red, freshly_rendered=True)
     output.on_frame(red, freshly_rendered=False)
-    _, again = output.current_frame()
+    _, again, _ = output.current_frame()
     assert again == first
 
     output.on_frame(blue, freshly_rendered=True)
     output.on_frame(blue, freshly_rendered=False)
-    _, changed = output.current_frame()
+    _, changed, _ = output.current_frame()
     assert changed != first
 
 
-def test_subscribers_are_told_the_new_etag(surfaces):
+def test_subscribers_are_told_the_new_etag_and_when_it_was_published(surfaces):
     red, blue = surfaces
     output = StreamOutput(debounce_ms=0)
     subscriber = output.subscribe()
 
     output.on_frame(red, freshly_rendered=True)
     output.on_frame(red, freshly_rendered=False)
-    _, etag = output.current_frame()
-    assert subscriber.get_nowait() == etag
+    _, etag, published_at = output.current_frame()
+    assert subscriber.get_nowait() == (etag, published_at)
 
     output.unsubscribe(subscriber)
     output.on_frame(blue, freshly_rendered=True)
@@ -289,3 +289,53 @@ def test_the_indicator_scales_with_the_screen(surfaces):
         x, y = indicator_position((1366, 768), small, corner)
         assert 0 <= x and x + small.get_width() <= 1366
         assert 0 <= y and y + small.get_height() <= 768
+
+
+# --- the latency overlay --------------------------------------------------
+
+
+def test_latency_lines_needs_a_published_at():
+    from grydgets.client import latency_lines
+
+    metrics = {"published_at": None, "notified_at": None, "fetch_start": 0, "fetch_end": 0}
+    assert latency_lines(metrics, displayed_at=1.0) == ["latency: no timestamp from server"]
+
+
+def test_latency_lines_skips_notice_without_an_sse_event():
+    """The unconditional startup fetch never followed an SSE event."""
+    from grydgets.client import latency_lines
+
+    metrics = {
+        "published_at": 100.0,
+        "notified_at": None,
+        "fetch_start": 100.1,
+        "fetch_end": 100.15,
+    }
+    lines = latency_lines(metrics, displayed_at=100.2)
+    assert not any(line.startswith("notice") for line in lines)
+    assert any(line.startswith("download") for line in lines)
+    assert any(line.startswith("total") for line in lines)
+
+
+def test_latency_lines_covers_notice_download_display_and_total():
+    from grydgets.client import latency_lines
+
+    metrics = {
+        "published_at": 100.0,
+        "notified_at": 100.05,
+        "fetch_start": 100.05,
+        "fetch_end": 100.1,
+    }
+    lines = latency_lines(metrics, displayed_at=100.15)
+    stages = [line.split()[0] for line in lines]
+    assert stages == ["notice", "download", "display", "total"]
+
+
+def test_the_metrics_overlay_renders_every_line(surfaces):
+    from grydgets.client import build_metrics_overlay
+
+    pygame.font.init()
+    font = pygame.font.Font(None, 16)
+    overlay = build_metrics_overlay(font, ["notice   10 ms", "total    50 ms"])
+    assert overlay.get_width() > 0
+    assert overlay.get_height() > 0

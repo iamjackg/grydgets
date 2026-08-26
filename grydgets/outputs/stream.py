@@ -71,6 +71,9 @@ class StreamOutput(Output):
         self._lock = threading.Lock()
         self._frame: bytes | None = None
         self._etag: str | None = None
+        # Wall-clock time.time(), not time.monotonic() -- clients compare it
+        # against their own wall clock to measure end-to-end latency.
+        self._published_at: float | None = None
         self._subscribers: set[queue.Queue] = set()
 
         # Render thread only.
@@ -99,9 +102,9 @@ class StreamOutput(Output):
         self._publish(self._pending)
         self._pending = None
 
-    def current_frame(self) -> tuple[bytes | None, str | None]:
+    def current_frame(self) -> tuple[bytes | None, str | None, float | None]:
         with self._lock:
-            return self._frame, self._etag
+            return self._frame, self._etag, self._published_at
 
     def subscribe(self) -> queue.Queue:
         subscriber: queue.Queue = queue.Queue(maxsize=1)
@@ -129,11 +132,12 @@ class StreamOutput(Output):
         with self._lock:
             if etag == self._etag:
                 return
-            self._frame, self._etag = data, etag
+            published_at = time.time()
+            self._frame, self._etag, self._published_at = data, etag, published_at
             subscribers = list(self._subscribers)
         self.logger.debug("Published frame %s (%d bytes)", etag, len(data))
         for subscriber in subscribers:
-            offer(subscriber, etag)
+            offer(subscriber, (etag, published_at))
 
     def _encode(self, surface: pygame.Surface) -> bytes:
         buf = io.BytesIO()

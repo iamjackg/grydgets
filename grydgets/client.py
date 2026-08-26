@@ -33,6 +33,8 @@ logging.basicConfig(
     format="[%(asctime)s] %(levelname)s:%(name)s:%(message)s", level=logging.INFO
 )
 
+logger = logging.getLogger("grydgets.client")
+
 # The viewer idles between frames. This only sets how quickly it notices a
 # window close and how soon the staleness indicator appears.
 CLIENT_FPS = 20
@@ -147,11 +149,17 @@ class FrameSource(threading.Thread):
                 self._disconnected_since = time.monotonic()
             self.stop_event.wait(delay)
 
-    def fetch_frame(self) -> None:
-        """Fetch the current frame unless the server says we already have it."""
+    def fetch_frame(self, notified_at: float | None = None) -> None:
+        """Fetch the current frame unless the server says we already have it.
+
+        ``notified_at`` is when the caller learned a new frame exists -- the
+        time the SSE ``data:`` line was read. It is ``None`` for the
+        unconditional startup fetch, which is not a response to an event.
+        """
         headers = dict(self.headers)
         if self._etag:
             headers["If-None-Match"] = self._etag
+        fetch_start = time.time()
         response = self.session.get(
             self.frame_url, headers=headers, timeout=FETCH_TIMEOUT
         )
@@ -164,9 +172,23 @@ class FrameSource(threading.Thread):
             self.logger.info("The server has not published a frame yet")
             return
         response.raise_for_status()
+        fetch_end = time.time()
         self._etag = response.headers.get("ETag")
         hint = EXTENSIONS.get(response.headers.get("Content-Type", ""), "frame")
-        offer(self.frames, (response.content, hint))
+        published_at = None
+        header = response.headers.get("X-Frame-Published-At")
+        if header is not None:
+            try:
+                published_at = float(header)
+            except ValueError:
+                pass
+        metrics = {
+            "published_at": published_at,
+            "notified_at": notified_at,
+            "fetch_start": fetch_start,
+            "fetch_end": fetch_end,
+        }
+        offer(self.frames, (response.content, hint, metrics))
 
     def stream_events(self) -> None:
         """Fetch a frame for every event, until the connection drops."""
@@ -185,7 +207,7 @@ class FrameSource(threading.Thread):
                 # Blank separators and ": ping" comments carry nothing. The
                 # ping exists to make a dead connection fail a read.
                 if line and line.startswith("data:"):
-                    self.fetch_frame()
+                    self.fetch_frame(notified_at=time.time())
 
 
 def build_indicator(resolution: tuple[int, int]) -> pygame.Surface:
@@ -253,6 +275,50 @@ def indicator_position(
     return x, y
 
 
+def latency_lines(metrics: dict, displayed_at: float) -> list[str]:
+    """Format how long a frame took to notice, download, and display.
+
+    ``published_at`` is the server's ``time.time()``, everything else is this
+    client's own wall clock -- the numbers drift with any clock skew between
+    the two machines. ``notified_at`` is ``None`` for the unconditional
+    startup fetch, since that one is not a response to an SSE event.
+    """
+    published_at = metrics["published_at"]
+    if published_at is None:
+        return ["latency: no timestamp from server"]
+    notified_at = metrics["notified_at"]
+    fetch_start = metrics["fetch_start"]
+    fetch_end = metrics["fetch_end"]
+    lines = []
+    if notified_at is not None:
+        lines.append(f"notice   {(notified_at - published_at) * 1000:5.0f} ms")
+    lines.append(f"download {(fetch_end - fetch_start) * 1000:5.0f} ms")
+    lines.append(f"display  {(displayed_at - fetch_end) * 1000:5.0f} ms")
+    lines.append(f"total    {(displayed_at - published_at) * 1000:5.0f} ms")
+    return lines
+
+
+def build_metrics_overlay(font: pygame.font.Font, lines: list[str]) -> pygame.Surface:
+    """A translucent panel of latency lines, for ``logging.level: debug``.
+
+    Uses pygame's bundled default font rather than a shipped font file --
+    the whole point of the client is to need none.
+    """
+    rendered = [font.render(line, True, (255, 255, 255)) for line in lines]
+    pad = round(font.get_height() * 0.4)
+    width = max(s.get_width() for s in rendered) + pad * 2
+    height = sum(s.get_height() for s in rendered) + pad * 2
+    surface = pygame.Surface((width, height), pygame.SRCALPHA)
+    pygame.draw.rect(
+        surface, (0, 0, 0, 170), surface.get_rect(), border_radius=round(pad * 0.5)
+    )
+    y = pad
+    for line_surface in rendered:
+        surface.blit(line_surface, (pad, y))
+        y += line_surface.get_height()
+    return surface
+
+
 def decode(payload: tuple[bytes, str], resolution: tuple[int, int]):
     """Turn received bytes into a surface the size of this screen."""
     data, hint = payload
@@ -286,13 +352,23 @@ def run(conf: dict) -> None:
     indicator = build_indicator(resolution)
     corner = indicator_position(resolution, indicator, conf["indicator"]["corner"])
 
+    # logging.level: debug also turns on the latency overlay -- there is
+    # nothing else that level would be for on a viewer with no widget tree.
+    debug = conf["logging"]["level"] == "debug"
+    metrics_font = None
+    if debug:
+        metrics_font = pygame.font.Font(None, max(10, round(16 * min(resolution) / 1080)))
+
     source.start()
 
     clock = pygame.time.Clock()
-    # The last good frame, never drawn on. The indicator goes onto a copy;
-    # drawing on this one would stack a triangle on it at every repaint.
+    # The last good frame, never drawn on. The indicator and the latency
+    # overlay go onto a copy; drawing on this one would stack another copy
+    # onto it at every repaint.
     frame = None
     showing_stale = None
+    metrics_surface = None
+    metrics_corner = None
     try:
         while not stop_event.is_set():
             for event in pygame.event.get():
@@ -307,21 +383,32 @@ def run(conf: dict) -> None:
             except queue.Empty:
                 payload = None
             if payload is not None:
-                decoded = decode(payload, resolution)
+                data, hint, metrics = payload
+                decoded = decode((data, hint), resolution)
                 if decoded is not None:
                     frame = decoded
                     repaint = True
+                    if debug:
+                        displayed_at = time.time()
+                        lines = latency_lines(metrics, displayed_at)
+                        logger.debug("frame latency: %s", "  ".join(lines))
+                        metrics_surface = build_metrics_overlay(metrics_font, lines)
+                        metrics_corner = indicator_position(
+                            resolution, metrics_surface, "top-left"
+                        )
 
             stale = source.is_stale()
             if stale != showing_stale:
                 repaint = True
 
             if repaint and frame is not None:
-                if stale:
+                shown = frame
+                if stale or metrics_surface is not None:
                     shown = frame.copy()
-                    shown.blit(indicator, corner)
-                else:
-                    shown = frame
+                    if stale:
+                        shown.blit(indicator, corner)
+                    if metrics_surface is not None:
+                        shown.blit(metrics_surface, metrics_corner)
                 output.on_frame(shown, True)
                 showing_stale = stale
 

@@ -368,7 +368,7 @@ def main():
         output = active_stream_output()
         if output is None:
             return feature_off("no stream output is configured")
-        data, etag = output.current_frame()
+        data, etag, published_at = output.current_frame()
         if data is None:
             return jsonify({
                 "success": False,
@@ -380,6 +380,9 @@ def main():
             response = app.response_class(data, mimetype=output.content_type)
         response.headers["ETag"] = f'"{etag}"'
         response.headers["Cache-Control"] = "no-store"
+        # Wall-clock time the server published this frame, so clients can
+        # measure how long it took to notice, download, and display it.
+        response.headers["X-Frame-Published-At"] = f"{published_at:.6f}"
         return response
 
     @app.route("/events", methods=["GET"])
@@ -396,9 +399,9 @@ def main():
             # the client reconnects to the new one.
             subscriber = output.subscribe()
             try:
-                _, etag = output.current_frame()
+                _, etag, published_at = output.current_frame()
                 if etag is not None:
-                    yield f"data: {json.dumps({'etag': etag})}\n\n"
+                    yield f"data: {json.dumps({'etag': etag, 'published_at': published_at})}\n\n"
                 while True:
                     try:
                         item = subscriber.get(timeout=SSE_PING_INTERVAL)
@@ -407,7 +410,8 @@ def main():
                         continue
                     if item is SHUTDOWN:
                         return
-                    yield f"data: {json.dumps({'etag': item})}\n\n"
+                    etag, published_at = item
+                    yield f"data: {json.dumps({'etag': etag, 'published_at': published_at})}\n\n"
             finally:
                 output.unsubscribe(subscriber)
 
