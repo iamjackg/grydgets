@@ -70,6 +70,7 @@ def create_outputs(output_configs: list[dict], render_config: dict) -> list[Outp
     from grydgets.outputs import framebuffer  # noqa: F401
     from grydgets.outputs import file  # noqa: F401
     from grydgets.outputs import post  # noqa: F401
+    from grydgets.outputs import stream  # noqa: F401
 
     outputs = []
     display_count = 0

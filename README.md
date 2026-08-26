@@ -72,6 +72,9 @@ grydgets [--widgets FILE] [--theme FILE] [--config-dir DIR]
 *   `--theme` — Theme file replacing the widgets file's `theme:` block, see [Theme files](#theme-files). Without it, the theme in the widgets file is used. Naming one theme for the whole run turns off [day/night switching](#day-and-night-themes) if `conf.yaml` configures it.
 *   `--config-dir` — Directory containing config files, fonts, and images. All relative paths are resolved from this directory. Defaults to the current working directory.
 
+`grydgets-client` displays a dashboard rendered on another machine. See
+[Remote displays](#remote-displays).
+
 ## Configuration
 
 ### General Grydgets options (`conf.yaml`)
@@ -98,6 +101,56 @@ server:
 *   `smooth-scaling` _(optional)_: Use bilinear filtering for image scaling (`true`, default) or faster nearest-neighbor (`false`). Set to `false` on low-power hardware like a Raspberry Pi 2.
 *   `flip` _(optional)_: Rotate the output 180 degrees. Defaults to `false`.
 *   `text-scale` _(optional)_: Multiplier applied to every text size written in `widgets.yaml`. Defaults to `1.0`, which changes nothing.
+
+##### The HTTP server
+
+The `server:` block configures the HTTP server but does not start it. Three
+features start it:
+
+| Feature | Endpoint it needs |
+|---|---|
+| A [notifiable widget](#http-notification-server) in `widgets.yaml` | `/notify` |
+| A [`stream` output](#stream) | `/frame`, `/events` |
+| [`appearance.http_control: true`](#day-and-night-themes) | `/theme` |
+
+Day/night switching by the sun is a timer in the render loop and needs no
+server. Without one of the three features above, Grydgets opens no port and the
+`server:` block does nothing.
+
+*   `host` _(optional)_: Address to bind. Defaults to `127.0.0.1`, which only
+    this machine can reach. Set it to `0.0.0.0` or a LAN address if anything on
+    another machine calls it — a [remote display](#remote-displays) fetching
+    frames, or Home Assistant posting a notification. Grydgets logs the bind
+    address at startup, and warns if it binds loopback while a stream output or
+    notifiable widget is configured.
+*   `port` _(optional)_: Defaults to `5000`.
+*   `auth` _(optional)_: Two bearer tokens. `stream_token` covers `/frame` and
+    `/events`, `control_token` covers `/notify` and `/theme`. Set either, both,
+    or neither. An unset token leaves that scope open.
+
+```yaml
+server:
+  host: 0.0.0.0
+  port: 5000
+  auth:
+    stream_token: !secret stream_token
+```
+
+Send tokens in an `Authorization: Bearer <token>` header, not as a query
+parameter — query parameters end up in access logs. A request missing a
+required token gets a `401`.
+
+Setting only `stream_token` is a reasonable starting point: nothing uses the
+stream yet, while `/notify` is usually already wired into Home Assistant
+automations that would all need editing. Be aware of what leaving `/notify`
+open means. It fetches an image from a URL taken straight from the request
+body, so anyone who can reach the port can make the dashboard display an
+arbitrary address. Setting `control_token` closes that.
+
+Endpoints check their feature on every request, so a hot reload can turn one on
+or off. An endpoint whose feature is off returns `404`. Starting or stopping
+the server itself needs a restart, and Grydgets warns if a reload would have
+changed that.
 
 ##### Reading the same widgets file on two screens
 
@@ -139,15 +192,19 @@ appearance:
 *   `latitude`, `longitude` _(optional, but both or neither)_: Decimal degrees, north and east positive. Sunrise and sunset are worked out locally — nothing is fetched, and the dashboard switches on time with no network. Leave them out to switch only over [HTTP](#setting-the-theme).
 *   `offsets` _(optional)_: Minutes to move each boundary, negative for earlier. Each applies to its own boundary only, so the example goes dark half an hour before sunset without also delaying the morning. Defaults to `0`.
 *   `default` _(optional)_: Which theme a fresh start puts up, `day` or `night`. It stands until something changes it, and is also what gets used on a day the sun neither rises nor sets. Defaults to `day`.
+*   `http_control` _(optional)_: Enables the [`/theme` endpoint](#setting-the-theme). Defaults to `false`. **This opens a port.** Switching by the sun does not.
 
 Without coordinates the sun is never consulted and the
 [`/theme` endpoint](#setting-the-theme) is the only thing that changes the
 theme — for when something else should be deciding, such as a Home Assistant
-automation watching a light sensor, or a presence rule:
+automation watching a light sensor, or a presence rule. This needs
+`http_control: true`. Without it nothing can switch the theme, and Grydgets
+warns about that at startup:
 
 ```yaml
 appearance:
   default: night
+  http_control: true
   themes:
     day: themes/day.yaml
     night: themes/night.yaml
@@ -184,7 +241,7 @@ If no `outputs` key is present, Grydgets falls back to legacy behavior based on 
 
 **Rules:**
 - At most one display output (`window` or `framebuffer`)
-- Any number of non-display outputs (`file`, `post`)
+- Any number of non-display outputs (`file`, `post`, `stream`)
 - At least one output is required
 - If no display output is configured, SDL runs in dummy mode (no screen needed)
 
@@ -278,6 +335,53 @@ outputs:
       url: http://display.local/set?img=/image/image.jpeg
 ```
 
+#### stream
+
+Keeps the latest frame in memory and serves it to
+[remote displays](#remote-displays) over the [HTTP server](#the-http-server).
+Adding this output starts the server. Frames come from the same port as
+`/notify` and `/theme`.
+
+*   `image_format` _(optional)_: `jpeg`, `jpg`, `png`, or `bmp`. Defaults to
+    `"jpeg"`. JPEG quality is fixed by pygame and cannot be configured.
+*   `debounce_ms` _(optional)_: How long the dashboard must stay still before
+    Grydgets publishes a new frame. Defaults to `200`.
+
+```yaml
+outputs:
+  - type: stream
+    image_format: jpeg
+    debounce_ms: 200
+```
+
+Frames are only pushed on changes, and Grydgets encodes nothing until it
+publishes one, so an idle dashboard uses no CPU. Debouncing waits for the
+dashboard to settle before pushing a new frame, so remote displays do not show
+animations and only update once things stop moving.
+
+Two endpoints:
+
+```
+GET /frame                        # the current frame, with an ETag
+  If-None-Match: "a1b2c3"         # -> 304 if you already have that one
+GET /events                       # text/event-stream, held open
+  data: {"etag": "d4e5f6"}        # one per published frame
+  : ping                          # every 20 seconds
+```
+
+The ETag is a hash of the frame's bytes. A re-render that produces identical
+pixels keeps the same ETag, so clients get a `304` and do not repaint. `/frame`
+returns `503` until the first frame is published, and `404` if no `stream`
+output is configured.
+
+```bash
+curl -o frame.jpg http://dashboard-host:5000/frame
+curl -N http://dashboard-host:5000/events
+```
+
+Each open `/events` connection holds a Werkzeug thread, so this suits a handful
+of displays, not dozens.
+
 #### Combining outputs
 
 You can use multiple outputs simultaneously. For example, display on screen while also pushing to a remote display:
@@ -317,6 +421,112 @@ For backwards compatibility, Grydgets still accepts the old `graphics` display s
 If you add an `outputs` key, the legacy display settings (`fullscreen`, `fb-device`, `x-display`) and `headless` block are ignored.
 
 **Important:** Switching between display and non-display modes requires restarting Grydgets. Configuration hot-reload (`SIGUSR1`) will warn and skip the change if the display mode changes.
+
+### Remote displays
+
+A screen can display a dashboard rendered on another machine. The rendering
+machine runs Grydgets with a [`stream` output](#stream). Each screen runs
+`grydgets-client`, which connects, fetches a new frame whenever one is
+published, scales it and displays it. Screens build no widget tree, run no
+providers, and need no fonts, images or `widgets.yaml`.
+
+Use this when the screens are too slow to render the dashboard themselves.
+Compositing a hundred widgets into a 1080p surface takes long enough on a
+Raspberry Pi to delay a notification by seconds. A desktop does it cheaply and
+can run a higher `fps-limit`.
+
+```
+     rendering host                        screens
+  ┌────────────────────┐             ┌──────────────────┐
+  │ grydgets           │   /events   │ grydgets-client  │
+  │  widgets.yaml      │ ──────────► │  client.yaml     │
+  │  providers.yaml    │   /frame    │   window or      │
+  │  outputs: [stream] │ ◄────────── │   framebuffer    │
+  └────────────────────┘             └──────────────────┘
+```
+
+#### On the rendering host
+
+Add a `stream` output, bind the server to an address the screens can reach, and
+raise `fps-limit`. Grydgets only picks up a notification on a render pass, so
+`fps-limit` decides how late one can be.
+
+```yaml
+graphics:
+  fps-limit: 10
+  resolution: [1920, 1080]
+server:
+  host: 0.0.0.0
+  port: 5000
+  auth:
+    stream_token: !secret stream_token
+outputs:
+  - type: stream
+    image_format: jpeg
+```
+
+The rendering host needs no screen of its own; with no display output, SDL runs
+in dummy mode. One process feeds every screen, and each client scales what it
+receives.
+
+#### On each screen
+
+```bash
+uv run grydgets-client [--config FILE] [--config-dir DIR]
+```
+
+*   `--config` — Client configuration file (default: `client.yaml`)
+*   `--config-dir` — Directory holding it. All relative paths resolve from here.
+
+The client reads `client.yaml`, not `conf.yaml`. A sample is in
+`client.yaml.sample`.
+
+```yaml
+server:
+  url: http://dashboard-host:5000
+  token: !secret stream_token   # only if the server sets stream_token
+  reconnect_delay: 2
+  stale_after: 30
+graphics:
+  resolution: [1366, 768]
+indicator:
+  corner: bottom-right
+outputs:
+  - type: window
+    fullscreen: true
+```
+
+*   `server.url`: Base URL of the rendering host's HTTP server.
+*   `server.token` _(optional)_: Must match the host's `server.auth.stream_token`.
+*   `server.reconnect_delay` _(optional)_: Seconds before reconnecting after a dropped connection. Defaults to `2`.
+*   `server.stale_after` _(optional)_: Seconds the connection must stay down before the warning triangle appears. Defaults to `30`.
+*   `graphics.resolution`: This screen's resolution. Frames arriving at a different size are scaled to it.
+*   `indicator.corner` _(optional)_: Where the warning triangle sits — `top-left`, `top-right`, `bottom-left`, `bottom-right`. Defaults to `bottom-right`.
+*   `outputs`: Exactly one display output, `window` or `framebuffer`, configured the same way as [on the server](#window).
+
+#### Sizing
+
+Render once at your largest screen's resolution and let smaller screens scale
+down. Rendering natively at a smaller resolution gives you a different layout,
+not a smaller one: widgets auto-fit text to their own cell, so a dense widget
+that reads fine at 1080p can turn into an unreadable run of digits at 768.
+
+The client always scales with `smoothscale`, whatever the server's
+`graphics.smooth-scaling` says. That setting applies to `ImageWidget`, and
+nearest-neighbour scaling breaks digit strokes at these ratios.
+
+#### When the connection drops
+
+The client keeps displaying the last frame it received and reconnects every
+`reconnect_delay` seconds. Once the connection has been down for `stale_after`
+seconds, it draws an amber warning triangle in a corner so you can tell the
+frame is old.
+
+A rejected token draws the triangle immediately and backs the client off for
+five minutes, since a bad token will not fix itself.
+
+There is no local-render fallback. That would put the widget tree and providers
+back on the screen, which defeats the point.
 
 ### Data Providers (`providers.yaml`)
 
@@ -1417,7 +1627,11 @@ This works in:
 
 ### HTTP Notification Server
 
-Grydgets runs a Flask server on the port specified in `conf.yaml` (default: 5000) that accepts POST requests to trigger notifications on widgets with the `notifiable` prefix.
+A widget with the `notifiable` prefix starts an HTTP server on the host and
+port from [`conf.yaml`'s `server:` block](#the-http-server). POST to `/notify`
+to trigger a notification on it. The default bind address is `127.0.0.1`, so
+set `server.host` if the caller runs on another machine. If
+`server.auth.control_token` is set, send it as `Authorization: Bearer <token>`.
 
 **Text Notifications:**
 ```bash
@@ -1435,8 +1649,10 @@ curl -X POST -H "Content-Type: application/json" \
 
 #### Setting the theme
 
-When `conf.yaml` configures [day and night themes](#day-and-night-themes),
-`/theme` holds one of them regardless of the sun, or hands control back:
+With [`appearance.http_control: true`](#day-and-night-themes), `/theme` holds
+one theme regardless of the sun, or hands control back to it. Without that
+setting the endpoint returns `404`. It is off by default because turning it on
+opens a port.
 
 ```bash
 curl -X POST -H "Content-Type: application/json" \
@@ -1463,7 +1679,8 @@ curl http://localhost:5000/theme
 ```
 
 Asking when there is only one theme, or while `--theme` is in force, is a 400
-saying so; so is `auto` when no coordinates are configured.
+saying so; so is `auto` when no coordinates are configured. A `404` means
+`http_control` is off, so the endpoint is disabled.
 
 ### Secrets Management
 

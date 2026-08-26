@@ -24,6 +24,7 @@ dependencies = [
 [project.scripts]
 grydgets = "grydgets.cli:main"
 grydgets-editor = "grydgets.editor.app:main"
+grydgets-client = "grydgets.client:main"
 
 [tool.pytest.ini_options]
 # Only test_*.py. Pytest's other default pattern, *_test.py, matches

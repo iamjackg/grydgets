@@ -124,6 +124,27 @@ def load_widget_config(filename, theme_file=None):
     return theme.apply_theme(document)
 
 
+# Loopback rather than 0.0.0.0, so a port opened on the config's behalf is not
+# also put on the network. Every remote-facing deployment overrides this, and
+# cli.py warns when one has not.
+DEFAULT_SERVER_HOST = "127.0.0.1"
+DEFAULT_SERVER_PORT = 5000
+
+
+def server_settings(conf):
+    """Host, port and tokens for the HTTP server, with defaults filled in.
+
+    ``load_config`` returns the file as written rather than the validated copy,
+    so schema defaults never reach it and ``server:`` may be missing entirely.
+    """
+    server = conf.get("server") or {}
+    return {
+        "host": server.get("host", DEFAULT_SERVER_HOST),
+        "port": server.get("port", DEFAULT_SERVER_PORT),
+        "auth": server.get("auth") or {},
+    }
+
+
 # Output sub-schemas
 window_output_schema = {
     voluptuous.Required("type"): "window",
@@ -184,6 +205,21 @@ post_output_schema = {
 }
 
 
+# Frames held in memory and served over the HTTP server rather than pushed
+# anywhere. ``debounce_ms`` is how long the tree must hold still before a frame
+# is published, so a flip that dirties the tree over many passes costs one
+# encode instead of one per pass.
+stream_output_schema = {
+    voluptuous.Required("type"): "stream",
+    voluptuous.Optional("image_format", default="jpeg"): voluptuous.In(
+        ["png", "jpg", "jpeg", "bmp"]
+    ),
+    voluptuous.Optional("debounce_ms", default=200): voluptuous.All(
+        int, voluptuous.Range(min=0, max=10000)
+    ),
+}
+
+
 # Day/night appearance. The two theme files are named here rather than in the
 # widgets file because the coordinates have to live in conf.yaml regardless --
 # they are a property of where the screen is, not of what it draws -- and
@@ -204,6 +240,10 @@ appearance_schema = {
     # otherwise, and the one the sun's answer is replaced by on a day it has
     # none (inside a polar circle).
     voluptuous.Optional("default", default="day"): voluptuous.In(["day", "night"]),
+    # Named for its consequence: turning it on opens a port. Switching by the
+    # sun is a timer in the render loop and needs no server, so a config that
+    # only describes an appearance never starts one by accident.
+    voluptuous.Optional("http_control", default=False): bool,
     voluptuous.Required("themes"): {
         voluptuous.Required("day"): str,
         voluptuous.Required("night"): str,
@@ -251,6 +291,7 @@ def _validate_output(value):
         "framebuffer": voluptuous.Schema(framebuffer_output_schema),
         "file": voluptuous.Schema(file_output_schema),
         "post": voluptuous.Schema(post_output_schema),
+        "stream": voluptuous.Schema(stream_output_schema),
     }
 
     output_type = value["type"]
@@ -286,10 +327,19 @@ config_schema = voluptuous.Schema(
                 ["debug", "info", "warning"]
             )
         },
-        voluptuous.Required("server"): {
-            voluptuous.Optional("port", default=5000): voluptuous.All(
+        # Configures the HTTP server but never starts it. Three features do
+        # that: a notifiable widget, a stream output, or
+        # appearance.http_control. If this block is absent, whichever of those
+        # asked for a server gets the defaults below.
+        voluptuous.Optional("server"): {
+            voluptuous.Optional("host", default=DEFAULT_SERVER_HOST): str,
+            voluptuous.Optional("port", default=DEFAULT_SERVER_PORT): voluptuous.All(
                 int, voluptuous.Range(1, 655355)
-            )
+            ),
+            voluptuous.Optional("auth"): {
+                voluptuous.Optional("stream_token"): str,
+                voluptuous.Optional("control_token"): str,
+            },
         },
         # Legacy headless config (still accepted, migrated to file output)
         voluptuous.Optional("headless"): {
@@ -415,6 +465,85 @@ def load_config(filename):
     _validate(config_schema, conf_data, filename)
 
     return conf_data
+
+
+# --- client.yaml ---------------------------------------------------------
+#
+# The remote frame viewer's entire configuration. A separate file rather than a
+# mode of conf.yaml, so a viewer machine's config directory holds one file and
+# no keys that silently do nothing.
+
+# Only outputs that put a frame on a screen. A viewer that fetched frames to
+# write them to disk or POST them elsewhere would be a relay, which is not what
+# this is for.
+CLIENT_OUTPUT_TYPES = ("window", "framebuffer")
+
+
+def _validate_client_output(value):
+    if not isinstance(value, dict) or "type" not in value:
+        raise voluptuous.Invalid("Each output must be a dict with a 'type' key")
+    schemas = {
+        "window": voluptuous.Schema(window_output_schema),
+        "framebuffer": voluptuous.Schema(framebuffer_output_schema),
+    }
+    output_type = value["type"]
+    if output_type not in schemas:
+        raise voluptuous.Invalid(
+            f"Unknown client output type '{output_type}'. "
+            f"Available: {list(schemas.keys())}"
+        )
+    return schemas[output_type](value)
+
+
+client_schema = voluptuous.Schema(
+    {
+        voluptuous.Required("server"): {
+            voluptuous.Required("url"): str,
+            voluptuous.Optional("token"): str,
+            # Seconds to wait before reconnecting after a dropped connection.
+            # A rejected token backs off much harder on its own.
+            voluptuous.Optional("reconnect_delay", default=2): voluptuous.All(
+                voluptuous.Coerce(float), voluptuous.Range(min=0.1, max=3600)
+            ),
+            # How long the connection must stay down before the staleness
+            # indicator appears, so a two-second reconnect does not flash one.
+            voluptuous.Optional("stale_after", default=30): voluptuous.All(
+                voluptuous.Coerce(float), voluptuous.Range(min=1, max=86400)
+            ),
+        },
+        voluptuous.Required("graphics"): {
+            voluptuous.Required("resolution"): voluptuous.All(
+                [int, voluptuous.Range(min=1)], voluptuous.Length(2)
+            ),
+        },
+        voluptuous.Optional("logging", default={"level": "info"}): {
+            voluptuous.Required("level", default="info"): voluptuous.In(
+                ["debug", "info", "warning"]
+            )
+        },
+        voluptuous.Optional(
+            "indicator", default={"corner": "bottom-right"}
+        ): {
+            voluptuous.Optional("corner", default="bottom-right"): voluptuous.In(
+                ["top-left", "top-right", "bottom-left", "bottom-right"]
+            ),
+        },
+        voluptuous.Required("outputs"): voluptuous.All(
+            [_validate_client_output], voluptuous.Length(min=1, max=1)
+        ),
+    }
+)
+
+
+def load_client_config(filename):
+    """Load and validate client.yaml.
+
+    Unlike :func:`load_config`, this returns the validated document, so the
+    client reads the schema's defaults.
+    """
+    conf_data = load_yaml(filename)
+    theme.reject_tokens(conf_data, filename)
+    return _validate(client_schema, conf_data, filename)
 
 
 def load_providers_config(filename):

@@ -5,8 +5,19 @@ graphics:
   # flip: false  # Rotate output 180 degrees
 logging:
   level: info
+
+# Configures the HTTP server; does not start it. Three things start it: a
+# notifiable widget in widgets.yaml, a stream output below, or
+# appearance.http_control. With none of those, no port is opened.
 server:
+  # Defaults to 127.0.0.1. Set this if another machine calls the server -- a
+  # remote display fetching /frame, or Home Assistant posting /notify.
+  host: 0.0.0.0
   port: 5000
+  # Optional and independent. An unset token leaves that scope open.
+  # auth:
+  #   stream_token: !secret stream_token    # /frame, /events
+  #   control_token: !secret control_token  # /notify, /theme
 
 # Day/night themes. Without this block there is one theme, all day.
 # appearance:
@@ -20,6 +31,7 @@ server:
 #     sunrise: 0
 #     sunset: -30
 #   default: day  # theme at startup, and on days the sun doesn't set
+#   http_control: true  # enables GET/POST /theme -- this opens a port
 
 # Output configuration — at least one output is required.
 # You can combine multiple outputs (e.g. window + post).
@@ -47,3 +59,8 @@ outputs:
   #   min_interval: 300
   #   auth:
   #     bearer: !secret esp_token
+
+  # Stream output (serves frames to remote displays running grydgets-client)
+  # - type: stream
+  #   image_format: jpeg
+  #   debounce_ms: 200

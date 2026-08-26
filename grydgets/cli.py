@@ -1,5 +1,10 @@
 import argparse
+import functools
+import hmac
+import ipaddress
+import json
 import os
+import queue
 import signal
 import sys
 from datetime import datetime, timezone
@@ -12,6 +17,7 @@ from flask import Flask, request, jsonify
 
 from grydgets import appearance, config, fonts, theme
 from grydgets.outputs import create_outputs
+from grydgets.outputs.stream import SHUTDOWN, StreamOutput
 from grydgets.widgets import image as image_module
 from grydgets.widgets.containers import ScreenWidget
 from grydgets.widgets.widgets import WidgetManager
@@ -71,6 +77,33 @@ def apply_text_scale(render_config):
 # boundaries move by seconds from one day to the next, so anything under a
 # minute is checking for nothing.
 MODE_CHECK_INTERVAL = 30
+
+# How often /events sends a comment line. Routers drop idle connections
+# silently, and without a ping the client keeps believing it is connected. With
+# one, a dead connection shows up as a read timeout.
+SSE_PING_INTERVAL = 20
+
+
+def is_loopback(host):
+    """Whether only this machine can reach an address.
+
+    Hostnames other than "localhost" are not resolved. A name pointing at
+    127.0.0.1 is rare enough not to justify a DNS lookup at startup, and
+    getting it wrong only costs one unprinted warning.
+    """
+    if host == "localhost":
+        return True
+    try:
+        return ipaddress.ip_address(host).is_loopback
+    except ValueError:
+        return False
+
+
+def etag_matches(header, etag):
+    """Whether an If-None-Match header names ``etag``."""
+    if not header or etag is None:
+        return False
+    return f'"{etag}"' in [token.strip() for token in header.split(",")]
 
 
 def main():
@@ -145,11 +178,22 @@ def main():
     if theme_files is not None:
         active_mode = default_mode
         if schedule is None:
-            logging.info(
-                "Day and night themes, but no coordinates: starting on the %s "
-                "theme, which changes only when POST /theme says so",
-                active_mode,
-            )
+            # Two themes and no coordinates: only POST /theme can switch them,
+            # and only if http_control turned that endpoint on.
+            if appearance_conf.get("http_control", False):
+                logging.info(
+                    "Day and night themes, but no coordinates: starting on the "
+                    "%s theme, which changes only when POST /theme says so",
+                    active_mode,
+                )
+            else:
+                logging.warning(
+                    "Day and night themes, but no coordinates and "
+                    "appearance.http_control is off: the %s theme will never "
+                    "change. Give a latitude and longitude to switch by the "
+                    "sun, or set http_control: true to switch over HTTP",
+                    active_mode,
+                )
         else:
             logging.info(schedule.describe())
             by_sun = schedule.mode_at()
@@ -231,10 +275,84 @@ def main():
         active_mode = mode
         last_surface = None
 
+    def active_stream_output():
+        """The stream output in the live outputs list, or None.
+
+        Looked up per request rather than captured, because a reload replaces
+        every output instance and can add or remove this one.
+        """
+        for output in outputs:
+            if isinstance(output, StreamOutput):
+                return output
+        return None
+
+    def http_control_enabled():
+        """Whether appearance.http_control is on. Read from the live config so
+        a reload that changes it takes effect on the next request.
+
+        --theme does not turn this off. With one theme in force, /theme answers
+        400 and says so, which is more useful than the 404 that means the
+        endpoint is disabled.
+        """
+        return bool((conf.get("appearance") or {}).get("http_control", False))
+
+    def server_reasons():
+        """What currently needs the HTTP server. Empty means nothing does.
+
+        The ``server:`` block configures a server but never asks for one. Each
+        of these is checked live, because a reload can change the answer.
+        """
+        reasons = []
+        if active_stream_output() is not None:
+            reasons.append("a stream output")
+        if widget_manager.name_to_instance:
+            reasons.append("notifiable widgets")
+        if http_control_enabled():
+            reasons.append("appearance.http_control")
+        return reasons
+
+    def feature_off(what):
+        """404 for an endpoint whose feature is off.
+
+        Every route is registered unconditionally, because Flask routes cannot
+        be unregistered and a reload can turn any of these features on or off.
+        Availability is therefore a per-request answer, not a per-route one.
+        """
+        return jsonify({"success": False, "error": what}), 404
+
+    def require_token(scope):
+        """Bearer-token check for one scope. Does nothing if that token is unset.
+
+        The two scopes are independent so the read path can be closed without
+        editing the Home Assistant automations that already POST to /notify.
+        """
+        def decorator(handler):
+            @functools.wraps(handler)
+            def wrapper(*args, **kwargs):
+                expected = config.server_settings(conf)["auth"].get(f"{scope}_token")
+                if expected is not None:
+                    supplied = request.headers.get("Authorization", "")
+                    prefix = "Bearer "
+                    if not supplied.startswith(prefix) or not hmac.compare_digest(
+                        supplied[len(prefix):], expected
+                    ):
+                        return jsonify({
+                            "success": False,
+                            "error": f"a valid {scope} bearer token is required",
+                        }), 401
+                return handler(*args, **kwargs)
+            return wrapper
+        return decorator
+
     app = Flask(__name__)
 
     @app.route("/notify", methods=["POST"])
+    @require_token("control")
     def widget():
+        if not widget_manager.name_to_instance:
+            return feature_off(
+                "no widget in the current theme's tree can be notified"
+            )
         payload = request.get_json()
         requested_widget = payload["widget"]
         if requested_widget not in widget_manager.name_to_instance:
@@ -242,6 +360,67 @@ def main():
 
         widget_manager.name_to_instance[requested_widget].notify(payload)
         return jsonify({"success": True})
+
+    @app.route("/frame", methods=["GET"])
+    @require_token("stream")
+    def frame():
+        """The latest published frame, or 304 if the caller already has it."""
+        output = active_stream_output()
+        if output is None:
+            return feature_off("no stream output is configured")
+        data, etag = output.current_frame()
+        if data is None:
+            return jsonify({
+                "success": False,
+                "error": "no frame has been published yet",
+            }), 503
+        if etag_matches(request.headers.get("If-None-Match"), etag):
+            response = app.response_class(status=304)
+        else:
+            response = app.response_class(data, mimetype=output.content_type)
+        response.headers["ETag"] = f'"{etag}"'
+        response.headers["Cache-Control"] = "no-store"
+        return response
+
+    @app.route("/events", methods=["GET"])
+    @require_token("stream")
+    def events():
+        """An event per published frame, so clients don't have to poll."""
+        output = active_stream_output()
+        if output is None:
+            return feature_off("no stream output is configured")
+
+        def generate(output):
+            # Capture the output instead of looking it up per event. A reload
+            # replaces it, and the old one pushes SHUTDOWN into this queue so
+            # the client reconnects to the new one.
+            subscriber = output.subscribe()
+            try:
+                _, etag = output.current_frame()
+                if etag is not None:
+                    yield f"data: {json.dumps({'etag': etag})}\n\n"
+                while True:
+                    try:
+                        item = subscriber.get(timeout=SSE_PING_INTERVAL)
+                    except queue.Empty:
+                        yield ": ping\n\n"
+                        continue
+                    if item is SHUTDOWN:
+                        return
+                    yield f"data: {json.dumps({'etag': item})}\n\n"
+            finally:
+                output.unsubscribe(subscriber)
+
+        return app.response_class(
+            generate(output),
+            mimetype="text/event-stream",
+            headers={
+                "Cache-Control": "no-store",
+                # Stops nginx buffering, which would hold every event until
+                # the connection closed.
+                "X-Accel-Buffering": "no",
+            },
+        )
 
     def no_switching():
         return jsonify({
@@ -256,9 +435,12 @@ def main():
         return schedule is not None and forced_mode is None
 
     @app.route("/theme", methods=["GET"])
+    @require_token("control")
     def get_theme():
         """Which theme is up, what decides it, and when it changes next --
         without changing anything."""
+        if not http_control_enabled():
+            return feature_off("appearance.http_control is off")
         if theme_files is None:
             return no_switching()
         upcoming = schedule.next_change() if schedule is not None else None
@@ -272,6 +454,7 @@ def main():
         })
 
     @app.route("/theme", methods=["POST"])
+    @require_token("control")
     def set_theme():
         """Hold one theme, or hand control back to the sun.
 
@@ -282,6 +465,8 @@ def main():
         button -- posts here.
         """
         nonlocal forced_mode, forced_until
+        if not http_control_enabled():
+            return feature_off("appearance.http_control is off")
         if theme_files is None:
             return no_switching()
 
@@ -325,12 +510,49 @@ def main():
                 "held_until": forced_until.isoformat() if forced_until else None,
             })
 
-    def run_server():
-        app.run(host="0.0.0.0", port=conf["server"]["port"])
+    def start_server():
+        """Start the HTTP server if something needs it, and log either way.
 
-    server_thread = threading.Thread(target=run_server)
-    server_thread.daemon = True
-    server_thread.start()
+        It cannot be started or stopped later. Werkzeug's server has no clean
+        in-process shutdown, and a socket appearing on SIGUSR1 would be a
+        surprise. A reload that changes the answer logs a warning instead.
+        """
+        reasons = server_reasons()
+        settings = config.server_settings(conf)
+        if not reasons:
+            logging.info(
+                "Not starting the HTTP server: nothing here needs one (no "
+                "stream output, no notifiable widgets, "
+                "appearance.http_control off)"
+            )
+            return False
+
+        logging.info(
+            "HTTP server on %s:%s, for %s",
+            settings["host"], settings["port"], ", ".join(reasons),
+        )
+        remote_facing = [r for r in reasons if r != "appearance.http_control"]
+        if remote_facing and is_loopback(settings["host"]):
+            logging.warning(
+                "The HTTP server is bound to %s, so nothing off this machine "
+                "can reach it -- and %s only matter to something that can. "
+                "Set server.host to 0.0.0.0 or this machine's LAN address "
+                "unless whatever calls it runs here too",
+                settings["host"], " and ".join(remote_facing),
+            )
+
+        def run_server():
+            # Threaded: each open /events connection holds a thread for as
+            # long as the client keeps it.
+            app.run(host=settings["host"], port=settings["port"], threaded=True)
+
+        server_thread = threading.Thread(target=run_server, daemon=True)
+        server_thread.start()
+        return True
+
+    server_running = start_server()
+    bound_host = config.server_settings(conf)["host"]
+    bound_port = config.server_settings(conf)["port"]
 
     def reload_configuration(signum, frame):
         nonlocal screen_widget, provider_manager, widget_manager, conf
@@ -409,9 +631,39 @@ def main():
 
                 widget_manager, screen_widget = build_for_mode(active_mode)
                 conf = new_conf
+                warn_about_server_changes()
                 logging.info("Configuration reloaded successfully.")
             except Exception as e:
                 logging.error(f"Failed to reload configuration: {e}")
+
+    def warn_about_server_changes():
+        """Warn when a reload asked for an HTTP server it cannot get.
+
+        The rest of the reload still applies; the endpoints follow the new
+        configuration on the next request. Only the socket is fixed for the
+        life of the process.
+        """
+        reasons = server_reasons()
+        if bool(reasons) != server_running:
+            if reasons:
+                logging.warning(
+                    "The configuration now wants an HTTP server (%s), but "
+                    "starting one requires a restart. Nothing is listening",
+                    ", ".join(reasons),
+                )
+            else:
+                logging.warning(
+                    "Nothing needs the HTTP server any more, but stopping it "
+                    "requires a restart. The port stays open"
+                )
+        elif server_running:
+            settings = config.server_settings(conf)
+            if (settings["host"], settings["port"]) != (bound_host, bound_port):
+                logging.warning(
+                    "server.host/server.port changed to %s:%s, but moving the "
+                    "socket requires a restart. Still listening on %s:%s",
+                    settings["host"], settings["port"], bound_host, bound_port,
+                )
 
     signal.signal(signal.SIGUSR1, reload_configuration)
 

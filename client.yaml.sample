@@ -1,0 +1,40 @@
+# Configuration for grydgets-client, the remote display.
+#
+# This machine renders nothing. It connects to a Grydgets instance with a
+# `stream` output, fetches each new frame, scales it and displays it. No
+# widgets.yaml, no providers.yaml, no fonts.
+
+server:
+  # The rendering machine's HTTP server. That instance needs a `stream` output
+  # and a server.host this machine can reach -- 127.0.0.1 will not work.
+  url: http://dashboard-host:5000
+  # Only needed if the server sets server.auth.stream_token. Must match it.
+  # token: !secret stream_token
+  # Seconds to wait before reconnecting after a dropped connection. A rejected
+  # token backs off for five minutes regardless of this setting.
+  reconnect_delay: 2
+  # Seconds the connection must stay down before the warning triangle appears
+  # over the last frame.
+  stale_after: 30
+
+graphics:
+  # This screen's resolution. Frames arrive at whatever size the server renders
+  # and are scaled to fit, so the two do not have to match.
+  resolution: [1366, 768]
+
+logging:
+  level: info
+
+# Where the warning triangle sits: top-left, top-right, bottom-left or
+# bottom-right. Move it if it covers something you need to read.
+indicator:
+  corner: bottom-right
+
+# One display output: window or framebuffer.
+outputs:
+  - type: window
+    fullscreen: true
+    # x_display: ':0'  # Only needed when starting via SSH
+
+  # - type: framebuffer
+  #   device: /dev/fb1
