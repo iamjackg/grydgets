@@ -7,7 +7,7 @@ name = "grydgets"
 version = "0.1.0"
 description = "A PyGame-based widget dashboard system with configurable grid layouts"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.9"
 license = "MIT"
 dependencies = [
     "pygame-ce",
