@@ -528,6 +528,20 @@ client_schema = voluptuous.Schema(
                 ["top-left", "top-right", "bottom-left", "bottom-right"]
             ),
         },
+        # Optional replacement for the staleness indicator: dim the last
+        # frame and show a clock, so a screen whose server has gone away is
+        # still worth looking at.
+        voluptuous.Optional("offline", default={}): {
+            voluptuous.Optional("enabled", default=False): bool,
+            voluptuous.Optional(
+                "message", default="Dashboard server unavailable"
+            ): str,
+            voluptuous.Optional("clock_format", default="%H:%M"): str,
+            # 0 leaves the frame as it is, 1 blacks it out entirely.
+            voluptuous.Optional("dim", default=0.75): voluptuous.All(
+                voluptuous.Coerce(float), voluptuous.Range(min=0, max=1)
+            ),
+        },
         voluptuous.Required("outputs"): voluptuous.All(
             [_validate_client_output], voluptuous.Length(min=1, max=1)
         ),

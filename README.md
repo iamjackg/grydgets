@@ -512,6 +512,11 @@ graphics:
   resolution: [1366, 768]
 indicator:
   corner: bottom-right
+offline:
+  enabled: true
+  message: Dashboard server unavailable
+  clock_format: "%H:%M"
+  dim: 0.75
 outputs:
   - type: window
     fullscreen: true
@@ -520,11 +525,34 @@ outputs:
 *   `server.url`: Base URL of the rendering host's HTTP server.
 *   `server.token` _(optional)_: Must match the host's `server.auth.stream_token`.
 *   `server.reconnect_delay` _(optional)_: Seconds before reconnecting after a dropped connection. Defaults to `2`.
-*   `server.stale_after` _(optional)_: Seconds the connection must stay down before the warning triangle appears. Defaults to `30`.
+*   `server.stale_after` _(optional)_: Seconds the connection must stay down before the warning triangle — or the [offline screen](#when-the-server-goes-away) — appears. Defaults to `30`.
 *   `graphics.resolution`: This screen's resolution. Sent to the host with every request, so frames arrive already this size; anything that arrives at a different size is scaled to it here.
 *   `logging.level` _(optional)_: `debug`, `info`, or `warning`. Defaults to `info`. `debug` also turns on the [latency overlay](#latency-logginglevel-debug).
 *   `indicator.corner` _(optional)_: Where the warning triangle sits — `top-left`, `top-right`, `bottom-left`, `bottom-right`. Defaults to `bottom-right`.
+*   `offline.enabled` _(optional)_: Show the [offline screen](#when-the-server-goes-away) instead of the warning triangle. Defaults to `false`.
+*   `offline.message` _(optional)_: The line under the clock. Defaults to `Dashboard server unavailable`.
+*   `offline.clock_format` _(optional)_: `strftime` format for the clock. Defaults to `%H:%M`.
+*   `offline.dim` _(optional)_: How far to darken the last frame — `0` leaves it alone, `1` blacks it out. Defaults to `0.75`.
 *   `outputs`: Exactly one display output, `window` or `framebuffer`, configured the same way as [on the server](#window).
+
+#### When the server goes away
+
+Once the connection has been down for `stale_after` seconds, the client draws a
+warning triangle in a corner of the last frame it received. That frame keeps
+whatever it said when the connection dropped, so a glance at the screen can
+still get you an hour-old temperature.
+
+Set `offline.enabled: true` and the screen becomes a clock instead: the last
+frame dimmed by `offline.dim`, with the time and `offline.message` across the
+middle in white. The triangle is dropped, since the message says the same
+thing in words. The clock repaints whenever the string changes, so a
+`clock_format` with `%S` ticks every second and the default `%H:%M` repaints
+once a minute.
+
+The clock comes from this machine's own clock and pygame's built-in font, so it
+keeps working with the server unreachable and needs no font on the viewer. It
+also works before any frame has ever arrived — a viewer that boots while the
+server is down shows the time on black.
 
 #### Sizing
 

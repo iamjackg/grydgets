@@ -457,3 +457,74 @@ def test_the_metrics_overlay_renders_every_line(surfaces):
     overlay = build_metrics_overlay(font, ["notice   10 ms", "total    50 ms"])
     assert overlay.get_width() > 0
     assert overlay.get_height() > 0
+
+
+# --- the offline screen ---------------------------------------------------
+
+
+def test_the_offline_screen_is_off_unless_asked_for(tmp_path):
+    conf = config.load_client_config(write(tmp_path, "client.yaml", CLIENT))
+    assert conf["offline"]["enabled"] is False
+    assert conf["offline"]["message"] == "Dashboard server unavailable"
+    assert conf["offline"]["clock_format"] == "%H:%M"
+    assert conf["offline"]["dim"] == 0.75
+
+
+def test_the_dim_is_a_fraction(tmp_path):
+    conf = CLIENT + "offline:\n  enabled: true\n  dim: 4\n"
+    with pytest.raises(ConfigError) as e:
+        config.load_client_config(write(tmp_path, "client.yaml", conf))
+    assert "dim" in str(e.value)
+
+
+OFFLINE = {
+    "message": "Dashboard server unavailable",
+    "clock_format": "%H:%M",
+    "dim": 0.75,
+}
+
+
+def test_the_offline_screen_works_before_any_frame_arrives(surfaces):
+    """A viewer that boots while the server is down is still a clock."""
+    from grydgets.client import OfflineScreen
+
+    pygame.font.init()
+    screen = OfflineScreen((640, 480), OFFLINE)
+    rendered = screen.render(None, "12:34")
+    assert rendered.get_size() == (640, 480)
+    # The clock and the message are the only light pixels on a black screen.
+    assert rendered.get_bounding_rect().height > 0
+
+
+def test_the_offline_screen_dims_the_last_frame(surfaces):
+    from grydgets.client import OfflineScreen
+
+    pygame.font.init()
+    frame = pygame.Surface((640, 480))
+    frame.fill((200, 200, 200))
+    screen = OfflineScreen((640, 480), OFFLINE)
+    rendered = screen.render(frame, "12:34")
+    # A corner, away from the centred clock and message.
+    assert rendered.get_at((5, 5))[0] < 200 * 0.5
+
+
+def test_the_offline_screen_redims_only_when_the_frame_changes(surfaces):
+    from grydgets.client import OfflineScreen
+
+    pygame.font.init()
+    screen = OfflineScreen((64, 48), OFFLINE)
+    frame = pygame.Surface((64, 48))
+    screen.render(frame, "12:34")
+    cached = screen._background
+    screen.render(frame, "12:35")
+    assert screen._background is cached
+    screen.render(pygame.Surface((64, 48)), "12:35")
+    assert screen._background is not cached
+
+
+def test_a_long_message_is_shrunk_to_fit(surfaces):
+    from grydgets.client import fit_font
+
+    pygame.font.init()
+    message = "Dashboard server unavailable"
+    assert fit_font(message, 80, 300).size(message)[0] <= 300

@@ -288,6 +288,101 @@ def indicator_position(
     return x, y
 
 
+def fit_font(text: str, line_height: int, max_width: int) -> pygame.font.Font:
+    """The bundled default font, about ``line_height`` tall and no wider than
+    ``max_width`` for ``text``.
+
+    pygame's default font is used rather than a shipped one so the viewer still
+    needs no font assets. A ``pygame.font.Font`` size is not its line height,
+    so ask for one and correct; then shrink, because a size that fits a clock
+    across the screen can overflow with a longer message.
+    """
+    size = max(8, round(line_height))
+    font = pygame.font.Font(None, size)
+    height = font.get_height()
+    if height and height != line_height:
+        size = max(8, round(size * line_height / height))
+        font = pygame.font.Font(None, size)
+    while size > 8 and font.size(text)[0] > max_width:
+        size = round(size * 0.9)
+        font = pygame.font.Font(None, size)
+    return font
+
+
+class OfflineScreen:
+    """The last frame dimmed, under a large clock and a message.
+
+    Optional, and separate from the staleness indicator: a screen showing this
+    has given up on the server for now and is being useful as a clock instead.
+    It works with no frame at all, so a viewer that boots while the server is
+    down still shows the time.
+    """
+
+    def __init__(self, resolution: tuple[int, int], settings: dict) -> None:
+        self.resolution = resolution
+        self.message = settings["message"]
+        self.clock_format = settings["clock_format"]
+        width, height = resolution
+        self.shade = pygame.Surface(resolution)
+        self.shade.fill((0, 0, 0))
+        self.shade.set_alpha(round(255 * settings["dim"]))
+        self.max_width = round(width * 0.9)
+        self.clock_height = max(12, round(height * 0.40))
+        self.message_font = fit_font(
+            self.message, max(10, round(height * 0.09)), self.max_width
+        )
+        self.gap = round(height * 0.03)
+        # Dimming a 1080p frame is not free, and the frame does not change
+        # while the server is unreachable -- only the clock does.
+        self._source: pygame.Surface | None = None
+        self._background: pygame.Surface | None = None
+
+    def clock_text(self) -> str:
+        return time.strftime(self.clock_format)
+
+    def background(self, frame: pygame.Surface | None) -> pygame.Surface:
+        """The dimmed frame, or black before any frame has arrived."""
+        if self._background is None or frame is not self._source:
+            background = pygame.Surface(self.resolution)
+            background.fill((0, 0, 0))
+            if frame is not None:
+                background.blit(frame, (0, 0))
+                background.blit(self.shade, (0, 0))
+            self._source = frame
+            self._background = background
+        return self._background
+
+    def render(self, frame: pygame.Surface | None, clock_text: str) -> pygame.Surface:
+        """Clock over message, centred as a block on the dimmed frame.
+
+        Positioned by each surface's inked area rather than its full height.
+        The font leaves room above digits for accents nothing here uses, which
+        would push the block visibly low.
+        """
+        surface = self.background(frame).copy()
+        clock_font = fit_font(clock_text, self.clock_height, self.max_width)
+        clock = clock_font.render(clock_text, True, (255, 255, 255))
+        message = self.message_font.render(self.message, True, (255, 255, 255))
+        clock_ink = clock.get_bounding_rect()
+        message_ink = message.get_bounding_rect()
+
+        centre = self.resolution[0] / 2
+        block = clock_ink.height + self.gap + message_ink.height
+        top = (self.resolution[1] - block) / 2
+        surface.blit(
+            clock,
+            (round(centre - clock_ink.centerx), round(top - clock_ink.top)),
+        )
+        surface.blit(
+            message,
+            (
+                round(centre - message_ink.centerx),
+                round(top + clock_ink.height + self.gap - message_ink.top),
+            ),
+        )
+        return surface
+
+
 def latency_lines(metrics: dict, displayed_at: float) -> list[str]:
     """Format how long a frame took to notice, download, and display.
 
@@ -365,6 +460,10 @@ def run(conf: dict) -> None:
     indicator = build_indicator(resolution)
     corner = indicator_position(resolution, indicator, conf["indicator"]["corner"])
 
+    offline = None
+    if conf["offline"]["enabled"]:
+        offline = OfflineScreen(resolution, conf["offline"])
+
     # logging.level: debug also turns on the latency overlay -- there is
     # nothing else that level would be for on a viewer with no widget tree.
     debug = conf["logging"]["level"] == "debug"
@@ -380,6 +479,7 @@ def run(conf: dict) -> None:
     # onto it at every repaint.
     frame = None
     showing_stale = None
+    showing_clock = None
     metrics_surface = None
     metrics_corner = None
     try:
@@ -414,16 +514,31 @@ def run(conf: dict) -> None:
             if stale != showing_stale:
                 repaint = True
 
-            if repaint and frame is not None:
-                shown = frame
-                if stale or metrics_surface is not None:
-                    shown = frame.copy()
-                    if stale:
-                        shown.blit(indicator, corner)
+            clock_text = None
+            if offline is not None and stale:
+                # The clock is the only thing moving on the offline screen, so
+                # repaint on the string changing rather than every tick. That
+                # follows whatever resolution clock_format asks for.
+                clock_text = offline.clock_text()
+                if clock_text != showing_clock:
+                    repaint = True
+
+            if repaint and (frame is not None or clock_text is not None):
+                if clock_text is not None:
+                    shown = offline.render(frame, clock_text)
                     if metrics_surface is not None:
                         shown.blit(metrics_surface, metrics_corner)
+                else:
+                    shown = frame
+                    if stale or metrics_surface is not None:
+                        shown = frame.copy()
+                        if stale:
+                            shown.blit(indicator, corner)
+                        if metrics_surface is not None:
+                            shown.blit(metrics_surface, metrics_corner)
                 output.on_frame(shown, True)
                 showing_stale = stale
+                showing_clock = clock_text
 
             clock.tick(CLIENT_FPS)
     except KeyboardInterrupt:

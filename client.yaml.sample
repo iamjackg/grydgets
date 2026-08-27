@@ -13,8 +13,8 @@ server:
   # Seconds to wait before reconnecting after a dropped connection. A rejected
   # token backs off for five minutes regardless of this setting.
   reconnect_delay: 2
-  # Seconds the connection must stay down before the warning triangle appears
-  # over the last frame.
+  # Seconds the connection must stay down before the warning triangle -- or
+  # the offline screen below -- appears over the last frame.
   stale_after: 30
 
 graphics:
@@ -33,6 +33,20 @@ logging:
 # bottom-right. Move it if it covers something you need to read.
 indicator:
   corner: bottom-right
+
+# What to show when the server has been unreachable for stale_after seconds.
+# Off by default, which leaves just the warning triangle over the last frame.
+# Enabled, the last frame is dimmed instead and a large clock and a message
+# take its place, so the screen stays useful as a clock. It also works before
+# the first frame ever arrives, on a viewer that booted while the server was
+# down.
+offline:
+  enabled: false
+  message: Dashboard server unavailable
+  # strftime format. Add %S if you want a ticking seconds display.
+  clock_format: "%H:%M"
+  # How far to darken the last frame: 0 leaves it alone, 1 blacks it out.
+  dim: 0.75
 
 # One display output: window or framebuffer.
 outputs:
