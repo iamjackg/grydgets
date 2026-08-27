@@ -2,7 +2,9 @@
 
 The reference times come from astral itself rather than being written out as
 literals: what's under test is the offset arithmetic and the ordering of
-boundaries around midnight, not astral's ephemeris.
+boundaries around midnight, not astral's ephemeris. They are asked for in the
+same longitude-derived zone the module buckets dates by, so that a date holds
+exactly one sunrise and one sunset.
 
 Run with: uv run --with pytest python -m pytest tests/test_appearance.py
 """
@@ -21,22 +23,15 @@ from grydgets.appearance import DAY, NIGHT, SunSchedule
 # either side of a UTC midnight, which is the case the module is built around.
 LAT, LON = 45.12, -75.34
 OBSERVER = Observer(latitude=LAT, longitude=LON)
+SOLAR = timezone(timedelta(hours=LON / 15))
 SUMMER = date(2026, 8, 9)
 
 
 def sun_times(day=SUMMER):
-    """The daylight interval that starts with the sunrise on UTC date ``day``.
-
-    The sunset that ends it is the one astral reports for the *next* UTC date:
-    this far west, an evening's sunset falls after 00:00 UTC, so
-    ``sunset(observer, day)`` is the end of the previous local day and comes
-    ten hours *before* that date's sunrise. Pairing the two naively is the
-    mistake the module's three-day transition list exists to avoid, so the
-    tests must not make it either.
-    """
+    """The daylight interval of solar date ``day``, in UTC."""
     return (
-        sunrise(OBSERVER, day, tzinfo=timezone.utc),
-        sunset(OBSERVER, day + timedelta(days=1), tzinfo=timezone.utc),
+        sunrise(OBSERVER, day, tzinfo=SOLAR).astimezone(timezone.utc),
+        sunset(OBSERVER, day, tzinfo=SOLAR).astimezone(timezone.utc),
     )
 
 
@@ -118,6 +113,17 @@ def test_next_change_reaches_into_tomorrow():
     when, mode = schedule.next_change(set_ + minutes(1))
     assert mode == DAY
     assert when > set_
+
+
+def test_every_evening_gets_its_own_sunset():
+    """At a longitude where sunset sits within a minute of 00:00 UTC, bucketing
+    dates by UTC drops one evening's sunset entirely and the theme stays on day
+    right through that night."""
+    schedule = SunSchedule(43.15, -79.24)
+    for day in range(24, 31):
+        # 21:00 EDT, an hour past the latest sunset in this week.
+        evening = datetime(2026, 8, day, 1, tzinfo=timezone.utc) + timedelta(days=1)
+        assert schedule.mode_at(evening) == NIGHT, f"2026-08-{day} evening"
 
 
 # --- the sun refusing to co-operate --------------------------------------

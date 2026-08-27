@@ -14,14 +14,13 @@
 
 Each offset is in minutes and moves that boundary only.
 
-Everything here works in UTC; local time appears only in
+Every instant here is UTC; local time appears only in
 :meth:`SunSchedule.describe`, for the log line.
 
 The mode is read off a list of transitions rather than by asking "is now
-between today's sunrise and today's sunset". Those two can fall either side of
-a UTC midnight, and an offset can push a boundary across the date line, so
-taking the most recent transition from yesterday, today and tomorrow avoids
-the ordering problem at every longitude.
+between today's sunrise and today's sunset", because an offset can push a
+boundary past midnight. Taking the most recent transition from yesterday,
+today and tomorrow avoids the ordering problem.
 """
 
 from __future__ import annotations
@@ -64,6 +63,13 @@ class SunSchedule:
         self.sunrise_offset = timedelta(minutes=sunrise_offset)
         self.sunset_offset = timedelta(minutes=sunset_offset)
         self._observer = Observer(latitude=latitude, longitude=longitude)
+        # Dates are bucketed by mean solar time at this longitude, not by UTC.
+        # astral returns the boundary falling inside the date it is given, and
+        # at longitudes where sunset sits near 00:00 UTC the drift of a minute
+        # a day makes one UTC date hold two sunsets and its neighbour none --
+        # so a sunset goes missing and the theme never flips that evening. An
+        # hour offset of longitude/15 keeps both boundaries mid-date anywhere.
+        self._solar = timezone(timedelta(hours=longitude / 15))
 
     @classmethod
     def from_config(cls, appearance_conf: dict) -> SunSchedule | None:
@@ -81,7 +87,8 @@ class SunSchedule:
         )
 
     def _boundary(self, which: str, day: date_type) -> datetime | None:
-        """One boundary for one UTC date, or ``None`` where there isn't one.
+        """One boundary for one solar date, in UTC, or ``None`` where there
+        isn't one.
 
         Above the polar circles the sun can fail to rise or set at all, which
         astral reports by raising. Sunrise and sunset are asked for separately
@@ -93,16 +100,17 @@ class SunSchedule:
             else (sunset, self.sunset_offset)
         )
         try:
-            return compute(self._observer, day, tzinfo=timezone.utc) + offset
+            when = compute(self._observer, day, tzinfo=self._solar)
         except ValueError:
             return None
+        return when.astimezone(timezone.utc) + offset
 
     def transitions(self, around: datetime) -> list[tuple[datetime, str]]:
-        """Every mode change in the three UTC days centred on ``around``,
+        """Every mode change in the three solar days centred on ``around``,
         in order. Each entry is the instant the named mode starts."""
         changes = []
         for day_offset in (-1, 0, 1):
-            day = (around + timedelta(days=day_offset)).date()
+            day = (around.astimezone(self._solar) + timedelta(days=day_offset)).date()
             for mode in MODES:
                 when = self._boundary(mode, day)
                 if when is not None:
@@ -136,11 +144,8 @@ class SunSchedule:
         """The daylight interval ``now`` is in, or the most recent one behind
         it. ``(None, None)`` where the sun does neither.
 
-        Taken off the transition list rather than by asking for sunrise and
-        sunset on the same date: west of Greenwich those two are not the same
-        day's daylight -- the sunset astral reports for a date is the end of
-        the *previous* local evening, hours before that date's sunrise -- so
-        pairing them shows a window that runs backwards.
+        Taken off the transition list so that an offset which moves a boundary
+        onto an adjacent date still pairs with the right sunrise.
         """
         now = now or datetime.now(timezone.utc)
         changes = self.transitions(now)
