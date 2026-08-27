@@ -456,6 +456,10 @@ Compositing a hundred widgets into a 1080p surface takes long enough on a
 Raspberry Pi to delay a notification by seconds. A desktop does it cheaply and
 can run a higher `fps-limit`.
 
+A device that cannot run `grydgets-client` -- a photo frame or signage box that
+only accepts uploads -- takes frames from a
+[`post` output](#pushing-frames-with-a-post-output) instead.
+
 ```
      rendering host                        screens
   ┌────────────────────┐             ┌──────────────────┐
@@ -617,6 +621,34 @@ five minutes, since a bad token will not fix itself.
 
 There is no local-render fallback. That would put the widget tree and providers
 back on the screen, which defeats the point.
+
+#### Pushing frames with a `post` output
+
+A [`post` output](#post) uploads each rendered frame to an endpoint named in the
+rendering host's `conf.yaml`. The destination runs no Grydgets client and never
+connects to the host, so this is how to drive a device with an upload API, or a
+screen the host can reach but which cannot reach back.
+
+The difference from `stream` is which end knows about the other. A `post` output
+names one destination, so adding a screen means adding another `post` block to
+the host's `conf.yaml` and reloading it with `SIGUSR1`. A `stream` output
+publishes a frame and knows nothing about who reads it: a screen joins by
+starting `grydgets-client` against the host's URL, and the host's configuration
+stays as it is.
+
+The rest follows from that:
+
+*   `post` sends frames at the resolution the dashboard renders at, so a
+    destination that wants another size scales it itself. `stream` encodes each
+    frame at the size the requesting screen asks for.
+*   Each `post` output encodes and uploads its own copy of the frame, so the work
+    on the host grows with the number of destinations. Screens asking `stream`
+    for the same size share one encode.
+*   `post` uploads at most once every `min_interval` seconds, so a change waits
+    up to that long. `stream` publishes as soon as the dashboard settles and
+    announces it on `/events`.
+*   `post` needs no HTTP server on the host and no `stream_token`. Each
+    destination carries its own `url` and `auth`.
 
 ### Data Providers (`providers.yaml`)
 
