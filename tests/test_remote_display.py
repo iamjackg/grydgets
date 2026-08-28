@@ -7,6 +7,7 @@ Run with: uv run --with pytest python -m pytest tests/test_remote_display.py
 import io
 import os
 import queue
+import threading
 
 import pytest
 import voluptuous
@@ -290,6 +291,86 @@ def test_a_subscriber_that_is_behind_drops_frames_rather_than_queueing_them():
     offer(subscriber, "third")
     assert subscriber.get_nowait() == "third"
     assert subscriber.empty()
+
+
+def test_encoding_happens_off_the_calling_thread(surfaces):
+    """Request threads must not allocate frame-sized buffers of their own: a
+    glibc arena per HTTP thread is memory the process never gives back."""
+    red, _ = surfaces
+    output = StreamOutput(debounce_ms=0)
+    publish(output, red)
+
+    threads = []
+    real_encode = output._encode
+    output._encode = lambda surface, size: threads.append(
+        threading.current_thread()
+    ) or real_encode(surface, size)
+
+    output.current_frame((40, 10))
+    assert threads == [output._encoder]
+
+
+def test_one_size_asked_for_at_once_costs_one_encode(surfaces):
+    """Several displays on the same size share the encode rather than each
+    paying for an identical copy of it."""
+    red, _ = surfaces
+    output = StreamOutput(debounce_ms=0)
+    publish(output, red)
+
+    started = threading.Event()
+    release = threading.Event()
+    encodes = []
+    real_encode = output._encode
+
+    def blocking_encode(surface, size):
+        encodes.append(size)
+        started.set()
+        release.wait(5)
+        return real_encode(surface, size)
+
+    output._encode = blocking_encode
+
+    results = []
+
+    def ask():
+        results.append(output.current_frame((40, 10)))
+
+    first = threading.Thread(target=ask)
+    first.start()
+    # Hold the encode open so the others arrive while it is still running,
+    # which is the case that would otherwise encode the same size four times.
+    assert started.wait(5)
+
+    rest = [threading.Thread(target=ask) for _ in range(3)]
+    for caller in rest:
+        caller.start()
+    release.set()
+    for caller in [first, *rest]:
+        caller.join(5)
+
+    assert encodes == [(40, 10)]
+    assert len(results) == 4
+    assert all(r == results[0] for r in results)
+
+
+def test_a_caller_is_answered_even_if_the_output_is_stopped(surfaces):
+    """A reload stops the old output while requests are still in flight
+    against it. They need bytes back, not a wait that never ends."""
+    red, _ = surfaces
+    output = StreamOutput(debounce_ms=0)
+    publish(output, red)
+    output.stop()
+
+    data, etag, published_at = output.current_frame((40, 10))
+    assert data is not None and etag is not None and published_at is not None
+
+
+def test_stopping_ends_the_encoder_thread(surfaces):
+    """Otherwise every SIGUSR1 reload would leave one behind."""
+    output = StreamOutput(debounce_ms=0)
+    assert output._encoder.is_alive()
+    output.stop()
+    assert not output._encoder.is_alive()
 
 
 def test_stopping_wakes_every_subscriber(surfaces):

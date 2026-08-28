@@ -5,6 +5,9 @@ changed. Displays ask for it at their own resolution and each size is encoded
 once, so a screen never scales what it receives and never downloads pixels it
 is about to throw away.
 
+Every encode runs on one thread rather than on the HTTP request thread that
+asked for it. See :class:`_EncodeJob` for why that matters.
+
 The HTTP endpoints that serve them live in ``cli.py``, because Flask routes
 cannot be unregistered and SIGUSR1 recreates every output -- an output that
 registered its own routes would fail on the second reload.
@@ -23,14 +26,20 @@ import pygame
 
 from grydgets.outputs import Output, register_output
 
-# stop() pushes this into every subscriber queue so blocked generators exit.
-# Without it they would keep clients connected to a discarded output, and those
+# stop() pushes this into every subscriber queue so blocked generators exit,
+# and into the encode queue so the encoder thread does. Without it the
+# generators would keep clients connected to a discarded output, and those
 # clients would never reconnect to the new one.
 SHUTDOWN = object()
 
 # Encoded sizes kept per published frame. Every publish clears them, so this
 # only has to cover the distinct display sizes asking within one frame's life.
 MAX_VARIANTS = 8
+
+# How long stop() waits for the encoder thread. Only an encode already under
+# way can delay it, so this is generous; the point is that a reload cannot
+# hang the render thread outright if one somehow never finishes.
+ENCODER_JOIN_TIMEOUT = 10.0
 
 CONTENT_TYPES = {
     "jpeg": "image/jpeg",
@@ -67,6 +76,34 @@ def offer(subscriber: queue.Queue, item: Any) -> None:
         pass
 
 
+class _EncodeJob:
+    """One frame encoded at one size, and the callers waiting on the bytes.
+
+    Jobs exist so that every encode happens on the output's own encoder thread
+    instead of on the HTTP request thread that asked for it. Scaling and
+    encoding a full-resolution frame allocates several megabytes, and glibc
+    gives each thread its own malloc arena that it never returns to the OS.
+    Encoding on request threads therefore parks an arena's worth of memory --
+    up to 64MB apiece -- for every thread the HTTP server has ever handed a
+    frame to, which on a long-running server is most of them.
+
+    Sharing a job also means several displays asking for the same size at once
+    cost one encode between them rather than one each.
+    """
+
+    __slots__ = ("surface", "etag", "size", "done", "data", "error")
+
+    def __init__(
+        self, surface: pygame.Surface, etag: str, size: tuple[int, int]
+    ) -> None:
+        self.surface = surface
+        self.etag = etag
+        self.size = size
+        self.done = threading.Event()
+        self.data: bytes | None = None
+        self.error: BaseException | None = None
+
+
 @register_output("stream")
 class StreamOutput(Output):
     needs_display = False
@@ -85,7 +122,8 @@ class StreamOutput(Output):
         self.content_type = CONTENT_TYPES.get(image_format, "application/octet-stream")
 
         # Everything below is read from Flask threads and written from the
-        # render thread, except _variants, which request threads also fill in.
+        # render thread, except _variants and _jobs, which the encoder thread
+        # writes too.
         self._lock = threading.Lock()
         self._frame: pygame.Surface | None = None
         self._etag: str | None = None
@@ -94,6 +132,17 @@ class StreamOutput(Output):
         self._published_at: float | None = None
         self._variants: dict[tuple[int, int], bytes] = {}
         self._subscribers: set[queue.Queue] = set()
+        # Encodes in flight, keyed by size, so callers asking for a size
+        # another one is already waiting on join it instead of queueing a
+        # second encode of the same thing.
+        self._jobs: dict[tuple[int, int], _EncodeJob] = {}
+        self._stopped = False
+
+        self._encode_queue: queue.Queue = queue.Queue()
+        self._encoder = threading.Thread(
+            target=self._encode_loop, name="StreamEncoder", daemon=True
+        )
+        self._encoder.start()
 
         # Render thread only.
         self._pending: pygame.Surface | None = None
@@ -143,9 +192,13 @@ class StreamOutput(Output):
     ) -> tuple[bytes | None, str | None, float | None]:
         """The current frame encoded at ``size``, defaulting to as rendered.
 
-        The first caller to ask for a size pays for the scale and the encode;
-        the rest of the displays on that size get the cached bytes.
+        The first caller to ask for a size waits on the encoder thread; the
+        rest of the displays on that size get the cached bytes. The bytes
+        returned are always the ones ``etag`` names, even if a newer frame is
+        published while this waits.
         """
+        job = None
+        encode_here = False
         with self._lock:
             surface, source, published_at = self._frame, self._etag, self._published_at
             if surface is None:
@@ -153,20 +206,27 @@ class StreamOutput(Output):
             key = tuple(size) if size else surface.get_size()
             etag = source if size is None else _variant_etag(source, key)
             data = self._variants.get(key)
+            if data is None:
+                job = self._jobs.get(key)
+                if job is None:
+                    job = _EncodeJob(surface, source, key)
+                    self._jobs[key] = job
+                    # A stopped output has no encoder thread left to pick the
+                    # job up, and a request still in flight against the output
+                    # a reload replaced needs an answer rather than a hang.
+                    encode_here = self._stopped
+                    if not encode_here:
+                        # Queued under the lock, so it cannot land behind the
+                        # SHUTDOWN that a concurrent stop() pushes.
+                        self._encode_queue.put(job)
 
-        if data is None:
-            data = self._encode(surface, key)
-            self.logger.debug(
-                "Encoded frame %s at %dx%d (%d bytes)",
-                source, key[0], key[1], len(data),
-            )
-            with self._lock:
-                # A publish while this was encoding cleared the cache, and
-                # these bytes are no longer what a display should be given.
-                if source == self._etag:
-                    if len(self._variants) >= MAX_VARIANTS:
-                        self._variants.pop(next(iter(self._variants)))
-                    self._variants[key] = data
+        if job is not None:
+            if encode_here:
+                self._run(job)
+            job.done.wait()
+            if job.error is not None:
+                raise job.error
+            data = job.data
 
         return data, etag, published_at
 
@@ -182,10 +242,49 @@ class StreamOutput(Output):
 
     def stop(self) -> None:
         with self._lock:
+            self._stopped = True
             subscribers = list(self._subscribers)
             self._subscribers.clear()
+            # Jobs queued ahead of this sentinel still get encoded, so nobody
+            # waiting on one is left without an answer.
+            self._encode_queue.put(SHUTDOWN)
         for subscriber in subscribers:
             offer(subscriber, SHUTDOWN)
+        self._encoder.join(timeout=ENCODER_JOIN_TIMEOUT)
+
+    def _encode_loop(self) -> None:
+        while True:
+            job = self._encode_queue.get()
+            if job is SHUTDOWN:
+                return
+            self._run(job)
+
+    def _run(self, job: _EncodeJob) -> None:
+        """Encode one job and release everyone waiting on it."""
+        try:
+            job.data = self._encode(job.surface, job.size)
+            self.logger.debug(
+                "Encoded frame %s at %dx%d (%d bytes)",
+                job.etag, job.size[0], job.size[1], len(job.data),
+            )
+        except BaseException as e:
+            # Re-raised in the caller that asked. Catching everything keeps a
+            # single bad encode from killing the thread every later frame
+            # needs, and the finally below still releases the waiters.
+            job.error = e
+        finally:
+            with self._lock:
+                # A publish while this was encoding cleared the cache, and
+                # these bytes are no longer what a display should be given.
+                if job.data is not None and job.etag == self._etag:
+                    if len(self._variants) >= MAX_VARIANTS:
+                        self._variants.pop(next(iter(self._variants)))
+                    self._variants[job.size] = job.data
+                # A publish clears the whole table, so this size may already
+                # belong to a job for a newer frame.
+                if self._jobs.get(job.size) is job:
+                    del self._jobs[job.size]
+            job.done.set()
 
     def _publish(self, surface: pygame.Surface) -> None:
         # Hash the pixels rather than an encoding of them: nothing is encoded
@@ -205,6 +304,10 @@ class StreamOutput(Output):
             self._etag = etag
             self._published_at = published_at
             self._variants.clear()
+            # Encodes still running are for the frame this replaces. They
+            # finish and answer their callers, but must not be joined by
+            # anyone asking for this one.
+            self._jobs.clear()
             subscribers = list(self._subscribers)
         self.logger.debug("Published frame %s", etag)
         for subscriber in subscribers:
