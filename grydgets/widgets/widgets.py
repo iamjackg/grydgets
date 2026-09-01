@@ -56,10 +56,8 @@ class WidgetManager:
 
         widget_type_name = widget_dictionary["widget"]
         widget_name = widget_dictionary.get("name") or widget_type_name
-        # Increment or initialize the widget counter
         counter[widget_name] = counter.get(widget_name, 0) + 1
 
-        # Generate a unique name based on the path and counter
         unique_name = "_".join(path + [f"{widget_name}{counter[widget_name]}"])
         widget_parameters = {
             key: value
@@ -67,16 +65,13 @@ class WidgetManager:
             if key not in ["widget", "children"]
         }
         logging.debug(f"Adding to widget tree: {unique_name}")
-        # Pass the unique name as an extra parameter
         widget_parameters["unique_name"] = unique_name
 
-        # Resolve providers if specified
         if "providers" in widget_parameters and self.provider_manager:
             provider_list = widget_parameters["providers"]
             if not isinstance(provider_list, list):
                 provider_list = [provider_list]
 
-            # Validate and resolve providers
             self.provider_manager.validate_providers(provider_list)
             provider_dict = {
                 name: self.provider_manager.get_provider(name)
@@ -101,7 +96,7 @@ class WidgetManager:
                 )
 
         if "children" in widget_dictionary:
-            child_counter = {}  # Reset counter for children
+            child_counter = {}
             for child in widget_dictionary["children"]:
                 widget.add_widget(
                     self.create_widget_tree(

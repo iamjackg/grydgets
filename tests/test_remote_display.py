@@ -30,9 +30,6 @@ def write(tmp_path, name, text):
     return str(path)
 
 
-# --- conf.yaml: the server block is configuration, not a switch ----------
-
-
 def test_conf_yaml_loads_without_a_server_block(tmp_path):
     """conf-pi.yaml has no server: block and must still load."""
     path = write(tmp_path, "conf.yaml", """
@@ -81,9 +78,6 @@ def test_http_control_is_off_unless_asked_for():
         {"themes": {"day": "d", "night": "n"}}
     )
     assert validated["http_control"] is False
-
-
-# --- the stream output ----------------------------------------------------
 
 
 def test_a_stream_output_validates_and_is_registered(tmp_path):
@@ -382,9 +376,6 @@ def test_stopping_wakes_every_subscriber(surfaces):
     assert all(s.get_nowait() is SHUTDOWN for s in subscribers)
 
 
-# --- helpers behind the endpoints ----------------------------------------
-
-
 def test_is_loopback():
     from grydgets.cli import is_loopback
 
@@ -403,7 +394,8 @@ def test_etag_matches():
     assert etag_matches('"abc"', "abc")
     assert etag_matches('"xyz", "abc"', "abc")
     assert not etag_matches('"xyz"', "abc")
-    assert not etag_matches("abc", "abc")  # unquoted isn't an ETag
+    # unquoted isn't an ETag
+    assert not etag_matches("abc", "abc")
     assert not etag_matches(None, "abc")
     assert not etag_matches('"abc"', None)
 
@@ -422,9 +414,6 @@ def test_requested_size():
     ):
         with pytest.raises(BadSize):
             requested_size(args)
-
-
-# --- client.yaml ----------------------------------------------------------
 
 
 CLIENT = """
@@ -473,9 +462,6 @@ def test_a_client_needs_somewhere_to_fetch_from(tmp_path):
     assert "url" in str(e.value)
 
 
-# --- the staleness indicator ---------------------------------------------
-
-
 def test_the_indicator_scales_with_the_screen(surfaces):
     from grydgets.client import build_indicator, indicator_position
 
@@ -488,9 +474,6 @@ def test_the_indicator_scales_with_the_screen(surfaces):
         x, y = indicator_position((1366, 768), small, corner)
         assert 0 <= x and x + small.get_width() <= 1366
         assert 0 <= y and y + small.get_height() <= 768
-
-
-# --- the latency overlay --------------------------------------------------
 
 
 def test_latency_lines_needs_a_published_at():
@@ -538,9 +521,6 @@ def test_the_metrics_overlay_renders_every_line(surfaces):
     overlay = build_metrics_overlay(font, ["notice   10 ms", "total    50 ms"])
     assert overlay.get_width() > 0
     assert overlay.get_height() > 0
-
-
-# --- the offline screen ---------------------------------------------------
 
 
 def test_the_offline_screen_is_off_unless_asked_for(tmp_path):

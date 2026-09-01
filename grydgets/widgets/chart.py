@@ -137,7 +137,7 @@ class ProviderBarChartWidget(Widget):
         return [str(v) for v in result]
 
     def render(self, size: tuple[int, int]) -> pygame.Surface:
-        super().render(size)  # updates self.size, may set self.dirty if size changed
+        super().render(size)
 
         needs_redraw = self.dirty or self.provider.get_timestamp() > self.last_seen_timestamp
 

@@ -23,7 +23,8 @@ from grydgets.editor import yamlio
 
 # A hung endpoint must not wedge the single-threaded editor.
 REQUEST_TIMEOUT = 10
-RAW_BODY_LIMIT = 8000  # chars of response body kept for display / re-extraction
+# Chars of response body kept for display / re-extraction.
+RAW_BODY_LIMIT = 8000
 
 
 def _load_secret_values(secrets_path: str) -> dict[str, Any]:

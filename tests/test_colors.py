@@ -76,7 +76,6 @@ def test_parsing_is_stable():
 
 
 def test_rgb_and_rgba_agree():
-    # The same colour written both ways must compare equal after parsing.
     assert parse_color([255, 136, 0]) == parse_color([255, 136, 0, 255])
     assert parse_color("#ff8800") == parse_color([255, 136, 0])
 

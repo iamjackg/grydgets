@@ -33,12 +33,7 @@ class Output:
         return False
 
     def on_frame(self, surface: pygame.Surface, freshly_rendered: bool) -> None:
-        """Receive the rendered surface.
-
-        Args:
-            surface: The current frame.
-            freshly_rendered: True if re-rendered this frame (False = identical to last).
-        """
+        """Receive the rendered surface."""
 
     def stop(self) -> None:
         """Clean shutdown."""
@@ -58,14 +53,11 @@ def register_output(name: str):
 def create_outputs(output_configs: list[dict], render_config: dict) -> list[Output]:
     """Create output instances from configuration.
 
-    Args:
-        output_configs: List of output config dicts, each with a 'type' key.
-        render_config: Global render settings (resolution, fps-limit, etc.).
-
-    Returns:
-        List of Output instances.
+    Each entry in ``output_configs`` needs a ``type`` key; ``render_config`` carries
+    global settings such as resolution and fps-limit shared by every output.
     """
-    # Import concrete types to trigger registration
+    # Each import's decorator populates OUTPUT_TYPES as a side effect; the
+    # module itself is otherwise unused here.
     from grydgets.outputs import window  # noqa: F401
     from grydgets.outputs import framebuffer  # noqa: F401
     from grydgets.outputs import file  # noqa: F401

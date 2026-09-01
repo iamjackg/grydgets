@@ -2,7 +2,8 @@
 
 Holds an SSE connection to a grydgets instance running a ``stream`` output and
 fetches each new frame at this screen's resolution, scaling one only if it
-arrives at some other size. No widget tree, no providers, no compositing.
+arrives at some other size. The client does not create widgets or providers
+and does almost no rendering at all, which keeps it light.
 
 Nothing here imports ``grydgets.widgets``, ``grydgets.providers`` or flask, and
 it must stay that way -- a small footprint is the reason to run a viewer at
@@ -65,8 +66,8 @@ class AuthRejected(Exception):
 def offer(destination: queue.Queue, item: Any) -> None:
     """Replace whatever is queued with ``item``.
 
-    The queue holds one frame. A frame the display hasn't picked up is already
-    out of date, so drop it rather than build a backlog.
+    The queue only holds the most recent frame -- a display that hasn't picked
+    up the previous one only needs the latest, not a backlog.
     """
     try:
         destination.get_nowait()

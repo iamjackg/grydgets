@@ -34,7 +34,9 @@ class FileOutput(Output):
         self.filename_pattern = filename_pattern
         self.keep_images = keep_images
         self.create_latest_symlink = create_latest_symlink
-        self._last_save_time = 0  # triggers immediate first save
+        # Zero guarantees the first on_frame() call is due a save regardless
+        # of render_interval.
+        self._last_save_time = 0
         self._sequence = 0
 
     def setup(self, screen_size: tuple[int, int]) -> None:

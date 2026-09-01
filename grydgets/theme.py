@@ -272,9 +272,8 @@ def _apply_defaults(value: Any, by_type: dict[str, dict[str, Any]]) -> None:
         if isinstance(widget_type, str):
             for key, default in by_type.get(widget_type, {}).items():
                 if key not in value:
-                    # Deep copy: without it every node defaulted from the same
-                    # entry would share one mutable list, and a later in-place
-                    # edit to any of them would show up in all the others.
+                    # Deep copy: without it, every node defaulted from this entry
+                    # would share one mutable list, and an edit to one would show up in all.
                     value[key] = copy.deepcopy(default)
         for child in value.values():
             _apply_defaults(child, by_type)

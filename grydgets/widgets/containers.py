@@ -392,7 +392,8 @@ class FlipWidget(ContainerWidget):
 
     def tick(self) -> None:
         if time.time() - self.last_update >= self.interval:
-            if not self.moving:  # This allows for the current animation to complete
+            # Skip if a transition is already running so it can finish before the next one starts.
+            if not self.moving:
                 self.moving = True
                 self.ticker = time.time()
                 self.last_update = int(time.time())
@@ -471,7 +472,8 @@ class ScheduleFlipWidget(FlipWidget):
             self.current_widget = self.get_current_widget(datetime.now().time())
         current_widget = self.get_current_widget(datetime.now().time())
         if current_widget != self.current_widget:
-            if not self.moving:  # This allows for the current animation to complete
+            # Skip if a transition is already running so it can finish before the next one starts.
+            if not self.moving:
                 self.moving = True
                 self.destination_widget = current_widget
                 self.ticker = time.time()
@@ -703,14 +705,10 @@ class HTTPFlipWidget(FlipWidget, UpdaterWidget):
         self._widget_index_cache.clear()
 
     def get_current_widget(self, response_value: str) -> int:
-        """Index in ``widget_list`` of the widget this response value selects.
+        """Index in ``widget_list`` this response value selects; memoised since only widget additions change the answer.
 
-        ``tick`` asks on every frame and the answer only changes when a child
-        is added, so it is memoised. The cache is per instance rather than a
-        ``functools.lru_cache`` on the method: that one lives on the class and
-        keys on ``self``, so it would keep every torn-down widget -- and the
-        rendered surfaces of its whole subtree -- alive across theme switches
-        and config reloads.
+        Cached per instance rather than via ``functools.lru_cache`` on the method, which keys on
+        ``self`` and would keep torn-down widgets alive across theme switches and config reloads.
         """
         cached = self._widget_index_cache.get(response_value)
         if cached is not None:
@@ -745,7 +743,8 @@ class HTTPFlipWidget(FlipWidget, UpdaterWidget):
             current_widget = self.current_widget
 
         if current_widget != self.current_widget:
-            if not self.moving:  # This allows for the current animation to complete
+            # Skip if a transition is already running so it can finish before the next one starts.
+            if not self.moving:
                 self.moving = True
                 self.destination_widget = current_widget
                 self.ticker = time.time()
@@ -764,7 +763,6 @@ class HTTPFlipWidget(FlipWidget, UpdaterWidget):
             self.widget_list[self.current_widget].tick()
 
     def update(self) -> None:
-        """Perform HTTP request and determine target widget"""
         try:
             response = requests.request(
                 method=self.method, url=self.url, **self.requests_kwargs

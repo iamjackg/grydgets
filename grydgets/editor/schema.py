@@ -22,9 +22,12 @@ RAW_TEXTAREA_FIELDS = {
 # Fields whose values reference a sibling child's `name`. Not expressible in
 # JSON Schema itself -- this is domain knowledge from the widget classes.
 NAME_REF_FIELDS = {
-    "default_widget": "single",  # value is one child name
-    "mapping": "values",  # dict values are child names, keys are free text
-    "schedule": "values",  # dict values are child names, keys are HH:MM
+    # "default_widget": value is one child name.
+    # "mapping": dict values are child names, keys are free text.
+    # "schedule": dict values are child names, keys are HH:MM.
+    "default_widget": "single",
+    "mapping": "values",
+    "schedule": "values",
 }
 
 COLOR_REF = "#/definitions/color"
@@ -58,9 +61,11 @@ class FieldSpec:
 class WidgetSpec:
     def __init__(self, widget_type):
         self.widget_type = widget_type
-        self.fields = {}  # name -> FieldSpec, excludes "widget"/"name"/"children"
+        # name -> FieldSpec, excludes "widget"/"name"/"children".
+        self.fields = {}
         self.min_children = 0
-        self.max_children = 0  # 0 means "not a container"
+        # 0 means "not a container".
+        self.max_children = 0
         self.has_children_field = False
 
     def is_container(self):
@@ -145,7 +150,8 @@ def parse_widget_specs(schema=None):
             if name == "children":
                 spec.has_children_field = True
                 spec.min_children = prop.get("minItems", 0)
-                spec.max_children = prop.get("maxItems")  # None means unbounded
+                # None means unbounded.
+                spec.max_children = prop.get("maxItems")
                 continue
             spec.fields[name] = _field_spec(name, prop, required_names)
 

@@ -1,9 +1,8 @@
 """Shared background painting for widgets that accept ``background_color``.
 
-Three widgets now paint the same square-or-rounded backdrop (``text`` and its
-wrappers, ``grid`` cells, ``empty``). Keeping it in one function means a
-rounded panel and a square one at the same colour agree pixel-for-pixel on
-alpha, which matters because these are composited on top of each other.
+Widgets that paint a background — ``text`` and its wrappers, ``grid`` cells, ``empty`` —
+share this function so a rounded panel and a square one at the same colour agree
+pixel-for-pixel on alpha, which matters since they are composited on top of each other.
 """
 
 from __future__ import annotations

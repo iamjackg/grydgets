@@ -25,9 +25,6 @@ server:
 """
 
 
-# --- files that can't be read --------------------------------------------
-
-
 @pytest.mark.parametrize(
     "load, name",
     [
@@ -77,9 +74,6 @@ def test_broken_yaml_names_the_file_and_keeps_the_parser_detail(tmp_path):
     assert "line 3" in message
 
 
-# --- documents that parse but aren't usable -------------------------------
-
-
 @pytest.mark.parametrize(
     "body, expected",
     [
@@ -115,9 +109,6 @@ def test_a_good_pair_of_files_still_loads(tmp_path):
     (tmp_path / "conf.yaml").write_text(CONF)
     assert config.load_widget_config(str(tmp_path / "widgets.yaml"))["widgets"]
     assert config.load_config(str(tmp_path / "conf.yaml"))["server"]["port"] == 5000
-
-
-# --- secrets --------------------------------------------------------------
 
 
 @pytest.fixture

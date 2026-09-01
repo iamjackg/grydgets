@@ -23,10 +23,9 @@ TESTABLE_WIDGETS = ("rest", "restimage")
 
 ROOT_PATH = "root"
 
-# The screen's own parameters, which the root inspector renders by hand
-# rather than from a widget spec -- there is no `widget: screen` node to look
-# one up from. Described as fields anyway so they can reuse the ordinary
-# controls and the theme-token picker.
+# The screen's own parameters, rendered by hand since there is no
+# `widget: screen` node to look them up from -- described as fields anyway
+# so they can reuse the ordinary controls and the theme-token picker.
 BACKGROUND_COLOR_FIELD = schema_mod.FieldSpec(
     "background_color", "color", control="color"
 )
@@ -76,9 +75,9 @@ class FieldRow:
         self.field = field
         self.value = value
         self.source = source
-        # What the widget will actually render with: a default written as
-        # `!font regular` is shown as the font it resolves to, with the token
-        # itself named alongside so the theme entry to edit is still obvious.
+        # What the widget actually renders with: a default written as
+        # `!font regular` shows as the font it resolves to, with the token
+        # named alongside so the theme entry to edit stays obvious.
         self.resolved = resolved if source is not None else value
         self.token_text = token_text
 
@@ -101,23 +100,12 @@ def _inherited_value(value, sections):
 
 
 def _field_rows(spec, node, defaults=None, sections=None):
-    """Fields shown in the edit form: required ones always, optional ones
-    only once they're actually present on the node -- otherwise every
-    optional field would render as an empty input and get silently written
-    back as a default value (false / "" / {}) on every edit, even for fields
-    the user never touched. Bringing in a new optional field is what the
-    "add property" menu is for.
+    """Fields shown in the edit form.
 
-    A field the node doesn't set but `theme.defaults` does is shown too, as
-    an inherited row. Without it the inspector goes quiet about most of what
-    a themed widget renders with, and a *required* field supplied by the
-    theme would render as an empty input and be written back as "".
-
-    spec is None for widget types not in schema.json (hand-written/legacy
-    widgets) -- the schema is advisory, so those nodes still need to be
-    viewable/editable, just with no known fields to show here; the
-    "unknown fields" raw-YAML path in update_node()/inspector.html covers
-    all of their keys instead."""
+    Optional fields appear only once set on the node; showing an untouched
+    one would get it written back as its default value on the next apply. A
+    field the node doesn't set but the theme does is still shown, as an
+    inherited row, so the inspector isn't blank for themed values."""
     if spec is None:
         return []
     defaults = defaults or {}
@@ -155,33 +143,28 @@ def _row_id(path):
 def _parse_number(raw, json_type):
     """Turn a numeric control's text back into an int or a float.
 
-    A whole number stays an int even where the schema says "number". Every
-    control hands its value back as a string, and running float() over all of
-    them rewrote the file's integer literals on any Apply that touched the
-    node -- `transition: 0` became `0.0`, `row_ratios: [4, 1, 4]` became
-    `[4.0, 1.0, 4.0]`. Harmless to the widgets, but it churned widgets.yaml
-    and buried the real edit in a diff full of noise.
-    """
+    A whole number stays an int even where the schema says "number", since
+    every control hands its value back as a string and running float() over
+    all of them would rewrite integer literals like `transition: 0` as
+    `0.0` on any apply that touches the node."""
     text = raw.strip()
     if json_type == "integer":
         return int(text)
     try:
         return int(text)
     except ValueError:
-        # Genuinely fractional, or exponent notation -- float() owns those.
+        # Fractional or exponent notation -- float() owns those.
         return float(text)
 
 
 def _assign_list(node, name, items):
     """Write a list field without rewriting how it was formatted.
 
-    Assigning a plain Python list drops ruamel's flow-style flag, so
-    `providers: [work_calendar]` came back as a two-line block sequence the
-    first time anything on the node was applied. Refilling the sequence that
-    is already there keeps its style. Comments held against entries past the
-    new end are dropped with them -- they belong to items that no longer
-    exist, and leaving them behind puts them on the wrong entry.
-    """
+    Assigning a plain Python list drops ruamel's flow-style flag, turning
+    `providers: [work_calendar]` into a block sequence on the next apply, so
+    the existing sequence is refilled in place instead. Comments held
+    against entries past the new end are dropped with them, since they
+    belong to items that no longer exist."""
     existing = node.get(name)
     if not isinstance(existing, CommentedSeq):
         node[name] = items
@@ -194,9 +177,8 @@ def _assign_list(node, name, items):
 
 
 def _parse_list_value(raw, items_type):
-    # One item per line rather than comma-separated: list entries are
-    # single-line strings that may legitimately contain commas (e.g. a label
-    # "Hello, world"), so splitting on commas would corrupt them on apply.
+    # One item per line, not comma-separated: a list entry may itself
+    # contain a comma (e.g. a label "Hello, world").
     items = [v.strip() for v in raw.splitlines() if v.strip() != ""]
     if items_type in ("integer", "number"):
         return [_parse_number(v, items_type) for v in items]
@@ -206,13 +188,11 @@ def _parse_list_value(raw, items_type):
 def _color_is_unchanged(current, submitted):
     """True when `submitted` is the colour `current` already holds.
 
-    Saving a node re-applies every one of its fields, not just the edited
-    one, and the colour control only ever hands back four numeric channels.
-    Writing those blindly rewrote `'#ff8800'` as `[255, 136, 0, 255]` (and
-    `[255, 136, 0]` the same way) whenever anything else on the node
-    changed. Comparing the parsed values instead lets a colour nobody
-    touched keep whatever form it was written in.
-    """
+    Saving a node re-applies every field, not just the edited one, and the
+    colour control only ever hands back four numeric channels, so writing
+    them unconditionally would rewrite `'#ff8800'` as `[255, 136, 0, 255]`
+    whenever anything else on the node changed. Comparing parsed values
+    instead lets an untouched colour keep whatever form it was written in."""
     if current is None:
         return False
     try:
@@ -250,13 +230,10 @@ def _plain_input_is_blank(form, field):
 def _apply_root_token(node, field, form, field_errors):
     """Handle the theme-token half of one of the screen's fields.
 
-    Returns True when the token half owns the value, so the caller leaves the
-    plain control below it alone. The root inspector applies its fields by
-    hand rather than through :func:`_apply_field` -- a blank text box there
-    means "no background image" and has to remove the key, where the generic
-    text branch would write an empty string -- so the token handling the two
-    share lives here.
-    """
+    Returns True when the token half owns the value, so the caller leaves
+    the plain control alone. Applied by hand rather than through
+    `_apply_field`, since a blank box here means "no background image"
+    (remove the key), where the generic text branch would write "" instead."""
     name = field.name
     current = node.get(name)
 
@@ -268,24 +245,19 @@ def _apply_root_token(node, field, form, field_errors):
             node[name] = token
         return True
 
-    # The plain control renders empty for a token because it has no way to
-    # show one, so a blank submission means "left alone" and not "delete it".
-    # Checked whether or not the picker was rendered: a theme with no matching
-    # section offers no token to pick, but a token written by hand is still
-    # sitting in the document and must survive an Apply.
+    # The plain control renders empty for a token, so a blank submission
+    # means "left alone", not "delete it" -- checked even when no picker was
+    # rendered, since a hand-written token must still survive an apply.
     return yamlio.is_theme_token(current) and _plain_input_is_blank(form, field)
 
 
 def _apply_field(node, field, form, errors, token_capable=False):
-    """Applies the submitted value for `field` to `node`. Returns True if the
-    node was actually written/removed, and False if it wasn't -- either an
-    error was recorded, or the submitted value is what the node already held.
-    Used by update_node() to decide whether to mark the document dirty.
+    """Apply the submitted value for `field` to `node`.
 
-    `token_capable` says the field was rendered with a theme-token picker, so
-    the mode radio decides whether the token or the plain control below it
-    owns the value.
-    """
+    Returns whether the node was actually written or removed, so
+    update_node() knows when to mark the document dirty. `token_capable`
+    means the field was rendered with a theme-token picker, so the mode
+    radio decides whether the token or the plain control owns the value."""
     name = field.name
     current = node.get(name)
 
@@ -301,10 +273,8 @@ def _apply_field(node, field, form, errors, token_capable=False):
             return True
         if yamlio.is_theme_token(current) and _plain_input_is_blank(form, field):
             # The radio moved off "theme" with nothing typed in its place.
-            # The plain control renders empty for a token (it has no way to
-            # show one), so applying here would write "" over the token or,
-            # for a number, drop the key outright. A stray radio click
-            # shouldn't cost the value.
+            # The plain control renders empty for a token, so applying here
+            # would write "" over it, or drop the key outright for a number.
             errors.append(
                 (name, "enter a value to replace the theme token, or leave this set to 'theme'")
             )
@@ -364,10 +334,9 @@ def _assign_mapping(node, name, values):
     """Write a mapping field by updating the mapping already in place.
 
     Replacing it with a fresh dict throws away everything ruamel hangs off
-    the old one -- inline comments, and the blank lines that separate a
-    block from the key after it. Keys that go away lose theirs, which is
-    right: the comment belonged to them.
-    """
+    the old one -- inline comments and the blank lines that separate a block
+    from the key after it. A key that goes away loses its comment too,
+    which is correct since the comment belonged to it."""
     existing = node.get(name)
     if not isinstance(existing, dict):
         node[name] = values
@@ -389,7 +358,8 @@ def _apply_name_ref_field(node, field_name, kind, form, errors):
             node[field_name] = value
         else:
             node.pop(field_name, None)
-    else:  # "values": dict field, parallel key/val lists
+    else:
+        # kind == "values": dict field, as parallel key/val lists.
         keys = form.getlist(f"{field_name}_key")
         vals = form.getlist(f"{field_name}_val")
         result = {}
@@ -442,16 +412,13 @@ def _apply_auth_field(node, form):
 
 
 def _token_is_read_only(field, value, token_capable):
-    """True when a field holds a theme token that no control on the form can
-    hand back intact, so update_node must leave it alone.
+    """True when a field holds a theme token that no form control can round-
+    trip, so update_node must leave it alone.
 
-    Two controls can round-trip a token: the picker a token-capable field is
-    rendered with, and the raw YAML box, whose contents are parsed back
-    through ruamel and keep their tag. Every other control -- text, number,
-    select, checkbox, list -- can only produce a literal, so applying one
-    would flatten `!font bold` to the string `bold`, or (a number input
-    can't display `radius`, so it posts empty) drop the key entirely.
-    """
+    Only the token picker (for a token-capable field) and the raw YAML box
+    preserve a token's tag. Every other control -- text, number, select,
+    checkbox, list -- can only produce a literal, flattening `!font bold` to
+    the string `bold`, or dropping the key when the control can't display it."""
     if not yamlio.contains_theme_token(value):
         return False
     if field.control == "raw":
@@ -460,16 +427,13 @@ def _token_is_read_only(field, value, token_capable):
 
 
 def _color_channels_filter(value):
-    """Expand a colour value into the four r/g/b/a numbers the colour control
-    shows.
+    """Expand a colour value into the four r/g/b/a numbers the colour
+    control shows.
 
-    Colours may be written as a hex string in widgets.yaml. The control edits
-    them as four numeric channels, and indexing a string yields its characters
-    -- '#ff8800' would fill the boxes with '#', 'f', 'f', '8' and write that
-    back on the next Apply. Parsing here keeps the control on numbers whatever
-    form the file uses. Note the editor still *saves* a list, so applying this
-    field to a hex colour rewrites it as [r, g, b, a].
-    """
+    Colours may be written as a hex string in widgets.yaml, and indexing a
+    string yields characters rather than channels, so parsing here keeps
+    the control on numbers whatever form the file uses. Applying this field
+    to a hex colour rewrites it as [r, g, b, a]."""
     if value is None:
         return []
     try:
@@ -555,9 +519,8 @@ def create_app(widgets_path):
             widget_type=widget_type,
             spec=spec,
             field_rows=rows,
-            # Names the theme could supply, so an overridden field's "remove"
-            # button can say what removing it falls back to, and the "add
-            # property" menu can leave out what is already on screen.
+            # Names the theme could supply, so "remove" can say what a field
+            # falls back to, and "add property" can skip what's shown already.
             default_sources={name: source for name, (_v, source) in defaults.items()},
             inherited_names=[row.field.name for row in rows if row.inherited],
             siblings=tree.get_children(node),
@@ -683,11 +646,9 @@ def create_app(widgets_path):
         token_fields = theme_ui.options_by_field(state.doc, spec)
         for row in _field_rows(spec, node, node_defaults(node)):
             if row.inherited:
-                # The theme supplies this one. Its controls are rendered
-                # disabled, so the browser posts nothing for it -- and if one
-                # ever did, writing it would copy the theme's value onto the
-                # node and quietly turn it into an override. Overriding is
-                # what the override-field route is for.
+                # The theme supplies this one, and its controls are rendered
+                # disabled, so writing it would turn it into an override --
+                # that's what the override-field route is for.
                 continue
             field = row.field
             value = node.get(field.name)
@@ -699,9 +660,11 @@ def create_app(widgets_path):
                 _apply_secret_capable_field(node, field.name, form)
                 changed = True
             elif yamlio.contains_secret(value):
-                continue  # secret nested somewhere other than auth -- read-only
+                # Secret nested somewhere other than auth: read-only.
+                continue
             elif _token_is_read_only(field, value, token_capable):
-                continue  # theme token this form can't carry -- read-only
+                # Theme token this form can't carry: read-only.
+                continue
             elif field.name in schema_mod.NAME_REF_FIELDS:
                 _apply_name_ref_field(
                     node, field.name, schema_mod.NAME_REF_FIELDS[field.name], form, errors
@@ -711,9 +674,8 @@ def create_app(widgets_path):
                 if _apply_field(node, field, form, errors, token_capable=token_capable):
                     changed = True
 
-        # unknown fields present on the node but not in the schema: raw round-trip
-        # (when spec is None -- widget type unknown to schema.json -- every
-        # field on the node falls into this path)
+        # Fields present on the node but not in the schema round-trip as raw
+        # YAML (when spec is None, every field on the node falls in here).
         known = (set(spec.fields.keys()) if spec else set()) | {"widget", "name", "children"}
         for key in list(node.keys()):
             if key in known:
@@ -842,9 +804,8 @@ def create_app(widgets_path):
         defaults = node_defaults(node)
         if field_name in defaults and field_name not in node:
             value, _source = defaults[field_name]
-            # Deep copy for the reason theme._apply_defaults documents: two
-            # nodes overriding the same entry would otherwise share one
-            # mutable list, and editing either would edit both.
+            # Without a deep copy, two nodes overriding the same entry would
+            # share one mutable list, and editing either would edit both.
             node[field_name] = copy.deepcopy(value)
             state.mark_dirty()
 

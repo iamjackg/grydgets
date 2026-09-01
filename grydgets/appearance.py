@@ -63,12 +63,8 @@ class SunSchedule:
         self.sunrise_offset = timedelta(minutes=sunrise_offset)
         self.sunset_offset = timedelta(minutes=sunset_offset)
         self._observer = Observer(latitude=latitude, longitude=longitude)
-        # Dates are bucketed by mean solar time at this longitude, not by UTC.
-        # astral returns the boundary falling inside the date it is given, and
-        # at longitudes where sunset sits near 00:00 UTC the drift of a minute
-        # a day makes one UTC date hold two sunsets and its neighbour none --
-        # so a sunset goes missing and the theme never flips that evening. An
-        # hour offset of longitude/15 keeps both boundaries mid-date anywhere.
+        # Bucketed by mean solar time, not UTC: near longitudes where sunset
+        # falls close to 00:00 UTC, a UTC date can hold two sunsets and its neighbour none.
         self._solar = timezone(timedelta(hours=longitude / 15))
 
     @classmethod

@@ -73,14 +73,12 @@ def apply_text_scale(render_config):
         logging.info("Configured text sizes are multiplied by %g", scale)
 
 
-# How often the sun is asked whether it's still the same time of day. The
-# boundaries move by seconds from one day to the next, so anything under a
-# minute is checking for nothing.
+# How often the sun is asked whether it's still the same time of day.
+# Sunrise/sunset shift by seconds a day, so checking more often finds nothing.
 MODE_CHECK_INTERVAL = 30
 
-# How often /events sends a comment line. Routers drop idle connections
-# silently, and without a ping the client keeps believing it is connected. With
-# one, a dead connection shows up as a read timeout.
+# How often /events sends a comment line, so a router that drops idle
+# connections silently turns into a read timeout instead of a stuck client.
 SSE_PING_INTERVAL = 20
 
 
@@ -179,9 +177,8 @@ def main():
         )
         appearance_conf = None
 
-    # schedule is None while theme_files isn't when the block names two themes
-    # but no coordinates: two themes to move between, nothing moving between
-    # them except POST /theme.
+    # schedule is None while theme_files isn't when the block names two
+    # themes but no coordinates, so only POST /theme moves between them.
     schedule = None
     theme_files = None
     default_mode = appearance.DAY
@@ -242,7 +239,7 @@ def main():
     any_needs_display = any(o.needs_display for o in outputs)
     fps_limit = max(o.preferred_fps for o in outputs)
 
-    # Set SDL environment variables before pygame.init()
+    # SDL_VIDEODRIVER only takes effect if set before pygame.init() runs.
     if not any_needs_display:
         os.environ["SDL_VIDEODRIVER"] = "dummy"
 

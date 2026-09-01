@@ -8,38 +8,24 @@ from grydgets.providers.rest import RestDataProvider
 
 
 class ProviderManager:
-    """Manages the lifecycle of data providers.
+    """Loads providers.yaml, creates provider instances, and manages their
+    lifecycle and lookup by name."""
 
-    Responsibilities:
-    - Load provider configuration from providers.yaml
-    - Create provider instances
-    - Start/stop all providers
-    - Provide lookup by name
-    """
-
-    # Map provider types to classes
     PROVIDER_TYPES = {
         'rest': RestDataProvider,
     }
 
     def __init__(self, config_path='providers.yaml'):
-        """Initialize the provider manager.
-
-        Args:
-            config_path: Path to providers configuration file (default: providers.yaml)
-        """
         self.config_path = config_path
         self.providers = {}
         self.logger = logging.getLogger('ProviderManager')
 
-        # Load and create providers
         if os.path.exists(config_path):
             self._load_providers()
         else:
             self.logger.info(f"No providers config found at {config_path}")
 
     def _load_providers(self):
-        """Load provider configuration and create provider instances."""
         try:
             config = load_providers_config(self.config_path)
         except Exception as e:
@@ -60,12 +46,6 @@ class ProviderManager:
                 raise
 
     def _create_provider(self, name, config):
-        """Create a single provider instance.
-
-        Args:
-            name: Provider name
-            config: Provider configuration dictionary
-        """
         if not isinstance(config, dict):
             raise ValueError(f"Provider '{name}' config must be a dictionary")
 
@@ -80,19 +60,16 @@ class ProviderManager:
                 f"Available types: {list(self.PROVIDER_TYPES.keys())}"
             )
 
-        # Extract provider-specific config
         provider_kwargs = dict(config)
         del provider_kwargs['type']
         provider_kwargs['name'] = name
 
-        # Create provider instance
         provider = provider_class(**provider_kwargs)
         self.providers[name] = provider
 
         self.logger.info(f"Created provider '{name}' of type '{provider_type}'")
 
     def start_all(self):
-        """Start all providers."""
         self.logger.info(f"Starting {len(self.providers)} providers")
         for name, provider in self.providers.items():
             try:
@@ -102,7 +79,6 @@ class ProviderManager:
                 raise
 
     def stop_all(self):
-        """Stop all providers."""
         self.logger.info(f"Stopping {len(self.providers)} providers")
         for name, provider in self.providers.items():
             try:
@@ -111,17 +87,6 @@ class ProviderManager:
                 self.logger.warning(f"Error stopping provider '{name}': {e}")
 
     def get_provider(self, name):
-        """Get a provider by name.
-
-        Args:
-            name: Provider name
-
-        Returns:
-            DataProvider instance
-
-        Raises:
-            KeyError: If provider not found
-        """
         if name not in self.providers:
             raise KeyError(
                 f"Provider '{name}' not found. "
@@ -130,25 +95,9 @@ class ProviderManager:
         return self.providers[name]
 
     def has_provider(self, name):
-        """Check if a provider exists.
-
-        Args:
-            name: Provider name
-
-        Returns:
-            True if provider exists, False otherwise
-        """
         return name in self.providers
 
     def validate_providers(self, required_providers):
-        """Validate that all required providers exist.
-
-        Args:
-            required_providers: List of provider names
-
-        Raises:
-            ValueError: If any required provider is missing
-        """
         missing = [name for name in required_providers if name not in self.providers]
         if missing:
             raise ValueError(

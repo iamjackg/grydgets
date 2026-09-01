@@ -202,10 +202,8 @@ def test_bad_hex_through_widget_manager_raises():
     assert "widget_background_color" in str(excinfo.value)
 
 
-# --- editor colour control -------------------------------------------------
-# The control edits colours as four numeric channels. Indexing a hex *string*
-# yields its characters, which the control would then write back on Apply, so
-# the filter that feeds it has to parse first.
+# The control edits colour as four numeric channels. Indexing a hex string
+# yields characters instead, so the filter feeding it must parse first.
 
 
 def test_editor_color_channels_from_hex():
@@ -228,10 +226,8 @@ def test_editor_color_channels_tolerate_junk():
     assert _color_channels_filter(None) == []
 
 
-# --- backgrounds -----------------------------------------------------------
-# Text and its wrappers can paint their own backdrop now, so these check the
-# pixels rather than just the parsed attribute: a background that parses but
-# never reaches the surface would pass an attribute-only test.
+# These check the rendered pixels rather than the parsed attribute, since a
+# background that parses but never reaches the surface would pass either way.
 
 
 def _pixel(surface, x, y):
@@ -319,8 +315,8 @@ def test_rest_forwards_background(monkeypatch):
 
 
 def test_provider_accepts_padding_and_align():
-    # Both are in the schema for this widget; before they were declared they
-    # collided with the values the wrapper passed positionally to TextWidget.
+    # The wrapper passes padding and align through positionally to TextWidget,
+    # so both must stay declared in this widget's own schema.
     w = ProviderWidget(providers={"p": FakeProvider()}, padding=2, align="left")
     assert w.text_widget.padding == 2
     assert w.text_widget.align == "left"
@@ -335,9 +331,6 @@ def test_empty_widget_paints_its_colour():
 def test_empty_widget_without_colour_stays_transparent():
     surface = EmptyWidget().render((10, 10))
     assert _pixel(surface, 5, 5)[3] == 0
-
-
-# --- per-cell grid colours -------------------------------------------------
 
 
 def _grid_with_children(**kwargs):
@@ -406,7 +399,6 @@ def test_grid_per_cell_bad_colour_names_the_key():
     assert "widget_background_colors.left" in str(excinfo.value)
 
 
-# --- renamed parameters ----------------------------------------------------
 # The old names still load so existing widgets.yaml files keep working.
 
 
@@ -432,9 +424,6 @@ def test_label_old_text_color_still_works():
 
 def test_label_defaults_to_white():
     assert LabelWidget(text="hi").text_widget.color == (255, 255, 255, 255)
-
-
-# --- notification backgrounds ----------------------------------------------
 
 
 def test_notification_background_applies():
@@ -475,11 +464,8 @@ def test_notification_bad_background_is_ignored():
     assert w.text_widget.background_color == (0, 0, 0, 255)
 
 
-# --- the editor preserves colour formatting ---------------------------------
-# Saving a node re-applies every field on it, not just the edited one, so an
-# untouched colour must come back out of the editor written exactly as it
-# went in -- otherwise editing any field decays every hex colour on that node
-# into an RGBA list.
+# Saving re-applies every field on a node, not just the edited one, so an
+# untouched colour must round-trip exactly or it decays into an RGBA list.
 
 
 def _editor_roundtrip(tmp_path, source, posts):
@@ -547,7 +533,8 @@ def test_editor_writes_a_colour_that_really_changed(tmp_path):
     form = dict(GRID_FORM, background_color__0="0", background_color__1="0")
     out = _editor_roundtrip(tmp_path, GRID_SOURCE, [("widgets/0", form)])
     assert "'#ff8800'" not in out
-    assert "- 255" in out  # [0, 0, 0, 255]
+    # "- 255" is the alpha channel of the block list [0, 0, 0, 255].
+    assert "- 255" in out
 
 
 def test_editor_keeps_the_root_background_hex(tmp_path):

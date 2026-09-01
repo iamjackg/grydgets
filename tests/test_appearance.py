@@ -39,9 +39,6 @@ def minutes(n):
     return timedelta(minutes=n)
 
 
-# --- the basic day/night split -------------------------------------------
-
-
 def test_midday_is_day_and_the_small_hours_are_night():
     schedule = SunSchedule(LAT, LON)
     rise, set_ = sun_times()
@@ -63,15 +60,11 @@ def test_night_holds_across_utc_midnight():
     schedule that only looked at today's boundaries would get this wrong."""
     schedule = SunSchedule(LAT, LON)
     rise, set_ = sun_times()
-    # The premise: this day's sunset is on the UTC date after its sunrise.
     assert set_.date() > rise.date()
     # An hour before that sunset is still daylight, on a UTC date whose own
     # sunrise is ten hours away.
     assert schedule.mode_at(set_ - minutes(60)) == DAY
     assert schedule.mode_at(set_ + minutes(60)) == NIGHT
-
-
-# --- offsets --------------------------------------------------------------
 
 
 def test_a_negative_sunset_offset_brings_night_forward():
@@ -93,9 +86,6 @@ def test_each_offset_moves_only_its_own_boundary():
     rise, _ = sun_times()
     assert schedule.mode_at(rise + minutes(1)) == DAY
     assert schedule.mode_at(rise - minutes(1)) == NIGHT
-
-
-# --- what comes next ------------------------------------------------------
 
 
 def test_next_change_is_the_first_boundary_still_ahead():
@@ -124,9 +114,6 @@ def test_every_evening_gets_its_own_sunset():
         # 21:00 EDT, an hour past the latest sunset in this week.
         evening = datetime(2026, 8, day, 1, tzinfo=timezone.utc) + timedelta(days=1)
         assert schedule.mode_at(evening) == NIGHT, f"2026-08-{day} evening"
-
-
-# --- the sun refusing to co-operate --------------------------------------
 
 
 @pytest.mark.parametrize(
@@ -176,9 +163,6 @@ def test_describe_says_so_when_nothing_is_going_to_happen():
     schedule = SunSchedule(78.22, 15.65)
     line = schedule.describe(datetime(2026, 6, 21, 12, tzinfo=timezone.utc))
     assert "no theme change due" in line
-
-
-# --- reading the conf.yaml block -----------------------------------------
 
 
 APPEARANCE = {

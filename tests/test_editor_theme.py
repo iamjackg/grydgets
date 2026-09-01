@@ -123,11 +123,6 @@ def is_token(value, section, name):
     return yamlio.is_theme_token(value) and yamlio.token_parts(value) == (section, name)
 
 
-# --------------------------------------------------------------------------
-# theme.section_for_tag / theme_ui field mapping
-# --------------------------------------------------------------------------
-
-
 def test_section_for_tag_accepts_both_spellings():
     assert theme.section_for_tag({"colors": {"a": 1}}, "color") == {"a": 1}
     assert theme.section_for_tag({"color": {"a": 1}}, "color") == {"a": 1}
@@ -164,16 +159,12 @@ def test_token_options_read_the_document_not_a_fixed_list(editor):
     assert theme_ui.token_options(doc, FieldSpec("corner_radius", control="number")) == []
 
 
-# --------------------------------------------------------------------------
-# A no-op Apply must not touch anything
-# --------------------------------------------------------------------------
-
-
 def test_reapplying_a_node_unchanged_keeps_every_token(client, editor):
     before = yamlio.dump_doc_to_string(doc_of(editor))
     for path in (ROOT_GRID, TITLED, PLAIN):
         html = client.get(f"/node/{path}/inspect").get_data(as_text=True)
-        assert "TaggedScalar" not in html  # never leak the repr into a form
+        # never leak the repr into a form
+        assert "TaggedScalar" not in html
     apply_to(
         client,
         TITLED,
@@ -192,7 +183,7 @@ def test_reapplying_a_node_unchanged_keeps_every_token(client, editor):
 
 def test_number_control_cannot_delete_a_token(client, editor):
     """A browser can't show `radius` in <input type=number>, so it posts an
-    empty string -- which used to pop the key."""
+    empty string for that field; the empty string must not delete the token."""
     apply_to(
         client,
         TITLED,
@@ -208,11 +199,6 @@ def test_number_control_cannot_delete_a_token(client, editor):
         text_size="40",
     )
     assert is_token(node_named(editor, "titled")["corner_radius"], "size", "radius")
-
-
-# --------------------------------------------------------------------------
-# Switching a field between a plain value and a token
-# --------------------------------------------------------------------------
 
 
 def test_plain_value_can_be_switched_to_a_token(client, editor):
@@ -303,22 +289,18 @@ def test_colour_token_survives_the_channel_boxes_being_blank(client, editor):
     assert is_token(node_named(editor, "titled")["color"], "color", "text")
 
 
-# --------------------------------------------------------------------------
-# Tokens no control can carry are read-only
-# --------------------------------------------------------------------------
-
-
 def test_token_on_a_field_with_no_picker_is_left_alone(client, editor):
     """`text:` is a string with no theme section behind it, so the inspector
     shows the token as written and Apply must not flatten it."""
     html = client.get(f"/node/{PLAIN}/inspect").get_data(as_text=True)
     assert "!color panel" in html
 
+    # text="panel" is what the text input would have posted back
     apply_to(
         client,
         PLAIN,
         name="plain",
-        text="panel",  # what the text input would have posted back
+        text="panel",
         font_path_kind="plain",
         font_path="fonts/Other.ttf",
         color_kind="plain",
@@ -343,11 +325,6 @@ def test_nested_token_in_a_raw_field_round_trips(client, editor):
     node = node_named(editor, "root")
     assert is_token(node["widget_background_colors"]["0,0"], "color", "panel")
     assert "!color panel" in yamlio.dump_doc_to_string(doc_of(editor))
-
-
-# --------------------------------------------------------------------------
-# Numbers keep the form they were written in
-# --------------------------------------------------------------------------
 
 
 def test_whole_numbers_stay_integers(client, editor):
@@ -381,8 +358,8 @@ def test_list_keeps_the_style_it_was_written_in(client, editor):
 
 
 def test_editing_a_node_keeps_its_comments_and_spacing(client, editor):
-    """auth used to be replaced with a fresh mapping, which threw away the
-    blank line and comment ruamel had attached around it."""
+    """Applying a node must not replace `auth` with a fresh mapping, which
+    would throw away the blank line and comment ruamel attaches around it."""
     before = yamlio.dump_doc_to_string(doc_of(editor))
     apply_to(
         client,
@@ -417,11 +394,6 @@ def test_parse_number(raw, json_type, expected):
     assert isinstance(result, type(expected))
 
 
-# --------------------------------------------------------------------------
-# Fields the theme supplies
-# --------------------------------------------------------------------------
-
-
 def test_defaults_carry_the_entry_they_came_from():
     parsed = yamlio.parse_value(SAMPLE)
     by_type = theme.defaults_with_source(parsed["theme"])
@@ -438,8 +410,10 @@ def test_defaults_carry_the_entry_they_came_from():
 def test_inherited_field_is_shown_with_its_source_and_value(client):
     html = client.get(f"/node/{INHERIT_A}/inspect").get_data(as_text=True)
     assert "from theme: text-like" in html
-    assert "!font regular" in html                      # what the theme says
-    assert 'value="OpenSans-Regular.ttf" disabled' in html  # what it resolves to
+    # what the theme says
+    assert "!font regular" in html
+    # what it resolves to
+    assert 'value="OpenSans-Regular.ttf" disabled' in html
     assert "override-field" in html
 
 
@@ -515,7 +489,8 @@ def test_add_property_menu_skips_what_the_theme_supplies(client):
     menu = html[html.find("add property"):]
     assert '<option value="font_path">' not in menu
     assert '<option value="color">' not in menu
-    assert '<option value="text_size">' in menu  # nothing supplies this one
+    # nothing supplies this one
+    assert '<option value="text_size">' in menu
 
 
 def test_test_panel_sees_defaults_and_resolved_tokens(editor, tmp_path):
@@ -536,16 +511,15 @@ def test_test_panel_sees_defaults_and_resolved_tokens(editor, tmp_path):
         theme.theme_sections(doc),
         theme.defaults_with_source(doc["theme"])["provider"],
     )
-    assert params["url"] == "http://hass.invalid/api/x"   # token resolved
-    assert params["data_path"] == "state"                 # default filled in
-    assert params["font_path"] == "OpenSans-Regular.ttf"  # default, then token
-    assert "url" in node                                  # node itself untouched
+    # token resolved
+    assert params["url"] == "http://hass.invalid/api/x"
+    # default filled in
+    assert params["data_path"] == "state"
+    # default, then token
+    assert params["font_path"] == "OpenSans-Regular.ttf"
+    # node itself untouched
+    assert "url" in node
     assert yamlio.is_theme_token(node["url"])
-
-
-# --------------------------------------------------------------------------
-# The document's own background_color
-# --------------------------------------------------------------------------
 
 
 def test_root_background_colour_token_is_not_dropped(client, editor):
@@ -565,11 +539,6 @@ def test_root_background_colour_token_is_not_dropped(client, editor):
         ]),
     )
     assert is_token(doc["background_color"], "color", "panel")
-
-
-# --------------------------------------------------------------------------
-# The document's own background_image
-# --------------------------------------------------------------------------
 
 
 def root_form(**overrides):

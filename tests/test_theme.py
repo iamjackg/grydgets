@@ -13,7 +13,7 @@ from grydgets.theme import ThemeError, Token
 def load(text):
     """Parse a widgets.yaml body without resolving it, the way the app's
     loader does (config imports register the tag handlers as a side effect)."""
-    assert config  # the import is what registers !secret and the token tags
+    assert config
     return yaml.load(text, Loader=yaml.FullLoader)
 
 
@@ -31,9 +31,6 @@ theme:
   sizes:
     radius: 25
 """
-
-
-# --- parsing -------------------------------------------------------------
 
 
 def test_tag_parses_to_a_token():
@@ -70,9 +67,6 @@ widgets:
     assert node["jq_expression"] == "$__loc__ | .value"
     assert node["format_string"] == "${:.2f}"
     assert node["text"] == "costs $5"
-
-
-# --- token resolution ----------------------------------------------------
 
 
 def test_tokens_resolve_from_their_section():
@@ -147,9 +141,6 @@ def test_the_theme_block_survives_resolved():
     assert doc["theme"]["colors"]["panel"] == "#3b4252"
 
 
-# --- token errors --------------------------------------------------------
-
-
 def test_unknown_entry_names_the_section_and_its_contents():
     with pytest.raises(ThemeError) as excinfo:
         resolve(THEME + "widgets: [{widget: text, color: !color pnael}]")
@@ -191,9 +182,6 @@ def test_tokens_are_rejected_in_conf_yaml(tmp_path):
     with pytest.raises(ThemeError) as excinfo:
         config.load_config(str(path))
     assert "widgets file" in str(excinfo.value)
-
-
-# --- defaults ------------------------------------------------------------
 
 
 DEFAULTS = """
@@ -314,9 +302,6 @@ widgets: []
     assert "color" not in doc["theme"]["blobs"]["thing"]
 
 
-# --- malformed theme blocks ----------------------------------------------
-
-
 @pytest.mark.parametrize(
     "body",
     [
@@ -335,9 +320,6 @@ def test_malformed_theme_blocks_raise(body):
 def test_a_document_with_no_theme_is_unchanged():
     text = "widgets: [{widget: text, color: '#bf616a'}]\n"
     assert resolve(text) == load(text)
-
-
-# --- theme files (main.py --theme) ---------------------------------------
 
 
 BASE = """

@@ -1,18 +1,17 @@
 """Shared HTTP fetch + JSON extraction for the REST widgets.
 
-The fetch/extract/format pipeline used to live inline inside each widget's
-``update()``. It's pulled out here so the editor's "test request" panel can
-run *exactly* the same code path a widget runs -- a preview that diverged
-from the real behaviour would be worse than no preview at all.
+Centralizing the fetch/extract/format pipeline here lets the editor's "test
+request" panel run *exactly* the same code path a widget runs -- a preview
+that diverged from the real behaviour would be worse than no preview at all.
 
 The functions return a staged result object (status, raw body, extracted
 value, final value) rather than just the final string, so the editor can show
 each step of the pipeline. The widgets only look at the final field.
 
-Fallback semantics (``"Error {code}"`` on non-200, ``"Unavailable"`` on a
-connection error, ``"--"`` on a failed extraction) are preserved from the
-original widget code so the refactor is behaviour-preserving. ``timeout``
-defaults to ``None`` to match the widgets' original (timeout-less) requests;
+These fallback strings (``"Error {code}"`` on non-200, ``"Unavailable"`` on a
+connection error, ``"--"`` on a failed extraction) match what the widgets
+themselves display, so changing them here changes what appears on screen.
+``timeout`` defaults to ``None`` since the widgets make timeout-less requests;
 the editor passes an explicit timeout so a hung endpoint can't wedge it.
 """
 
@@ -31,9 +30,9 @@ from grydgets.json_utils import extract_data
 def build_auth_headers(auth: dict[str, Any] | None) -> dict[str, str]:
     """Turn a widget ``auth`` mapping into request headers.
 
-    Mirrors the (previously duplicated) header-building in RESTWidget and
-    RESTImageWidget: ``{"bearer": tok}`` -> Bearer, ``{"basic": {...}}`` ->
-    base64 Basic. Values are expected to already be resolved (no ``!secret``).
+    Shared by RESTWidget and RESTImageWidget: ``{"bearer": tok}`` -> Bearer,
+    ``{"basic": {...}}`` -> base64 Basic. Values are expected to already be
+    resolved (no ``!secret``).
     """
     headers: dict[str, str] = {}
     if not auth:
@@ -52,12 +51,15 @@ def build_auth_headers(auth: dict[str, Any] | None) -> dict[str, str]:
 class RestTextResult:
     """Staged result of the text (``rest`` widget) pipeline."""
 
-    value: str = ""  # final formatted text -- what the widget renders
-    connection_error: str | None = None  # transport failure (-> "Unavailable")
+    # Final formatted text -- what the widget renders.
+    value: str = ""
+    # Transport failure (-> "Unavailable").
+    connection_error: str | None = None
     status_code: int | None = None
     elapsed_ms: float | None = None
     raw_text: str | None = None
-    json: Any = None  # parsed body when extraction ran (cached for re-extract)
+    # Parsed body when extraction ran, cached for re-extract.
+    json: Any = None
     is_json: bool = False
     extracted: Any = None
     extraction_error: str | None = None
@@ -150,11 +152,13 @@ def fetch_text(
 class RestImageResult:
     """Staged result of the image (``restimage`` widget) pipeline."""
 
-    image_bytes: bytes | None = None  # final image bytes -- what the widget loads
+    # Final image bytes -- what the widget loads.
+    image_bytes: bytes | None = None
     error: str | None = None
     status_code: int | None = None
     elapsed_ms: float | None = None
-    extracted_url: str | None = None  # image URL pulled from a JSON response
+    # Image URL pulled from a JSON response.
+    extracted_url: str | None = None
     extraction_error: str | None = None
     content_type: str | None = None
 

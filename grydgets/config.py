@@ -145,7 +145,6 @@ def server_settings(conf):
     }
 
 
-# Output sub-schemas
 window_output_schema = {
     voluptuous.Required("type"): "window",
     voluptuous.Optional("fullscreen", default=False): bool,
@@ -282,7 +281,6 @@ def _validate_appearance(value):
 
 
 def _validate_output(value):
-    """Validate a single output entry by dispatching to the right sub-schema."""
     if not isinstance(value, dict) or "type" not in value:
         raise voluptuous.Invalid("Each output must be a dict with a 'type' key")
 
@@ -357,7 +355,6 @@ config_schema = voluptuous.Schema(
             ),
             voluptuous.Optional("create_latest_symlink", default=True): bool,
         },
-        # New outputs config
         voluptuous.Optional("outputs"): [_validate_output],
         # Day/night theme switching. Absent means one theme, all day.
         voluptuous.Optional("appearance"): _validate_appearance,
@@ -366,11 +363,7 @@ config_schema = voluptuous.Schema(
 
 
 def migrate_config(conf):
-    """Translate legacy config to new outputs-based config.
-
-    If 'outputs' key is present, use it directly.
-    Otherwise, synthesize outputs from graphics + headless keys.
-    """
+    """Fold legacy graphics/headless config into the newer outputs list."""
     if "outputs" in conf:
         return conf
 
@@ -400,7 +393,6 @@ def migrate_config(conf):
     return conf
 
 
-# Provider configuration schema
 provider_auth_schema = voluptuous.Schema(
     voluptuous.Any(
         {
@@ -467,11 +459,9 @@ def load_config(filename):
     return conf_data
 
 
-# --- client.yaml ---------------------------------------------------------
-#
-# The remote frame viewer's entire configuration. A separate file rather than a
-# mode of conf.yaml, so a viewer machine's config directory holds one file and
-# no keys that silently do nothing.
+# client.yaml is the remote frame viewer's entire configuration, kept separate
+# from conf.yaml so a viewer machine's config directory holds one file and no
+# keys that silently do nothing.
 
 # Only outputs that put a frame on a screen. A viewer that fetched frames to
 # write them to disk or POST them elsewhere would be a relay, which is not what
@@ -561,14 +551,6 @@ def load_client_config(filename):
 
 
 def load_providers_config(filename):
-    """Load and validate provider configuration.
-
-    Args:
-        filename: Path to providers configuration file
-
-    Returns:
-        Validated provider configuration dict
-    """
     conf_data = load_yaml(filename)
     theme.reject_tokens(conf_data, filename)
     _validate(provider_schema, conf_data, filename)
