@@ -16,7 +16,6 @@ registered its own routes would fail on the second reload.
 from __future__ import annotations
 
 import hashlib
-import io
 import queue
 import threading
 import time
@@ -24,7 +23,7 @@ from typing import Any
 
 import pygame
 
-from grydgets.outputs import Output, register_output
+from grydgets.outputs import Output, encode_image, register_output
 
 # stop() pushes this into every subscriber queue so blocked generators exit,
 # and into the encode queue so the encoder thread does. Without it the
@@ -314,7 +313,6 @@ class StreamOutput(Output):
             offer(subscriber, (etag, published_at))
 
     def _encode(self, surface: pygame.Surface, size: tuple[int, int]) -> bytes:
-        buf = io.BytesIO()
         if surface.get_size() != size:
             surface = pygame.transform.smoothscale(surface, size)
         if self.image_format in ("jpg", "jpeg"):
@@ -323,5 +321,4 @@ class StreamOutput(Output):
             opaque = pygame.Surface(surface.get_size())
             opaque.blit(surface, (0, 0))
             surface = opaque
-        pygame.image.save(surface, buf, f"image.{self.image_format}")
-        return buf.getvalue()
+        return encode_image(surface, self.image_format)

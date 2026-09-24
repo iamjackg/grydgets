@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import io
 import threading
 import time
 from typing import Any
@@ -10,7 +9,7 @@ from typing import Any
 import pygame
 import requests
 
-from grydgets.outputs import Output, register_output
+from grydgets.outputs import Output, encode_image, register_output
 
 
 @register_output("post")
@@ -60,14 +59,11 @@ class PostOutput(Output):
         self._worker_thread.start()
 
     def _encode_surface(self, surface: pygame.Surface) -> bytes:
-        buf = io.BytesIO()
         if self.image_format in ("jpg", "jpeg"):
             temp = pygame.Surface(surface.get_size())
             temp.blit(surface, (0, 0))
-            pygame.image.save(temp, buf, f"image.{self.image_format}")
-        else:
-            pygame.image.save(surface, buf, f"image.{self.image_format}")
-        return buf.getvalue()
+            surface = temp
+        return encode_image(surface, self.image_format)
 
     def _do_post(self, image_bytes: bytes) -> None:
         try:

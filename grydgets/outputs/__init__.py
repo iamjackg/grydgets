@@ -6,6 +6,8 @@ Outputs receive rendered surfaces and present them via display, file, or network
 from __future__ import annotations
 
 import logging
+import os
+import tempfile
 from typing import Any
 
 import pygame
@@ -37,6 +39,28 @@ class Output:
 
     def stop(self) -> None:
         """Clean shutdown."""
+
+
+# tmpfs on Linux, so an encode never touches the disk. Elsewhere the system
+# temp directory is the best on offer.
+_ENCODE_DIR = "/dev/shm" if os.path.isdir("/dev/shm") else None
+
+
+def encode_image(surface: pygame.Surface, image_format: str) -> bytes:
+    """Encode ``surface`` as ``image_format`` and return the file's bytes.
+
+    Goes through a temporary file because ``pygame.image.save`` never releases
+    a Python file object it writes to: every ``BytesIO`` handed to it stays
+    alive, encoded image and all, for the life of the process.
+    """
+    fd, path = tempfile.mkstemp(suffix=f".{image_format}", dir=_ENCODE_DIR)
+    try:
+        os.close(fd)
+        pygame.image.save(surface, path)
+        with open(path, "rb") as f:
+            return f.read()
+    finally:
+        os.unlink(path)
 
 
 OUTPUT_TYPES: dict[str, type[Output]] = {}
