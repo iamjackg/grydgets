@@ -16,6 +16,15 @@ from grydgets.fonts import FontCache, scale_text_size
 font_cache = FontCache()
 
 
+def fit_font(font_path: str | None, text: str, size: int, max_width: int) -> tuple[pygame.font.Font, int]:
+    """The font at ``size``, shrunk one step at a time until ``text`` fits ``max_width``."""
+    font = font_cache.get_font(font_path, size)
+    while font.size(text)[0] > max_width and size > 1:
+        size -= 1
+        font = font_cache.get_font(font_path, size)
+    return font, size
+
+
 class TextWidget(Widget):
     def __init__(
         self,
@@ -82,15 +91,14 @@ class TextWidget(Widget):
             text_size = (
                 scale_text_size(self.text_size) if self.text_size else real_size[1]
             )
-            font = font_cache.get_font(self.font_path, text_size)
-            while font.size(self.text)[0] > real_size[0] and text_size > 1:
-                text_size -= 1
-                font = font_cache.get_font(self.font_path, text_size)
+            font, text_size = fit_font(self.font_path, self.text, text_size, real_size[0])
             text_surface = font.render(self.text, True, self.color)
 
             blit_coordinates = [self.padding, self.padding]
             if self.align == "center":
                 blit_coordinates[0] += (real_size[0] - text_surface.get_width()) / 2
+            elif self.align == "right":
+                blit_coordinates[0] += real_size[0] - text_surface.get_width()
 
             blit_coordinates[1] -= font.get_ascent() - text_size - font.get_descent()
             real_text_height = text_size + font.get_descent()
@@ -108,6 +116,13 @@ class TextWidget(Widget):
 
 
 class DateClockWidget(Widget):
+    # Each line is as big as fits in its share of the height (and the width),
+    # and the two are then stacked and centred as one block.
+    TIME_SHARE = 0.7
+    PADDING = 2
+    # The space between the two lines, as a fraction of the date's height.
+    GAP = 0.4
+
     def __init__(
         self,
         time_font_path: str | None = None,
@@ -121,53 +136,53 @@ class DateClockWidget(Widget):
     ) -> None:
         super().__init__(**kwargs)
         color = parse_color(color, "color")
-        time_color = parse_optional_color(time_color, "time_color") or color
-        date_color = parse_optional_color(date_color, "date_color") or color
-        self.grid_widget = GridWidget(
-            rows=2,
-            columns=1,
-            row_ratios=[7, 3],
-            widget_background_color=parse_optional_color(
-                background_color, "background_color"
-            ),
-            corner_radius=corner_radius,
-            **kwargs
-        )
-        self.hour_widget = TextWidget(
-            font_path=time_font_path,
-            color=time_color,
-            padding=2,
-            align="center",
-            vertical_align="center",
-            **kwargs
-        )
-        self.date_widget = TextWidget(
-            font_path=date_font_path,
-            color=date_color,
-            padding=2,
-            align="center",
-            vertical_align="top",
-            **kwargs
-        )
-        self.grid_widget.add_widget(self.hour_widget)
-        self.grid_widget.add_widget(self.date_widget)
+        self.time_font_path = time_font_path
+        self.date_font_path = date_font_path
+        self.time_color = parse_optional_color(time_color, "time_color") or color
+        self.date_color = parse_optional_color(date_color, "date_color") or color
+        self.background_color = parse_optional_color(background_color, "background_color")
+        self.corner_radius = corner_radius
+        self.time_text = ""
+        self.date_text = ""
         self.surface: pygame.Surface | None = None
-
-    def is_dirty(self) -> bool:
-        return self.hour_widget.is_dirty() or self.date_widget.is_dirty()
+        self.tick()
 
     def tick(self) -> None:
-        self.hour_widget.set_text(datetime.datetime.now().strftime("%H:%M"))
-        self.date_widget.set_text(datetime.datetime.now().strftime("%A, %B %d"))
+        now = datetime.datetime.now()
+        time_text = now.strftime("%H:%M")
+        date_text = now.strftime("%A, %B %d")
+        if (time_text, date_text) != (self.time_text, self.date_text):
+            self.time_text, self.date_text = time_text, date_text
+            self.dirty = True
+
+    def _ink(self, font_path: str | None, text: str, color, height: int) -> pygame.Surface:
+        """``text`` as large as fits the width and ``height``, cropped to its ink."""
+        font, _ = fit_font(font_path, text, height, self.size[0] - self.PADDING * 2)
+        rendered = font.render(text, True, color)
+        ink = rendered.get_bounding_rect()
+        # Cropping only vertically keeps each line centred on its advance width,
+        # which is how the text widget centres too.
+        return rendered.subsurface((0, ink.top, rendered.get_width(), ink.height))
 
     def render(self, size: tuple[int, int]) -> pygame.Surface:
         super().render(size)
 
-        if self.is_dirty() or self.dirty:
-            self.surface = self.grid_widget.render(self.size)
+        if self.dirty or self.surface is None:
+            self.surface = pygame.Surface(self.size, pygame.SRCALPHA, 32)
+            paint_background(self.surface, self.background_color, self.size, self.corner_radius)
+
+            time_height = round(self.size[1] * self.TIME_SHARE) - self.PADDING * 2
+            date_height = self.size[1] - round(self.size[1] * self.TIME_SHARE) - self.PADDING * 2
+            time_line = self._ink(self.time_font_path, self.time_text, self.time_color, time_height)
+            date_line = self._ink(self.date_font_path, self.date_text, self.date_color, date_height)
+
+            gap = round(date_line.get_height() * self.GAP)
+            top = (self.size[1] - time_line.get_height() - gap - date_line.get_height()) / 2
+            for line in (time_line, date_line):
+                self.surface.blit(line, ((self.size[0] - line.get_width()) / 2, top))
+                top += line.get_height() + gap
 
         self.dirty = False
-        assert self.surface is not None
         return self.surface
 
 

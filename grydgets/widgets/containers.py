@@ -404,38 +404,36 @@ class FlipWidget(ContainerWidget):
         else:
             self.widget_list[self.current_widget].tick()
 
+    def next_widget_index(self) -> int:
+        """Index of the child the running transition slides to."""
+        return (self.current_widget + 1) % len(self.widget_list)
+
     def render(self, size: tuple[int, int]) -> pygame.Surface:
         if self.moving:
-            surface = pygame.Surface(size, pygame.SRCALPHA, 32)
-            if self.transition != 0:
-                transition_percentage = min(
-                    self.ease_in_out(
-                        (time.time() - self.ticker) / self.transition, self.ease
-                    ),
-                    1,
-                )
-            else:
-                transition_percentage = 1
-
-            current_widget = self.widget_list[self.current_widget]
-            next_widget = self.widget_list[
-                (self.current_widget + 1) % len(self.widget_list)
-            ]
-
-            surface.blit(
-                current_widget.render(size), (-(size[0] * transition_percentage), 0)
-            )
-            surface.blit(
-                next_widget.render(size), (size[0] * (1 - transition_percentage), 0)
-            )
-
-            if time.time() - self.ticker >= self.transition:
+            elapsed = time.time() - self.ticker
+            if elapsed >= self.transition:
+                # Settle on the destination before drawing: is_dirty() turns
+                # False once moving stops, so a mid-slide frame drawn here would
+                # stay on screen until the child next changes.
                 self.moving = False
-                self.current_widget = (self.current_widget + 1) % len(self.widget_list)
+                self.current_widget = self.next_widget_index()
+            else:
+                transition_percentage = self.ease_in_out(
+                    elapsed / self.transition, self.ease
+                )
+                current_widget = self.widget_list[self.current_widget]
+                next_widget = self.widget_list[self.next_widget_index()]
 
-            return surface
-        else:
-            return self.widget_list[self.current_widget].render(size)
+                surface = pygame.Surface(size, pygame.SRCALPHA, 32)
+                surface.blit(
+                    current_widget.render(size), (-(size[0] * transition_percentage), 0)
+                )
+                surface.blit(
+                    next_widget.render(size), (size[0] * (1 - transition_percentage), 0)
+                )
+                return surface
+
+        return self.widget_list[self.current_widget].render(size)
 
 
 class ScheduleFlipWidget(FlipWidget):
@@ -491,39 +489,9 @@ class ScheduleFlipWidget(FlipWidget):
             assert self.current_widget is not None
             self.widget_list[self.current_widget].tick()
 
-    def render(self, size: tuple[int, int]) -> pygame.Surface:
-        if self.moving:
-            assert self.current_widget is not None
-            assert self.destination_widget is not None
-            surface = pygame.Surface(size, pygame.SRCALPHA, 32)
-            if self.transition != 0:
-                transition_percentage = min(
-                    self.ease_in_out(
-                        (time.time() - self.ticker) / self.transition, self.ease
-                    ),
-                    1,
-                )
-            else:
-                transition_percentage = 1
-
-            current_widget = self.widget_list[self.current_widget]
-            next_widget = self.widget_list[self.destination_widget]
-
-            surface.blit(
-                current_widget.render(size), (-(size[0] * transition_percentage), 0)
-            )
-            surface.blit(
-                next_widget.render(size), (size[0] * (1 - transition_percentage), 0)
-            )
-
-            if time.time() - self.ticker >= self.transition:
-                self.moving = False
-                self.current_widget = self.destination_widget
-
-            return surface
-        else:
-            assert self.current_widget is not None
-            return self.widget_list[self.current_widget].render(size)
+    def next_widget_index(self) -> int:
+        assert self.destination_widget is not None
+        return self.destination_widget
 
 
 class PillWidget(ContainerWidget):

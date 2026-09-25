@@ -51,19 +51,19 @@ def test_text_widget_hex_matches_list():
 
 def test_dateclock_per_line_colors():
     w = DateClockWidget(color="#111111", time_color="#ff8800", date_color="teal")
-    assert w.hour_widget.color == (255, 136, 0, 255)
-    assert w.date_widget.color == (0, 128, 128, 255)
+    assert w.time_color == (255, 136, 0, 255)
+    assert w.date_color == (0, 128, 128, 255)
 
 
 def test_dateclock_falls_back_to_color():
     w = DateClockWidget(color="#ff8800")
-    assert w.hour_widget.color == (255, 136, 0, 255)
-    assert w.date_widget.color == (255, 136, 0, 255)
+    assert w.time_color == (255, 136, 0, 255)
+    assert w.date_color == (255, 136, 0, 255)
 
 
 def test_dateclock_background_hex():
     w = DateClockWidget(background_color="#00000080")
-    assert w.grid_widget.widget_background_color == (0, 0, 0, 128)
+    assert w.background_color == (0, 0, 0, 128)
 
 
 def test_label_widget_hex():

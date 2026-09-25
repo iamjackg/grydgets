@@ -325,39 +325,9 @@ class ProviderFlipWidget(FlipWidget):
             assert self.current_widget is not None
             self.widget_list[self.current_widget].tick()
 
-    def render(self, size: tuple[int, int]) -> pygame.Surface:
-        if self.moving:
-            assert self.current_widget is not None
-            assert self.destination_widget is not None
-            surface = pygame.Surface(size, pygame.SRCALPHA, 32)
-            if self.transition != 0:
-                transition_percentage = min(
-                    self.ease_in_out(
-                        (time.time() - self.ticker) / self.transition, self.ease
-                    ),
-                    1,
-                )
-            else:
-                transition_percentage = 1
-
-            current_widget = self.widget_list[self.current_widget]
-            next_widget = self.widget_list[self.destination_widget]
-
-            surface.blit(
-                current_widget.render(size), (-(size[0] * transition_percentage), 0)
-            )
-            surface.blit(
-                next_widget.render(size), (size[0] * (1 - transition_percentage), 0)
-            )
-
-            if time.time() - self.ticker >= self.transition:
-                self.moving = False
-                self.current_widget = self.destination_widget
-
-            return surface
-        else:
-            assert self.current_widget is not None
-            return self.widget_list[self.current_widget].render(size)
+    def next_widget_index(self) -> int:
+        assert self.destination_widget is not None
+        return self.destination_widget
 
 
 class ProviderImageWidget(Widget):
