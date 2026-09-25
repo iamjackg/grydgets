@@ -21,6 +21,12 @@ dependencies = [
     "astral>=3.2",
 ]
 
+[dependency-groups]
+docs = [
+    "mkdocs>=1.6",
+    "mkdocs-material>=9.5",
+]
+
 [project.scripts]
 grydgets = "grydgets.cli:main"
 grydgets-editor = "grydgets.editor.app:main"

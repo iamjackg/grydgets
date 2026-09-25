@@ -120,3 +120,6 @@ venv.bak/
 
 # personal theme experiments, not part of the project
 /themes/
+
+# MkDocs build output
+site/

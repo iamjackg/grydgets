@@ -1,0 +1,79 @@
+site_name: Grydgets
+site_description: A PyGame-based widget dashboard system with configurable grid layouts
+site_url: https://iamjackg.github.io/grydgets/
+repo_url: https://github.com/iamjackg/grydgets
+repo_name: iamjackg/grydgets
+edit_uri: edit/master/docs/
+
+theme:
+  name: material
+  features:
+    - navigation.sections
+    - navigation.top
+    - navigation.instant
+    - content.code.copy
+    - toc.follow
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: teal
+      accent: deep orange
+      toggle:
+        icon: material/weather-night
+        name: Switch to the night theme
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: teal
+      accent: deep orange
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to the day theme
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+
+# Any link that doesn't resolve to a real page is a build failure, so a moved
+# page can't silently break the ones pointing at it.
+validation:
+  links:
+    absolute_links: relative_to_docs
+    unrecognized_links: warn
+    anchors: warn
+
+nav:
+  - Home: index.md
+  - Install: install.md
+  - Your first dashboard: tutorial.md
+  - A more advanced dashboard: advanced-tutorial.md
+  - How the config files fit together: config-files.md
+  - Configuration:
+      - conf.yaml: configuration/conf-yaml.md
+      - widgets.yaml: configuration/widgets-yaml.md
+      - providers.yaml: configuration/providers-yaml.md
+      - secrets.yaml: configuration/secrets-yaml.md
+      - Colors: configuration/colors.md
+      - Authentication: configuration/authentication.md
+      - Data extraction: configuration/data-extraction.md
+  - Widgets:
+      - Index: widgets/index.md
+      - Containers: widgets/containers.md
+      - Text and clocks: widgets/text-and-clocks.md
+      - Images: widgets/images.md
+      - Provider widgets: widgets/provider-widgets.md
+      - Push widgets: widgets/push-widgets.md
+  - Theming: theming.md
+  - Remote displays: remote-displays.md
+  - Hot reload: hot-reload.md
+  - Widget editor: widget-editor.md
+  - Reference: reference.md
