@@ -1,0 +1,12 @@
+/* Section headers in the sidebar otherwise look like the pages under them.
+   They're kept out of the primary colour, since that already marks the
+   current page. The width matches the one where navigation.sections starts
+   rendering sections as headers instead of drill-down menus. */
+@media screen and (min-width: 76.25em) {
+  .md-nav--primary .md-nav__item--section > .md-nav__link {
+    color: var(--md-default-fg-color);
+    font-size: 0.6rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+}
