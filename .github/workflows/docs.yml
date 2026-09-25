@@ -2,7 +2,7 @@ name: Docs
 
 on:
   push:
-    branches: [master]
+    branches: [master, docs-site]
   pull_request:
   workflow_dispatch:
 
@@ -44,8 +44,9 @@ jobs:
           path: site
 
   deploy:
-    # Pull requests get the build as a check, but only master is published.
-    if: github.ref == 'refs/heads/master' && github.event_name != 'pull_request'
+    # Pull requests get the build as a check, but only master and docs-site are
+    # published.
+    if: (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/docs-site') && github.event_name != 'pull_request'
     needs: build
     runs-on: ubuntu-latest
     permissions:
