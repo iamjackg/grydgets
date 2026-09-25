@@ -83,7 +83,6 @@ def create_outputs(output_configs: list[dict], render_config: dict) -> list[Outp
     # Each import's decorator populates OUTPUT_TYPES as a side effect; the
     # module itself is otherwise unused here.
     from grydgets.outputs import window  # noqa: F401
-    from grydgets.outputs import framebuffer  # noqa: F401
     from grydgets.outputs import file  # noqa: F401
     from grydgets.outputs import post  # noqa: F401
     from grydgets.outputs import stream  # noqa: F401
@@ -109,7 +108,7 @@ def create_outputs(output_configs: list[dict], render_config: dict) -> list[Outp
 
     if display_count > 1:
         raise ValueError(
-            "At most one display output (window or framebuffer) is allowed."
+            "At most one window output is allowed."
         )
 
     if not outputs:

@@ -151,11 +151,6 @@ window_output_schema = {
     voluptuous.Optional("x_display"): str,
 }
 
-framebuffer_output_schema = {
-    voluptuous.Required("type"): "framebuffer",
-    voluptuous.Required("device"): str,
-}
-
 file_output_schema = {
     voluptuous.Required("type"): "file",
     voluptuous.Optional("output_path", default="./headless_output"): str,
@@ -286,7 +281,6 @@ def _validate_output(value):
 
     schemas = {
         "window": voluptuous.Schema(window_output_schema),
-        "framebuffer": voluptuous.Schema(framebuffer_output_schema),
         "file": voluptuous.Schema(file_output_schema),
         "post": voluptuous.Schema(post_output_schema),
         "stream": voluptuous.Schema(stream_output_schema),
@@ -312,7 +306,6 @@ config_schema = voluptuous.Schema(
             voluptuous.Required("resolution"): voluptuous.All(
                 [int, voluptuous.Range(min=1)], voluptuous.Length(2)
             ),
-            voluptuous.Optional("fb-device"): str,
             voluptuous.Optional("x-display"): str,
             voluptuous.Optional("flip", default=False): bool,
             voluptuous.Optional("smooth-scaling", default=True): bool,
@@ -375,11 +368,6 @@ def migrate_config(conf):
         file_conf = {k: v for k, v in headless.items() if k != "enabled"}
         file_conf["type"] = "file"
         outputs.append(file_conf)
-    elif "fb-device" in graphics:
-        outputs.append({
-            "type": "framebuffer",
-            "device": graphics["fb-device"],
-        })
     else:
         output = {
             "type": "window",
@@ -466,7 +454,7 @@ def load_config(filename):
 # Only outputs that put a frame on a screen. A viewer that fetched frames to
 # write them to disk or POST them elsewhere would be a relay, which is not what
 # this is for.
-CLIENT_OUTPUT_TYPES = ("window", "framebuffer")
+CLIENT_OUTPUT_TYPES = ("window",)
 
 
 def _validate_client_output(value):
@@ -474,7 +462,6 @@ def _validate_client_output(value):
         raise voluptuous.Invalid("Each output must be a dict with a 'type' key")
     schemas = {
         "window": voluptuous.Schema(window_output_schema),
-        "framebuffer": voluptuous.Schema(framebuffer_output_schema),
     }
     output_type = value["type"]
     if output_type not in schemas:

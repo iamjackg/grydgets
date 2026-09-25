@@ -48,11 +48,9 @@ offline:
   # How far to darken the last frame: 0 leaves it alone, 1 blacks it out.
   dim: 0.75
 
-# One display output: window or framebuffer.
+# Exactly one window output.
 outputs:
   - type: window
     fullscreen: true
     # x_display: ':0'  # Only needed when starting via SSH
 
-  # - type: framebuffer
-  #   device: /dev/fb1

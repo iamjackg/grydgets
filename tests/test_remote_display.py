@@ -448,7 +448,7 @@ def test_a_client_cannot_configure_an_output_that_shows_nothing(tmp_path):
 
 
 def test_a_client_shows_one_screen(tmp_path):
-    conf = CLIENT + "  - type: framebuffer\n    device: /dev/fb1\n"
+    conf = CLIENT + "  - type: window\n"
     with pytest.raises(ConfigError):
         config.load_client_config(write(tmp_path, "client.yaml", conf))
 
