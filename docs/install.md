@@ -58,26 +58,26 @@ dependencies are installed in that Python.
 The repository includes a Dockerfile and a docker-compose configuration, in case you want to run Grydgets without a
 screen and save the dashboard to disk instead.
 
-1. Create a `data/` directory with your configuration files, fonts, and images:
+1.  Create a `data/` directory with your configuration files, fonts, and images:
 
-```
-data/
-├── conf.yaml
-├── widgets.yaml
-├── providers.yaml
-├── secrets.yaml  # optional
-├── myfont.ttf    # any custom fonts referenced in widgets.yaml
-└── images/       # any images referenced in widgets.yaml
-    └── logo.jpg
-```
+    ```
+    data/
+    ├── conf.yaml
+    ├── widgets.yaml
+    ├── providers.yaml
+    ├── secrets.yaml  # optional
+    ├── myfont.ttf    # any custom fonts referenced in widgets.yaml
+    └── images/       # any images referenced in widgets.yaml
+        └── logo.jpg
+    ```
 
-2. Make sure `conf.yaml` has a file output configured (see [Outputs](configuration/conf-yaml.md#outputs)).
+2.  Make sure `conf.yaml` has a file output configured (see [Outputs](configuration/conf-yaml.md#outputs)).
 
-3. Start the container:
+3.  Start the container:
 
-```bash
-docker compose up -d
-```
+    ```bash
+    docker compose up -d
+    ```
 
 Rendered images are saved to `data/headless_output/`, and the notification endpoint is exposed on port 5000.
 

@@ -1,6 +1,6 @@
 # Theming
 
-The `theme:` block in `widgets.yaml` lets you define colours, fonts and sizes
+The `theme:` block in `widgets.yaml` lets you define colors, fonts and sizes
 once and refer to them by name from the rest of the file. It also lets you set defaults per widget
 type, so that most widgets don't need to specify them at all.
 
@@ -74,7 +74,7 @@ background_image: !image screen
 background_color: !color screen
 ```
 
-If you want a flat colour instead of a wallpaper in one of your themes, set
+If you want a flat color instead of a wallpaper in one of your themes, set
 `images.screen` to `null` and the screen will use `background_color` instead.
 Keep in mind that a [theme file](#theme-files) has to define everything the
 base theme does, so it needs an `images.screen` entry even if it's `null`.
@@ -109,7 +109,7 @@ types, so that you can apply the same defaults to all of them at once:
       font_path: !font regular
 ```
 
-Defaults set on a specific widget type always win over one set on a group
+A default set on a specific widget type always wins over one set on a group
 that the type belongs to.
 
 Keep in mind that if you don't want a specific widget to pick up a default, you have to override it explicitly (for example with `widget_corner_radius: 0`).
@@ -185,7 +185,7 @@ With the default, `next`, you can force the night theme in the afternoon
 and the dashboard will still switch back to the day theme the next morning.
 Use `forever` if you want to keep it that way until you change your mind.
 
-If  there are no coordinates configured, there's no sunrise or sunset to wait for,
+If there are no coordinates configured, there's no sunrise or sunset to wait for,
 so the theme will never change on its own.
 
 You can also `GET` the same URL and receive a report of the current state without changing it:

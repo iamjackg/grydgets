@@ -32,7 +32,7 @@ outputs:
 *   `fps-limit`: the most times per second the dashboard gets redrawn. Clocks update once a
     minute, so 10 is plenty. Keep this low on slow devices like a Raspberry Pi: I use 1 fps on mine.
 *   `resolution`: the size of the dashboard, in pixels.
-*   `logging.level`: `debug`, `info`, or `warning`. `debug` is very verbose, but it's helpful to see how grydgets lays everything out when you're first starting out.
+*   `logging.level`: `debug`, `info`, or `warning`. `debug` is very verbose, but it's helpful to see how Grydgets lays everything out when you're first starting out.
 *   `outputs`: where the finished picture goes. A `window` is the easy one to start with, but this is
     also where you'd configure Grydgets to save to a file on disk or send to
     [another machine entirely](remote-displays.md).
@@ -53,8 +53,8 @@ grydgets
 
 ![A white clock and date on a black background, filling the window](img/tutorial/step-1-clock.png)
 
-There! The clock gets the entire window, since there's nothing else to share it with. Since we didn't specify a `text_size`, the clock grew to fit whatever space it was handed, which is why the numbers are
-quite that enormous.
+There! The clock gets the entire window, since there's nothing else to share it with. We didn't specify a `text_size`, so the clock grew to fit whatever space it was handed, which is why the numbers are
+so enormous.
 
 On startup, Grydgets prints a "Hello from the pygame community" line. That comes from
 [PyGame](https://pyga.me/), the library Grydgets draws with, and you can ignore it. The rest of the
@@ -70,7 +70,7 @@ error will show up.
 To quit, close the window, or click anywhere inside it.
 
 Keep Grydgets running for the rest of the tutorial. You
-can tell it to reload the widget file again without restarting, by running this in another terminal each time
+can tell it to reload the widget file without restarting, by running this in another terminal each time
 you save a change:
 
 ```bash
@@ -115,8 +115,8 @@ starts. Step 3 will make things nicer.
 The widget in each cell is automatically sized to fit its own contents. Since "Hello" is a much shorter string than the date, it gets blown up to a much bigger size to fill its half.
 
 You've probably also noticed that Hello is stuck at the top of its cell, while the clock
-is nicely centred. That's just the defaults: a `text` widget starts at the top left, and `dateclock`
-centres itself. You can change that with `align` (`left`, `center` or `right`) and `vertical_align`
+is nicely centered. That's just the defaults: a `text` widget starts at the top left, and `dateclock`
+centers itself. You can change that with `align` (`left`, `center` or `right`) and `vertical_align`
 (`top`, `center` or `bottom`):
 
 ```yaml
@@ -141,7 +141,7 @@ Cells are all the same size by default. You can use `row_ratios` and `column_rat
 
 ## 3. Make it look nicer
 
-So far it's white text on black. Kinda boring. Thankfully, grids can apply colours to their cells:
+So far it's white text on black. Kinda boring. Thankfully, grids can apply colors to their cells:
 
 ```yaml title="widgets.yaml"
 background_color: '#2e3440'
@@ -167,14 +167,14 @@ widgets:
 applied to every cell separately, so each half of the screen gets its own rounded panel, and you can
 finally see where the grid cells actually are.
 
-!!! warning "Quote your hex colours"
+!!! warning "Quote your hex colors"
 
     An unquoted `#` starts a comment in YAML, so `background_color: #2e3440` would parse as an empty
-    value and Grydgets would stop at startup with `background_color: None is not a colour`.
+    value and Grydgets would stop at startup with `background_color: None is not a color`.
 
 !!! tip
 
-    Every colour parameter also supports `[r, g, b]` lists of floats from 0.0 to 1.0 as well, if you like that better. See
+    Every color parameter also accepts `[r, g, b]` lists with each component from 0 to 255, if you like that better. See
     [Colors](configuration/colors.md).
 
 ## 4. Show live data
@@ -215,7 +215,7 @@ widgets:
             update_frequency: 900
 ```
 
-![The clock in a rounded panel on the left, and the temperature above a small grey Outside caption on the right](img/tutorial/step-4-weather.png)
+![The clock in a rounded panel on the left, and the temperature above a small gray Outside caption on the right](img/tutorial/step-4-weather.png)
 
 The `rest` widget takes these parameters:
 
@@ -228,10 +228,10 @@ The `rest` widget takes these parameters:
 *   `update_frequency`: how often to request new data, in seconds. It defaults to 30, but that's a lot
     to ask of a free service for a number that changes every few hours, so in our example we increased it to 900.
 
-`text_size` is the fix for the problem you saw back in step 2, where Hello came out enormous. The `rest` widget centres its text by default, so you don't need `align` here.
+`text_size` is the fix for the problem you saw back in step 2, where Hello came out enormous. The `rest` widget centers its text by default, so you don't need `align` here.
 
 The `rest` widget is the child of a `label`, which takes `position: below` to put the caption under its child instead of
-above it. `color` is set to grey rather than white like the temperature, so the two lines
+above it. `color` is set to gray rather than white like the temperature, so the two lines
 don't compete visually. The caption always gets a third of the cell's height, which is why there's a bit of a
 gap between the two in a cell this tall. We'll fix this in the next step, where the cells get
 shorter.
@@ -243,8 +243,8 @@ hold another grid, so the right-hand half can be split into three readouts of it
 
 There's one snag. A grid paints `widget_background_color` behind *every* one of its cells, so leaving
 it on the outer grid would put a panel behind the inner grid, and then the inner grid would paint
-three more panels on top of it. To avoid that, we'll change the outer grid to not paint anything, the inner one
-paints its three cells, and the clock gets its own background parameter: `dateclock` takes a `background_color`
+three more panels on top of it. To avoid that, we'll change the outer grid so it doesn't paint anything, let the inner one
+paint its three cells, and give the clock its own background: `dateclock` takes a `background_color`
 and a `corner_radius` directly, so you don't have to wrap it in a grid to give it a panel.
 
 ```yaml title="widgets.yaml"
@@ -364,7 +364,7 @@ That's it for the basics. Every dashboard is a tree of widgets, where some of th
 others and some of them go off and fetch data. Most of what's left to learn is the individual
 widgets and their parameters.
 
-The dashboard you just built still has a couple things to improve on. Reading the rest of the documentation shows you how to deal with them. The first is that `'#3b4252'`, `text_size: 22` and `color: '#a3afc2'` are written
+The dashboard you just built still has a couple of things to improve on. Reading the rest of the documentation shows you how to deal with them. The first is that `'#3b4252'`, `text_size: 22` and `color: '#a3afc2'` are written
 out three and four times each, so if you want to change the look of the dashboard you have to change
 every copy. [Theming](theming.md) lets you give those values names and set more defaults, the same
 way you just did for fonts. The second is that three widgets are asking wttr.in for the same JSON
@@ -376,7 +376,7 @@ see [providers.yaml](configuration/providers-yaml.md).
 *   [How the config files fit together](config-files.md) covers the two files you just wrote and the
     two you didn't, and when you'd want them.
 *   [Widgets](widgets/index.md) lists all 17 of them, with every parameter.
-*   [Theming](theming.md) gives colours, fonts and sizes names, and sets defaults per widget type so
+*   [Theming](theming.md) gives colors, fonts and sizes names, and sets defaults per widget type so
     that most widgets don't have to mention them at all.
 *   [Remote displays](remote-displays.md), for when the screen on which you want to display the dashboard isn't the machine
     you want to render it on.

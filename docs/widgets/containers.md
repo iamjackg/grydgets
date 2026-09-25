@@ -18,11 +18,11 @@ inside each other. It's also the easiest way to give a group of widgets matching
 *   `rows`: The number of rows in the grid.
 *   `columns`: The number of columns in the grid.
 *   `padding` _(optional)_: The gap around each child, in pixels. Defaults to `0`.
-*   `background_color` _(optional)_: A colour for the grid itself, which shows through between and behind the cells.
+*   `background_color` _(optional)_: A color for the grid itself, which shows through between and behind the cells.
     See [Colors](../configuration/colors.md).
-*   `widget_background_color` _(optional)_: A colour painted behind each child, inside its cell. See
+*   `widget_background_color` _(optional)_: A color painted behind each child, inside its cell. See
     [Colors](../configuration/colors.md).
-*   `widget_background_colors` _(optional)_: Per-cell background colours, overriding `widget_background_color` for the
+*   `widget_background_colors` _(optional)_: Per-cell background colors, overriding `widget_background_color` for the
     cells they name. See [Per-cell overrides](#per-cell-overrides).
 *   `corner_radius` _(optional)_: The corner radius of the grid's own background, in pixels. Defaults to `0`.
 *   `widget_corner_radius` _(optional)_: The corner radius of each child's background, in pixels. Defaults to `0`.
@@ -95,7 +95,7 @@ covers the child. It's basically a simpler version of a grid with a very specifi
 *   `font_path` _(optional)_: The path to a `.ttf` file to use for the label.
 *   `position` _(optional)_: `above` or `below` the child. Defaults to `above`.
 *   `text_size` _(optional)_: The size of the label text in pixels.
-*   `color` _(optional)_: The colour of the label text, see [Colors](../configuration/colors.md). Defaults to
+*   `color` _(optional)_: The color of the label text, see [Colors](../configuration/colors.md). Defaults to
     `[255, 255, 255]` (white).
 
 ### Example
@@ -129,7 +129,7 @@ alternates between today's weather and tomorrow's.
 *   `interval` _(optional)_: How long each child stays on screen, in seconds. Defaults to `5`.
 *   `transition` _(optional)_: How long the slide to the next child takes, in seconds. Set it to `0` to switch
     instantly. Defaults to `1`.
-*   `ease` _(optional)_: How fast the slide speeds up and slows down. Higher values start and end the slide more
+*   `ease` _(optional)_: How much the slide speeds up and slows down. Higher values start and end the slide more
     abruptly. Defaults to `2`.
 
 ### Example
@@ -207,8 +207,6 @@ that returns `True` when the garage door is open, so the flip can switch from th
     instantly. Defaults to `1`.
 *   `ease` _(optional)_: How much the slide speeds up and slows down. Defaults to `2`.
 
-Use `update_frequency` to change how often the request is made.
-
 ### Example
 
 ```yaml
@@ -246,17 +244,17 @@ temperature on a camera image. With `circular_mask`, the picture gets cropped in
 
 *   `children`: Exactly two children. The first one is the base, and the second one is drawn inside the pill.
 *   `circular_mask` _(optional)_: If `true`, crops the base child into a circle. Defaults to `false`.
-*   `widget_background_color` _(optional)_: A colour painted behind the base child when `circular_mask` is on. See
+*   `widget_background_color` _(optional)_: A color painted behind the base child when `circular_mask` is on. See
     [Colors](../configuration/colors.md).
-*   `pill_background_color` _(optional)_: The colour of the pill. See [Colors](../configuration/colors.md). Defaults
+*   `pill_background_color` _(optional)_: The color of the pill. See [Colors](../configuration/colors.md). Defaults
     to transparent.
 *   `pill_width_percent` _(optional)_: The width of the pill, as a fraction of the container's width. Defaults to
     `0.8`.
 *   `pill_height_percent` _(optional)_: The height of the pill, as a fraction of the container's height. Defaults to
     `0.2`.
-*   `pill_position_x` _(optional)_: Where the centre of the pill goes horizontally, from `0.0` (left edge) to `1.0`
+*   `pill_position_x` _(optional)_: Where the center of the pill goes horizontally, from `0.0` (left edge) to `1.0`
     (right edge). Defaults to `0.5`.
-*   `pill_position_y` _(optional)_: Where the centre of the pill goes vertically, from `0.0` (top) to `1.0` (bottom).
+*   `pill_position_y` _(optional)_: Where the center of the pill goes vertically, from `0.0` (top) to `1.0` (bottom).
     Defaults to `0.8`.
 *   `pill_corner_radius` _(optional)_: The corner radius of the pill, in pixels. If you leave it out, the ends are
     fully rounded.

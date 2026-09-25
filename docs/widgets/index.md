@@ -40,7 +40,7 @@ Every widget page lists the widget's parameters, a "When you'd want this" sectio
 | Widget | What it does |
 |---|---|
 | [`restimage`](images.md#restimage) | Periodically fetches an image and displays it |
-| [`empty`](images.md#empty) | Takes up space, optionally as a coloured block or divider |
+| [`empty`](images.md#empty) | Takes up space, optionally as a colored block or divider |
 
 **Provider widgets.** They read from a shared provider defined in [`providers.yaml`](../configuration/providers-yaml.md) instead of making their own requests.
 

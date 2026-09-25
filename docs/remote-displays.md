@@ -11,7 +11,7 @@ themselves. A big dashboard with hundreds of widgets at 1080p can take a Raspber
 draw that the clock might end up half a minute late, while a desktop can draw it quickly and
 run at a higher `fps-limit`.
 
-If you have a display device that can't run `grydgets-client` but it accepts some form of image upload, like a WiFi photo frame or a signage box, you can push frames to it with a [`post` output](#pushing-frames-with-a-post-output) instead.
+If you have a display device that can't run `grydgets-client` but accepts some form of image upload, like a WiFi photo frame or a signage box, you can push frames to it with a [`post` output](#pushing-frames-with-a-post-output) instead.
 
 ## On the rendering host
 
@@ -77,7 +77,7 @@ outputs:
 *   `offline.enabled` _(optional)_: Show the [offline screen](#when-the-server-goes-away) instead of the warning triangle. Defaults to `false`.
 *   `offline.message` _(optional)_: The text shown under the offline screen's clock. Defaults to `Dashboard server unavailable`.
 *   `offline.clock_format` _(optional)_: `strftime` format for the offline screen's clock. Defaults to `%H:%M`.
-*   `offline.dim` _(optional)_: How much to darken the last succesfully downloaded frame in the background when displaying the offline screen, from `0` (not at all) to `1` (completely black). Defaults to `0.75`.
+*   `offline.dim` _(optional)_: How much to darken the last successfully downloaded frame in the background when displaying the offline screen, from `0` (not at all) to `1` (completely black). Defaults to `0.75`.
 *   `outputs`: Exactly one `window` output, configured the same way as [on the server](configuration/conf-yaml.md#window). On a device without a desktop, see [Running without a desktop](configuration/conf-yaml.md#running-without-a-desktop).
 
 ## When the server goes away
@@ -105,7 +105,7 @@ waits five minutes before trying again.
 
 Render the dashboard at the resolution of your largest screen, and let the
 smaller ones ask for a scaled-down copy. That way the layout is only drawn once, at the
-host's resolution, and then shrunk for each screen direclty on the host itself, so you don't need to adjust
+host's resolution, and then shrunk for each screen directly on the host itself, so you don't need to adjust
 `text_size` or `text-scale` for the smaller ones. This also helps a lot on weak hardware, where down- or upscaling a large frame can take much longer than displaying it.
 
 `graphics.smooth-scaling` doesn't have any effect on these frames: they're
@@ -172,7 +172,7 @@ Example returned data:
 The idea is that whenever you receive an event telling you that there's a new frame, you can request that frame:
 
 ```
-GET /frame                        # reeturns the current frame, with a unique ETag
+GET /frame                        # returns the current frame, with a unique ETag
   ?width=1366&height=768          # optional: encode it at this size
   
 You can optionally supply this header:  

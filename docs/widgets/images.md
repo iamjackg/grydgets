@@ -65,16 +65,16 @@ from an API. For example, if a weather API returns `"cloudy"`, this shows `image
 
 ## empty
 
-Takes up space without drawing anything, or fills it with a flat colour.
+Takes up space without drawing anything, or fills it with a flat color.
 
 ### When you'd want this
 
 Use it to leave a hole in a grid, to push other widgets into place, or, with a `color`, as a divider line or a plain
-coloured block.
+colored block.
 
 ### Parameters
 
-*   `color` _(optional)_: The colour to fill the widget with, see [Colors](../configuration/colors.md). If you leave
+*   `color` _(optional)_: The color to fill the widget with, see [Colors](../configuration/colors.md). If you leave
     it out, the widget is fully transparent.
 *   `corner_radius` _(optional)_: The corner radius of `color`, in pixels. Defaults to `0`.
 

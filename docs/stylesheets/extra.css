@@ -1,5 +1,5 @@
 /* Section headers in the sidebar otherwise look like the pages under them.
-   They're kept out of the primary colour, since that already marks the
+   They're kept out of the primary color, since that already marks the
    current page. The width matches the one where navigation.sections starts
    rendering sections as headers instead of drill-down menus. */
 @media screen and (min-width: 76.25em) {

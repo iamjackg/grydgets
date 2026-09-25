@@ -36,12 +36,12 @@ violations are shown as warnings when you save, but they never stop you from sav
 `!secret` values, and any field that contains one (like `auth.bearer`), are shown read-only. You can't edit them
 through the editor.
 
-Theme tokens are kept as they are when you edit a widget. Colour, font path, image path and numeric fields have a
+Theme tokens are kept as they are when you edit a widget. Color, font path, image path and numeric fields have a
 **value / theme** switch, so you can either pick an entry from the matching theme section (`!color panel`,
 `!font bold`, `!image screen`, `!size radius`) or type a plain value. A token on any other kind of field is shown as
 written and left alone. The same goes for the screen's own `background_image` and `background_color`.
 
-A field that gets its value from [`theme.defaults`](theming.md) is shown greyed out, along with the entry it came
+A field that gets its value from [`theme.defaults`](theming.md) is shown grayed out, along with the entry it came
 from (`from theme: text-like`) and the value it resolves to. **Override** copies that value onto the widget so you
 can edit it there, and **remove** drops the override and goes back to the theme default. Defaults are never written
 to the file.

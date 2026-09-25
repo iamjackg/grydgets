@@ -17,9 +17,9 @@ widgets:
       - widget: text
         text: 'Top left'
       - widget: text
-        text: 'Top right'
-      - widget: text
         text: 'Bottom left'
+      - widget: text
+        text: 'Top right'
       - widget: text
         text: 'Bottom right'
 ```

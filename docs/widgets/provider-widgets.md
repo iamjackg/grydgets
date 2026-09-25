@@ -34,9 +34,9 @@ The template can read any entity in Home Assistant, so you can combine several o
     setting things up. Defaults to `false`.
 *   `font_path` _(optional)_: The path to a `.ttf` file to use.
 *   `text_size` _(optional)_: The size of the text in pixels. If you leave it out, the text grows to fit the widget.
-*   `color` _(optional)_: The colour of the text, see [Colors](../configuration/colors.md). Defaults to
+*   `color` _(optional)_: The color of the text, see [Colors](../configuration/colors.md). Defaults to
     `[255, 255, 255]` (white).
-*   `background_color` _(optional)_: A colour painted behind the text, see [Colors](../configuration/colors.md). It
+*   `background_color` _(optional)_: A color painted behind the text, see [Colors](../configuration/colors.md). It
     covers the whole widget, and `padding` only moves the text inward. If you leave it out, the widget is transparent.
 *   `corner_radius` _(optional)_: The corner radius of `background_color`, in pixels. Defaults to `0`.
 *   `padding` _(optional)_: The gap around the text, in pixels. Defaults to `6`.
@@ -191,7 +191,7 @@ Draws a bar chart from a list of numbers in provider data. It's deliberately min
 ### When you'd want this
 
 Use it for a quick sense of how something changes over time, like the chance of rain for each of the next 24 hours,
-or energy use per day for the last week. The bars can be coloured by value, and you can add optional labels
+or energy use per day for the last week. The bars can be colored by value, and you can add optional labels
 underneath and guide lines behind them.
 
 ### Parameters
@@ -199,14 +199,14 @@ underneath and guide lines behind them.
 *   `providers`: A list with exactly one provider name.
 *   `data_path` _(optional)_: A path to the list of values.
 *   `jq_expression` _(optional)_: A jq expression that returns a JSON array of numbers.
-*   `bar_color` _(optional)_: The default colour of the bars, see [Colors](../configuration/colors.md). Defaults to
+*   `bar_color` _(optional)_: The default color of the bars, see [Colors](../configuration/colors.md). Defaults to
     `[100, 149, 237]` (cornflower blue).
-*   `bar_colors` _(optional)_: A mapping of labels to colours. A bar whose label matches a key is drawn in that
-    colour, regardless of `bar_color_thresholds` and `bar_color`.
+*   `bar_colors` _(optional)_: A mapping of labels to colors. A bar whose label matches a key is drawn in that
+    color, regardless of `bar_color_thresholds` and `bar_color`.
 *   `bar_color_thresholds` _(optional)_: A list of `{above: <value>, color: <color>}` entries. Each bar gets the
-    colour of the highest threshold that its value is at or above. If it's below all of them, it gets `bar_color`.
-*   `bar_background_colors` _(optional)_: A mapping of labels to colours. The matching bar gets a full-height
-    rectangle of that colour behind it. Use this to mark specific bars, like midnight on an hourly chart: the
+    color of the highest threshold that its value is at or above. If it's below all of them, it gets `bar_color`.
+*   `bar_background_colors` _(optional)_: A mapping of labels to colors. The matching bar gets a full-height
+    rectangle of that color behind it. Use this to mark specific bars, like midnight on an hourly chart: the
     background is visible even when the bar's value is zero.
 *   `bar_gap` _(optional)_: The gap between bars, in pixels. Defaults to `2`.
 *   `max_value` _(optional)_: The value at the top of the chart. If you leave it out, the chart scales to the largest
@@ -216,18 +216,18 @@ underneath and guide lines behind them.
 *   `midline` _(optional)_: If `true`, draws a horizontal line at the halfway point, behind the bars. Defaults to
     `false`.
 *   `midline_thickness` _(optional)_: The thickness of the midline, in pixels. Defaults to `1`.
-*   `midline_color` _(optional)_: The colour of the midline, see [Colors](../configuration/colors.md). Defaults to
+*   `midline_color` _(optional)_: The color of the midline, see [Colors](../configuration/colors.md). Defaults to
     `[255, 255, 255]` (white).
 *   `quartline` _(optional)_: If `true`, draws horizontal lines at the 25% and 75% points, behind the bars. Defaults
     to `false`.
 *   `quartline_thickness` _(optional)_: The thickness of the quartlines, in pixels. Defaults to `1`.
-*   `quartline_color` _(optional)_: The colour of the quartlines, see [Colors](../configuration/colors.md). Defaults
+*   `quartline_color` _(optional)_: The color of the quartlines, see [Colors](../configuration/colors.md). Defaults
     to `[255, 255, 255]` (white).
 *   `labels_jq_expression` _(optional)_: A jq expression that returns a JSON array of strings, one label per bar.
 *   `labels_data_path` _(optional)_: A path to the list of labels, if you don't need jq for them.
 *   `label_font_path` _(optional)_: The path to a `.ttf` file to use for the labels.
 *   `label_size` _(optional)_: The size of the labels, in pixels. Defaults to `12`.
-*   `label_color` _(optional)_: The colour of the labels, see [Colors](../configuration/colors.md). Defaults to
+*   `label_color` _(optional)_: The color of the labels, see [Colors](../configuration/colors.md). Defaults to
     `[200, 200, 200]`.
 
 ### Example

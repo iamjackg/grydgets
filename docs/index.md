@@ -14,7 +14,7 @@ that supports Python, PyGame, and SDL, from the oldest Raspberry Pi to a full-bl
     response.
 *   **Several outputs at once**: a window, a PNG on disk, an HTTP POST to a networked display, or
     a live stream to other machines. See [Outputs](configuration/conf-yaml.md#outputs).
-*   **[Themes](theming.md)** that move colours, fonts and sizes out of the layout, including a day and a night theme
+*   **[Themes](theming.md)** that move colors, fonts and sizes out of the layout, including a day and a night theme
     that follow the sun.
 *   **[Remote displays](remote-displays.md)**: render on one machine and show the result on several others with
     `grydgets-client`.

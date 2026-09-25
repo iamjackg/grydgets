@@ -15,9 +15,9 @@ laying out a dashboard. If the text needs to come from somewhere, use [`rest`](#
 *   `text` _(optional)_: The text to display. Defaults to an empty string.
 *   `text_size` _(optional)_: The size of the text in pixels. If you leave it out, the text grows to fit the widget.
 *   `font_path` _(optional)_: The path to a `.ttf` file to use. If you leave it out, PyGame's default font is used.
-*   `color` _(optional)_: The colour of the text, see [Colors](../configuration/colors.md). Defaults to
+*   `color` _(optional)_: The color of the text, see [Colors](../configuration/colors.md). Defaults to
     `[255, 255, 255]` (white).
-*   `background_color` _(optional)_: A colour painted behind the text, see [Colors](../configuration/colors.md). It
+*   `background_color` _(optional)_: A color painted behind the text, see [Colors](../configuration/colors.md). It
     covers the whole widget, and `padding` only moves the text inward. If you leave it out, the widget is transparent.
 *   `corner_radius` _(optional)_: The corner radius of `background_color`, in pixels. Defaults to `0`.
 *   `padding` _(optional)_: The gap around the text, in pixels. Defaults to `0`.
@@ -46,18 +46,18 @@ Displays a 24-hour clock, with the current date underneath.
 
 ### When you'd want this
 
-Use it whenever you want the time and date on the dashboard. The time and the date are drawn as separate lines with their own font and colour, so you can do cool stuff like use a serif display font for the time
+Use it whenever you want the time and date on the dashboard. The time and the date are drawn as separate lines with their own font and color, so you can do cool stuff like use a serif display font for the time
 and a sans-serif one for the date.
 
 ### Parameters
 
 *   `time_font_path`: The path to a `.ttf` file to use for the time.
 *   `date_font_path`: The path to a `.ttf` file to use for the date.
-*   `color` _(optional)_: The colour of both lines, see [Colors](../configuration/colors.md). Defaults to
+*   `color` _(optional)_: The color of both lines, see [Colors](../configuration/colors.md). Defaults to
     `[255, 255, 255]` (white).
-*   `time_color` _(optional)_: The colour of the time only. Overrides `color` for the time.
-*   `date_color` _(optional)_: The colour of the date only. Overrides `color` for the date.
-*   `background_color` _(optional)_: A colour painted behind the clock, see [Colors](../configuration/colors.md).
+*   `time_color` _(optional)_: The color of the time only. Overrides `color` for the time.
+*   `date_color` _(optional)_: The color of the date only. Overrides `color` for the date.
+*   `background_color` _(optional)_: A color painted behind the clock, see [Colors](../configuration/colors.md).
 *   `corner_radius` _(optional)_: The corner radius of `background_color`, in pixels. Defaults to `0`.
 
 ### Example
@@ -101,9 +101,9 @@ so the request is only made once.
     change while the dashboard is running. Defaults to `false`.
 *   `font_path` _(optional)_: The path to a `.ttf` file to use. If you leave it out, PyGame's default font is used.
 *   `text_size` _(optional)_: The size of the text in pixels. If you leave it out, the text grows to fit the widget.
-*   `color` _(optional)_: The colour of the text, see [Colors](../configuration/colors.md). Defaults to
+*   `color` _(optional)_: The color of the text, see [Colors](../configuration/colors.md). Defaults to
     `[255, 255, 255]` (white).
-*   `background_color` _(optional)_: A colour painted behind the text, see [Colors](../configuration/colors.md). It
+*   `background_color` _(optional)_: A color painted behind the text, see [Colors](../configuration/colors.md). It
     covers the whole widget, and `padding` only moves the text inward. If you leave it out, the widget is transparent.
 *   `corner_radius` _(optional)_: The corner radius of `background_color`, in pixels. Defaults to `0`.
 *   `padding` _(optional)_: The gap around the text, in pixels. Defaults to `6`.

@@ -25,7 +25,7 @@
           "maxItems": 4
         },
         {
-          "description": "A CSS-style hex string (#rgb, #rgba, #rrggbb, #rrggbbaa) or a colour name. Names are validated at load time, not here.",
+          "description": "A CSS-style hex string (#rgb, #rgba, #rrggbb, #rrggbbaa) or a color name. Names are validated at load time, not here.",
           "type": "string",
           "pattern": "^(#([0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})|[a-zA-Z]+[0-9]*)$"
         }

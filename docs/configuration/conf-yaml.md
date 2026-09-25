@@ -18,7 +18,7 @@ graphics:
 
 *   `fps-limit`: Maximum frames per second. Defaults to `60`.
 *   `resolution`: Screen resolution as `[width, height]`.
-*   `smooth-scaling` _(optional)_: Use bilinear filtering when scaling images (`true`, the default) or the faster but uglier nearest-neighbour (`false`). Set it to `false` on slow hardware like a Raspberry Pi 2.
+*   `smooth-scaling` _(optional)_: Use bilinear filtering when scaling images (`true`, the default) or the faster but uglier nearest-neighbor (`false`). Set it to `false` on slow hardware like a Raspberry Pi 2.
 *   `flip` _(optional)_: Rotates the output 180 degrees. Defaults to `false`.
 *   `text-scale` _(optional)_: A multiplier applied to every text size in `widgets.yaml`, see below. Defaults to `1.0`.
 
@@ -59,7 +59,7 @@ outputs:
     fullscreen: true
 ```
 
-If no `outputs` key is present, Grydgets falls back to legacy behavior based on the `graphics` and `headless` keys (see [Legacy Configuration](#legacy-configuration)).
+If no `outputs` key is present, Grydgets falls back to legacy behavior based on the `graphics` and `headless` keys (see [Legacy configuration](#legacy-configuration)).
 
 You need at least one output. You can have at most one `window` output, and as many of the others (`file`, `post`,
 `stream`) as you like. If you don't configure a `window`, Grydgets doesn't need a screen at all, so you can run it on a
