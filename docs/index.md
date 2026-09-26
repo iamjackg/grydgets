@@ -3,7 +3,8 @@
 Grydgets draws widget-based dashboards that update in real time, showing local and online data. You describe the dashboard as a tree of container and data widgets in a YAML file. It runs on anything
 that supports Python, PyGame, and SDL, from the oldest Raspberry Pi to a full-blown modern PC.
 
-![A Grydgets dashboard](img/grydgets-window.png)
+![A Grydgets dashboard with a dark theme](img/grydgets-dashboard-dark.png#only-light)
+![A Grydgets dashboard with a light theme](img/grydgets-dashboard-light.png#only-dark)
 
 ## What it can do
 

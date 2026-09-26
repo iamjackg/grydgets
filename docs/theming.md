@@ -4,6 +4,11 @@ The `theme:` block in `widgets.yaml` lets you define colors, fonts and sizes
 once and refer to them by name from the rest of the file. It also lets you set defaults per widget
 type, so that most widgets don't need to specify them at all.
 
+<figure markdown="span">
+  ![The same dashboard rendered with four theme files, two light and two dark](img/theming-grid.webp)
+  <figcaption>The same widgets file rendered with four different theme files. Only the colors, fonts and corner radius change.</figcaption>
+</figure>
+
 ```yaml
 theme:
   colors:

@@ -3,7 +3,7 @@
 Grydgets draws widget-based dashboards that update in real time, showing local and online data. It runs on anything
 that supports Python, PyGame, and SDL, from the oldest Raspberry Pi to a full-blown modern PC.
 
-![A Grydgets dashboard](images/grydgets-window.png)
+![A Grydgets dashboard](images/grydgets-dashboard.png)
 
 **The full documentation is at [iamjackg.github.io/grydgets](https://iamjackg.github.io/grydgets/).**
 
