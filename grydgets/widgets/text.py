@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import datetime
 import logging
-from typing import Any
+from functools import lru_cache
+from typing import Any, Callable
 
 import pygame
 
@@ -16,10 +17,38 @@ from grydgets.fonts import FontCache, scale_text_size
 font_cache = FontCache()
 
 
-def fit_font(font_path: str | None, text: str, size: int, max_width: int) -> tuple[pygame.font.Font, int]:
-    """The font at ``size``, shrunk one step at a time until ``text`` fits ``max_width``."""
+# Letters that reach the usual descender depth.
+DESCENDER_REFERENCE = "gjpqy"
+
+
+@lru_cache(maxsize=64)
+def descender_depth(font: pygame.font.Font) -> int:
+    """How far below the baseline the font's descenders reach, in pixels.
+
+    Measured from real glyphs, since a font's declared descent can be much
+    deeper than its letters go. It's the same for every string in the font,
+    so text with and without descenders is sized the same way.
+    """
+    glyphs = [m for m in font.metrics(DESCENDER_REFERENCE) if m is not None]
+    if not glyphs:
+        return -font.get_descent()
+    return max(0, -min(m[2] for m in glyphs))
+
+
+def fit_font(
+    font_path: str | None,
+    text: str,
+    size: int,
+    max_width: int,
+    fits_height: Callable[[pygame.font.Font, int], bool] | None = None,
+) -> tuple[pygame.font.Font, int]:
+    """The font at ``size``, shrunk one step at a time until ``text`` fits
+    ``max_width`` and, if given, ``fits_height(font, size)`` is true."""
     font = font_cache.get_font(font_path, size)
-    while font.size(text)[0] > max_width and size > 1:
+    while size > 1 and (
+        font.size(text)[0] > max_width
+        or (fits_height is not None and not fits_height(font, size))
+    ):
         size -= 1
         font = font_cache.get_font(font_path, size)
     return font, size
@@ -71,6 +100,23 @@ class TextWidget(Widget):
             self.background_color = parsed
             self.dirty = True
 
+    def _descenders_fit(self, font: pygame.font.Font, text_size: int) -> bool:
+        """Whether descenders stay inside the widget at this size.
+
+        Alignment only counts the part of the text above the baseline, so
+        descenders hang below the aligned box, and may hang into the bottom
+        padding. Bottom alignment puts the baseline on the bottom edge of the
+        text area, so no size helps there.
+        """
+        available = self.size[1] - self.padding * 2
+        above_baseline = text_size + font.get_descent()
+        depth = descender_depth(font)
+        if self.vertical_align == "center":
+            return above_baseline + 2 * depth <= available + 2 * self.padding
+        if self.vertical_align == "top":
+            return above_baseline + depth <= available + self.padding
+        return True
+
     def render(self, size: tuple[int, int]) -> pygame.Surface:
         super().render(size)
         if self.dirty:
@@ -91,7 +137,9 @@ class TextWidget(Widget):
             text_size = (
                 scale_text_size(self.text_size) if self.text_size else real_size[1]
             )
-            font, text_size = fit_font(self.font_path, self.text, text_size, real_size[0])
+            font, text_size = fit_font(
+                self.font_path, self.text, text_size, real_size[0], self._descenders_fit
+            )
             text_surface = font.render(self.text, True, self.color)
 
             blit_coordinates = [self.padding, self.padding]
